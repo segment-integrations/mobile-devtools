@@ -8,6 +8,11 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      is_release: ${{ steps.check.outputs.is_release }}
+      tag: ${{ steps.check.outputs.tag }}
+      mcp_bumped: ${{ steps.check-mcp.outputs.mcp_bumped }}
+      mcp_version: ${{ steps.check-mcp.outputs.mcp_version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -29,6 +34,20 @@ jobs:
             echo "is_release=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Check if devbox-mcp was bumped
+        id: check-mcp
+        if: steps.check.outputs.is_release == 'true'
+        run: |
+          if git diff --name-only HEAD~1 HEAD | grep -q '^plugins/devbox-mcp/package.json$'; then
+            VERSION=$(jq -r '.version' plugins/devbox-mcp/package.json)
+            echo "mcp_bumped=true" >> "$GITHUB_OUTPUT"
+            echo "mcp_version=$VERSION" >> "$GITHUB_OUTPUT"
+            echo "devbox-mcp version bumped to $VERSION"
+          else
+            echo "mcp_bumped=false" >> "$GITHUB_OUTPUT"
+            echo "devbox-mcp not changed in this release"
+          fi
+
       - name: Create GitHub Release
         if: steps.check.outputs.is_release == 'true' && steps.check.outputs.tag != ''
         env:
@@ -37,3 +56,34 @@ jobs:
           gh release create "${{ steps.check.outputs.tag }}" \
             --title "${{ steps.check.outputs.tag }}" \
             --notes "${{ steps.check.outputs.body }}"
+
+  npm-publish:
+    name: Publish devbox-mcp to npm
+    runs-on: ubuntu-latest
+    needs: check-release
+    if: needs.check-release.outputs.is_release == 'true' && needs.check-release.outputs.mcp_bumped == 'true'
+    environment:
+      name: npm-publish
+      url: https://www.npmjs.com/package/devbox-mcp/v/${{ needs.check-release.outputs.mcp_version }}
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        working-directory: plugins/devbox-mcp
+        run: npm ci
+
+      - name: Publish to npm
+        working-directory: plugins/devbox-mcp
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          echo "Publishing devbox-mcp@${{ needs.check-release.outputs.mcp_version }} to npm"
+          npm publish --access public
