@@ -55,15 +55,16 @@ devbox run stop:sim
 
 ## Build and Deploy
 
+Build and deploy scripts are project-specific. Define them in your `devbox.json`.
+
 ```bash
-# Build app
-devbox run build
-
-# Build, install, and launch app
-devbox run start:ios
-
-# Build and run on specific device
-devbox run start:ios iphone15
+# User-defined scripts (add to your devbox.json shell.scripts):
+# "build": ["xcodebuild -project ${IOS_APP_PROJECT} -scheme ${IOS_APP_SCHEME} ..."]
+# "start:app": [
+#   "ios.sh simulator start ${1:-}",
+#   "xcrun simctl install booted path/to/app.app",
+#   "xcrun simctl launch booted ${IOS_APP_BUNDLE_ID}"
+# ]
 ```
 
 ## Configuration
@@ -134,12 +135,12 @@ launchctl kickstart -k gui/$UID/com.apple.CoreSimulatorService
 
 ## Testing
 
-```bash
-# Run fast tests
-devbox run test:fast
+Test scripts are project-specific. Define them in your `devbox.json`.
 
-# Run E2E tests
-devbox run test:e2e
+```bash
+# User-defined scripts (add to your devbox.json shell.scripts):
+# "test": ["xcodebuild ... test"]
+# "test:e2e": ["process-compose -f tests/test-suite.yaml --no-server"]
 ```
 
 ## Files and Directories
@@ -151,9 +152,9 @@ devbox.d/ios/
     ├── max.json
     └── devices.lock   # Generated lock file
 
-.devbox/virtenv/ios/   # Runtime directory (auto-regenerated)
+.devbox/virtenv/ios/   # Runtime directory (auto-regenerated, never edit)
 ├── scripts/           # Plugin scripts
-└── DerivedData/       # Build output
+└── DerivedData/       # Build output (if configured)
 
 reports/
 ├── logs/             # Test logs

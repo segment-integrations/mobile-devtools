@@ -3,10 +3,10 @@
 ## Files
 
 - `.devbox/virtenv/android/android.json` — generated config (created from env vars for Nix flake evaluation)
-- `devbox.d/android/devices/*.json` — device definitions
-- `devbox.d/android/devices.lock` — resolved API list for the SDK flake
+- Device definitions in your devbox.d directory (e.g., `devbox.d/android/devices/*.json`)
+- `devices/devices.lock` in your devbox.d directory — resolved API list for the SDK flake
 - `.devbox/virtenv/android/scripts` — runtime scripts (added to PATH)
-- `devbox.d/android/flake.nix` — SDK flake (device APIs drive evaluation)
+- `.devbox/virtenv/android/flake.nix` — SDK flake (device APIs drive evaluation)
 
 ## Device definition schema
 
@@ -61,7 +61,7 @@ Configure the plugin by setting environment variables in `plugin.json`. These ar
 
 ### Run app
 
-- `devbox run start [apk_path] [device]`
+- `devbox run --pure android.sh run [apk_path] [device]`
   - Builds, installs, and launches the app on the emulator
   - If `apk_path` is provided, skips build step and installs provided APK
   - If no arguments, builds project and installs APK matched by `ANDROID_APP_APK`

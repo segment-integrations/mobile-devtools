@@ -9,8 +9,8 @@ This document describes the testing infrastructure for the Devbox mobile plugins
 Tests are designed to provide fast feedback during development while ensuring comprehensive coverage before merging. The test suite uses process-compose for orchestration, enabling parallel execution, automatic dependency management, and health checks.
 
 **Key principles:**
-- Fast tests run frequently during development (1-3 minutes)
-- Slow tests run before merging or in CI (10-30 minutes)
+- Fast tests run frequently during development
+- Slow tests run before merging or in CI
 - Tests are isolated and reproducible
 - All tests use project-local state (no global pollution)
 - Process-compose orchestrates complex workflows
@@ -19,11 +19,11 @@ Tests are designed to provide fast feedback during development while ensuring co
 
 Tests are organized into three categories by speed and scope:
 
-| Category | Speed | Purpose | When to Run |
-|----------|-------|---------|-------------|
-| **Fast Tests** | 1-3 min | Linting, unit tests, integration tests | After every code change |
-| **Plugin Tests** | 2-5 min | Plugin script validation | Before committing |
-| **E2E Tests** | 10-30 min | Full workflow with emulators/simulators | Before merging, in CI |
+| Category | Purpose | When to Run |
+|----------|---------|-------------|
+| **Fast Tests** | Linting, unit tests, integration tests | After every code change |
+| **Plugin Tests** | Plugin script validation | Before committing |
+| **E2E Tests** | Full workflow with emulators/simulators | Before merging, in CI |
 
 ## Test Categories
 
@@ -151,16 +151,16 @@ Phase 2: React Native (after Android + iOS complete)
 
 ```bash
 # Fast feedback during development
-devbox run test:fast               # Lint + unit + integration (~2-3 min)
+devbox run test:fast               # Lint + unit + integration
 
 # Before committing
-devbox run test:plugin:unit        # All plugin tests (~3-5 min)
+devbox run test:plugin:unit        # All plugin tests
 
 # Before merging
-devbox run test:e2e                # Full E2E suite (~15-20 min)
+devbox run test:e2e                # Full E2E suite
 
 # Everything
-devbox run test                    # Fast + E2E (~20-25 min)
+devbox run test                    # Fast + E2E
 ```
 
 ### Platform-Specific Tests
@@ -656,12 +656,12 @@ The repository includes two main CI workflows:
 
 **1. PR Fast Checks (`pr-checks.yml`):**
 - Runs automatically on every PR and push to main
-- Fast validation (~30-40 minutes)
+- Fast validation
 - Linting, unit tests, quick smoke tests
 
 **2. Full E2E Tests (`e2e-full.yml`):**
 - Manual trigger or weekly schedule
-- Comprehensive testing (~45-60 minutes per platform)
+- Comprehensive testing
 - Tests min/max platform versions (API 21-36, iOS 15.4-18.2)
 
 ### Running Tests in CI

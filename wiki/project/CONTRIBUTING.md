@@ -420,12 +420,12 @@ devbox run test:e2e:web
 
 ### Test Categories
 
-**Fast tests (~15-30 minutes):**
+**Fast tests:**
 - Linting and formatting checks
 - Plugin unit tests (device management, validation, utilities)
 - Quick integration tests
 
-**E2E tests (~45-60 minutes per platform):**
+**E2E tests:**
 - Full build and deployment workflows
 - Emulator/simulator boot and app launch
 - Tests min and max platform versions:
@@ -519,8 +519,6 @@ Runs automatically on every PR.
 - Plugin validation and quick smoke tests
 - Fast tests (lint + unit + integration)
 - E2E tests for min and max devices on each platform
-- ~15-30 minutes total for fast tests
-- ~25-45 minutes for E2E tests per platform
 
 ### Full E2E Tests (`e2e-full.yml`)
 
@@ -530,7 +528,6 @@ Manual trigger or weekly schedule.
 - Android: API 21 (min) to API 36 (max)
 - iOS: iOS 15.4 (min) to iOS 26.2 (max)
 - React Native: Full cross-platform testing
-- ~45-60 minutes per platform
 - Matrix execution for parallel testing
 
 ### Workflow Structure

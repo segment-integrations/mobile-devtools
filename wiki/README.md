@@ -15,7 +15,7 @@ Welcome to the devbox-plugins documentation. This wiki provides comprehensive gu
 
 Step-by-step tutorials and practical workflows for using the plugins:
 
-- [Quick Start](guides/quick-start.md) - Get started in 5 minutes
+- [Quick Start](guides/quick-start.md) - Set up your first project
 - [Android Guide](guides/android-guide.md) - Complete Android workflow
 - [iOS Guide](guides/ios-guide.md) - Complete iOS workflow
 - [React Native Guide](guides/react-native-guide.md) - Complete React Native workflow

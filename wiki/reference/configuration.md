@@ -12,22 +12,8 @@ Complete reference for configuring the Android, iOS, and React Native devbox plu
 }
 ```
 
-Or use path-based inclusion:
-```json
-{
-  "include": ["github:segment-integrations/devbox-plugins?dir=plugins/android"]
-}
-```
-
 ### iOS Plugin
 
-```json
-{
-  "include": ["github:segment-integrations/devbox-plugins?dir=plugins/ios"]
-}
-```
-
-Or use path-based inclusion:
 ```json
 {
   "include": ["github:segment-integrations/devbox-plugins?dir=plugins/ios"]
@@ -38,13 +24,6 @@ Or use path-based inclusion:
 
 The React Native plugin automatically includes both Android and iOS plugins:
 
-```json
-{
-  "include": ["github:segment-integrations/devbox-plugins?dir=plugins/react-native"]
-}
-```
-
-Or use path-based inclusion:
 ```json
 {
   "include": ["github:segment-integrations/devbox-plugins?dir=plugins/react-native"]
@@ -552,6 +531,8 @@ Customize Metro bundler port range:
 
 Device definitions in `devbox.d/android/devices/*.json`:
 
+> **Note:** The actual directory name under `devbox.d/` depends on how the plugin is included. When using GitHub includes (e.g., `github:segment-integrations/devbox-plugins?dir=plugins/android`), the directory name is derived from the repository path (e.g., `devbox.d/segment-integrations.devbox-plugins.android/devices/`). When using local path includes, it matches the plugin directory name.
+
 ```json
 {
   "name": "pixel_api30",
@@ -573,6 +554,8 @@ Device definitions in `devbox.d/android/devices/*.json`:
 ### iOS Device Schema
 
 Device definitions in `devbox.d/ios/devices/*.json`:
+
+> **Note:** The actual directory name under `devbox.d/` depends on how the plugin is included, same as the Android plugin above. For example, with GitHub includes it becomes `devbox.d/segment-integrations.devbox-plugins.ios/devices/`.
 
 ```json
 {
@@ -615,6 +598,8 @@ Example iOS `max.json`:
 
 Generated at `devbox.d/android/devices/devices.lock` by `android.sh devices eval`.
 
+> **Note:** The actual path depends on how the plugin is included. See the note in the Device Definitions section above.
+
 Format (plain text):
 ```
 device_name:checksum
@@ -625,6 +610,8 @@ max:789ghi012jkl
 ### iOS Lock File
 
 Generated at `devbox.d/ios/devices/devices.lock` by `ios.sh devices eval`.
+
+> **Note:** The actual path depends on how the plugin is included. See the note in the Device Definitions section above.
 
 Format (JSON):
 ```json

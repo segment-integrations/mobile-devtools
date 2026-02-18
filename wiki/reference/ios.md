@@ -2,8 +2,8 @@
 
 ## Files
 
-- `devbox.d/ios/devices/*.json` — simulator definitions
-- `devbox.d/ios/devices/devices.lock` — generated lock file (tracks evaluated devices)
+- Device definitions in your devbox.d directory (e.g., `devbox.d/ios/devices/*.json`)
+- `devices/devices.lock` in your devbox.d directory — generated lock file (tracks evaluated devices)
 - `.devbox/virtenv/ios/scripts/` — runtime scripts (organized by layer)
   - `lib/` — utility functions
   - `platform/` — Xcode discovery and device config
@@ -60,7 +60,7 @@ Configure the plugin by setting environment variables in `devbox.json` or `plugi
 
 Start simulator:
 ```bash
-devbox run --pure start-sim [device]
+devbox run --pure start:sim [device]
 ```
 - If `device` is specified, uses that device name
 - Otherwise uses `IOS_DEFAULT_DEVICE`
@@ -68,29 +68,11 @@ devbox run --pure start-sim [device]
 
 Stop simulator:
 ```bash
-devbox run --pure stop-sim
+devbox run --pure stop:sim
 ```
 - Shuts down all running simulators
 
-### Build and Run
-
-Build and run app:
-```bash
-devbox run --pure start-ios [device]
-```
-- Runs `devbox run --pure build-ios` first
-- Installs app bundle matched by `IOS_APP_ARTIFACT`
-- Launches app on simulator
-- If `device` specified, uses that device; otherwise uses `IOS_DEFAULT_DEVICE`
-
-Build only:
-```bash
-devbox run --pure build-ios
-```
-- Builds Xcode project using `IOS_APP_PROJECT` and `IOS_APP_SCHEME`
-- Outputs to `IOS_APP_DERIVED_DATA`
-- Configuration: Debug
-- Destination: iOS Simulator
+Note: Build and run commands (e.g., `build:ios`, `start:ios`) are user-defined scripts configured in your project's `devbox.json`, not provided by the plugin. The plugin provides `start:sim` and `stop:sim` for simulator lifecycle management. See the example projects for typical build/run script definitions.
 
 ### Device Management
 
@@ -98,7 +80,7 @@ List devices:
 ```bash
 devbox run --pure ios.sh devices list
 ```
-Shows all device definitions in `devbox.d/ios/devices/`
+Shows all device definitions in your devbox.d directory
 
 Show specific device:
 ```bash
@@ -441,11 +423,11 @@ ios.sh devices list
 # Generate lock file
 ios.sh devices eval
 
-# Start simulator
+# Start simulator (plugin-provided)
 devbox run start:sim
 
-# Build and run app
-devbox run start:ios
+# Build and run app (user-defined script in devbox.json)
+# devbox run start:app
 ```
 
 ### Adding New Device

@@ -16,7 +16,6 @@
     "development-environment"
   ],
   "author": "",
-  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/segment-integrations/devbox-plugins.git",
