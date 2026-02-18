@@ -1,5 +1,5 @@
 {
-  "include": ["path:../../plugins/react-native/plugin.json"],
+  "include": ["github:segment-integrations/devbox-plugins/main?dir=plugins/react-native"],
   "packages": [
     "nodejs@20",
     "watchman@latest",

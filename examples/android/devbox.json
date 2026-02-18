@@ -1,5 +1,5 @@
 {
-  "include": ["path:../../plugins/android/plugin.json"],
+  "include": ["github:segment-integrations/devbox-plugins/main?dir=plugins/android"],
   "packages": {
     "jdk17": "latest",
     "gradle": "latest"

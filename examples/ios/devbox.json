@@ -1,5 +1,5 @@
 {
-  "include": ["path:../../plugins/ios/plugin.json"],
+  "include": ["github:segment-integrations/devbox-plugins/main?dir=plugins/ios"],
   "packages": {
     "process-compose": "latest"
   },

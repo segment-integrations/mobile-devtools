@@ -125,6 +125,17 @@ Initialize a new devbox.json file in the specified directory.
 ### `devbox_docs_search`
 Search the devbox documentation for relevant information.
 
+**Requires GitHub Authentication:** This tool uses GitHub's code search API which requires a Personal Access Token (PAT). Set one of these environment variables:
+- `GITHUB_TOKEN=your_token_here`
+- `GITHUB_PAT=your_token_here`
+
+To create a token:
+1. Visit https://github.com/settings/tokens
+2. Create a fine-grained token with `public_repo` read access
+3. Set it in your environment
+
+If authentication isn't available, use `devbox_docs_list` to browse files, then `devbox_docs_read` to read specific docs.
+
 ```typescript
 devbox_docs_search({
   query: "init hooks",
@@ -153,8 +164,9 @@ devbox_docs_read({
 
 ## Requirements
 
-- Node.js 18+
-- devbox CLI installed and in PATH
+- Node.js 18+ (for native fetch support)
+- devbox CLI installed and in PATH (for devbox commands)
+- GitHub Personal Access Token (optional, required for `devbox_docs_search`)
 
 ## License
 

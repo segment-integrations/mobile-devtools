@@ -7,9 +7,6 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { tmpdir } from "os";
-import { join } from "path";
-import { existsSync, mkdirSync } from "fs";
 
 const execFileAsync = promisify(execFile);
 
@@ -45,140 +42,156 @@ async function runDevbox(args, options = {}) {
   }
 }
 
-// Helper to ensure docs repo is available
-async function ensureDocsRepo() {
-  const docsDir = join(tmpdir(), "devbox-docs");
-  const docsRepo = "https://github.com/jetify-com/docs.git";
+// Helper to fetch file list from GitHub API
+async function fetchDocsList() {
+  try {
+    const response = await fetch(
+      "https://api.github.com/repos/jetify-com/docs/git/trees/main?recursive=1",
+      {
+        headers: {
+          "User-Agent": "devbox-mcp-server",
+          "Accept": "application/vnd.github+json",
+        },
+      }
+    );
 
-  if (!existsSync(docsDir)) {
-    mkdirSync(docsDir, { recursive: true });
-    await execFileAsync("git", ["clone", "--depth", "1", docsRepo, docsDir], {
-      timeout: 60000,
-    });
-  } else {
-    // Update existing repo
-    try {
-      await execFileAsync("git", ["pull", "--depth", "1"], {
-        cwd: docsDir,
-        timeout: 30000,
-      });
-    } catch (pullError) {
-      // If pull fails, try to re-clone
-      await execFileAsync("rm", ["-rf", docsDir]);
-      mkdirSync(docsDir, { recursive: true });
-      await execFileAsync("git", ["clone", "--depth", "1", docsRepo, docsDir], {
-        timeout: 60000,
-      });
+    if (!response.ok) {
+      throw new Error(`GitHub API returned ${response.status}: ${response.statusText}`);
     }
-  }
 
-  return docsDir;
+    const tree = await response.json();
+    const docFiles = tree.tree
+      .filter((item) => item.type === "blob" && (item.path.endsWith(".md") || item.path.endsWith(".mdx")))
+      .map((item) => item.path)
+      .sort();
+
+    return { success: true, files: docFiles };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+}
+
+// Helper to fetch raw content from GitHub
+async function fetchRawContent(filePath) {
+  try {
+    const response = await fetch(
+      `https://api.github.com/repos/jetify-com/docs/contents/${filePath}`,
+      {
+        headers: {
+          "User-Agent": "devbox-mcp-server",
+          "Accept": "application/vnd.github.raw",
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`GitHub API returned ${response.status}: ${response.statusText}`);
+    }
+
+    const content = await response.text();
+    return { success: true, content };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
 }
 
 // Helper to search devbox docs
 async function searchDocs(query, options = {}) {
   const { maxResults = 10 } = options;
 
+  // Check for GitHub PAT token
+  const githubToken = process.env.GITHUB_TOKEN || process.env.GITHUB_PAT;
+
   try {
-    const docsDir = await ensureDocsRepo();
+    // Use GitHub's code search API
+    const searchQuery = `${query} repo:jetify-com/docs path:*.md path:*.mdx`;
+    const url = new URL("https://api.github.com/search/code");
+    url.searchParams.set("q", searchQuery);
+    url.searchParams.set("per_page", String(maxResults));
 
-    // Search through docs using grep
-    const { stdout } = await execFileAsync(
-      "grep",
-      [
-        "-r",
-        "-i",
-        "-n",
-        "-H",
-        "--include=*.md",
-        "--include=*.mdx",
-        query,
-        docsDir,
-      ],
-      {
-        timeout: 30000,
-        maxBuffer: 10 * 1024 * 1024,
+    const headers = {
+      "User-Agent": "devbox-mcp-server",
+      "Accept": "application/vnd.github.text-match+json",
+    };
+
+    // Add authorization header if token is available
+    if (githubToken) {
+      headers["Authorization"] = `Bearer ${githubToken}`;
+    }
+
+    const response = await fetch(url, { headers });
+
+    if (!response.ok) {
+      // Return detailed error with helpful message for authentication issues
+      const errorDetails = {
+        status: response.status,
+        statusText: response.statusText,
+      };
+
+      if (response.status === 401 || response.status === 403) {
+        return {
+          success: false,
+          error: `GitHub API returned ${response.status}: ${response.statusText}`,
+          requiresAuth: true,
+          helpMessage: !githubToken
+            ? "GitHub's code search API requires authentication. Please set a GitHub Personal Access Token (PAT) in your environment:\n\n" +
+              "1. Create a PAT at: https://github.com/settings/tokens (fine-grained token with public_repo read access)\n" +
+              "2. Set it as an environment variable:\n" +
+              "   export GITHUB_TOKEN='your_token_here'\n" +
+              "   or\n" +
+              "   export GITHUB_PAT='your_token_here'\n\n" +
+              "Alternatively, use devbox_docs_list to browse files, then devbox_docs_read to read specific docs."
+            : "Your GitHub token may have expired or lacks the required permissions. Please check:\n\n" +
+              "1. Token has 'public_repo' or 'repo' read access\n" +
+              "2. Token hasn't expired (check https://github.com/settings/tokens)\n\n" +
+              "Alternatively, use devbox_docs_list to browse files, then devbox_docs_read to read specific docs.",
+        };
       }
-    );
 
-    // Parse results and format
-    const lines = stdout.split("\n").filter((line) => line.trim());
-    const results = lines.slice(0, maxResults).map((line) => {
-      const [filePath, ...rest] = line.split(":");
-      const lineNum = rest[0];
-      const content = rest.slice(1).join(":").trim();
-      const relativePath = filePath.replace(docsDir + "/", "");
-      return { file: relativePath, line: lineNum, content };
+      throw new Error(`GitHub API returned ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const results = data.items.map((item) => {
+      // Extract first text match if available
+      const match = item.text_matches?.[0];
+      const fragment = match?.fragment || "";
+
+      return {
+        file: item.path,
+        line: "1",
+        content: fragment || "(match in file)",
+      };
     });
 
-    return { success: true, results, total: lines.length };
+    return { success: true, results, total: data.total_count };
   } catch (error) {
     return {
       success: false,
       error: error.message,
-      stderr: error.stderr || "",
     };
   }
 }
 
 // Helper to list documentation files
 async function listDocs() {
-  try {
-    const docsDir = await ensureDocsRepo();
-
-    // Find all markdown files
-    const { stdout } = await execFileAsync(
-      "find",
-      [docsDir, "-type", "f", "-name", "*.md", "-o", "-type", "f", "-name", "*.mdx"],
-      {
-        timeout: 10000,
-        maxBuffer: 10 * 1024 * 1024,
-      }
-    );
-
-    const files = stdout
-      .split("\n")
-      .filter((line) => line.trim())
-      .map((file) => file.replace(docsDir + "/", ""))
-      .sort();
-
-    return { success: true, files };
-  } catch (error) {
-    return {
-      success: false,
-      error: error.message,
-      stderr: error.stderr || "",
-    };
-  }
+  return fetchDocsList();
 }
 
 // Helper to read a specific doc file
 async function readDoc(filePath) {
   try {
-    const docsDir = await ensureDocsRepo();
-    const fullPath = join(docsDir, filePath);
-
-    // Security check: ensure the path is within docsDir
-    if (!fullPath.startsWith(docsDir)) {
-      return {
-        success: false,
-        error: "Invalid file path: must be within docs directory",
-      };
+    const result = await fetchRawContent(filePath);
+    if (result.success) {
+      return { success: true, content: result.content, filePath };
     }
-
-    if (!existsSync(fullPath)) {
-      return {
-        success: false,
-        error: `File not found: ${filePath}`,
-      };
-    }
-
-    const { stdout } = await execFileAsync("cat", [fullPath], {
-      timeout: 10000,
-      maxBuffer: 10 * 1024 * 1024,
-    });
-
-    return { success: true, content: stdout, filePath };
+    return result;
   } catch (error) {
     return {
       success: false,
@@ -308,7 +321,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         name: "devbox_docs_search",
         description:
           "Search devbox documentation for a keyword or phrase. " +
-          "Returns matching lines from the official devbox docs repository.",
+          "Returns matching lines from the official devbox docs repository.\n\n" +
+          "Requires: GitHub Personal Access Token (PAT) set as GITHUB_TOKEN or GITHUB_PAT environment variable. " +
+          "Create a token at https://github.com/settings/tokens with public_repo read access.\n\n" +
+          "Alternative: Use devbox_docs_list to browse files, then devbox_docs_read to read specific docs.",
         inputSchema: {
           type: "object",
           properties: {
@@ -502,11 +518,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const result = await searchDocs(query, { maxResults });
 
       if (!result.success) {
+        let errorMessage = `✗ Failed to search docs\n\nError: ${result.error}`;
+
+        // Add helpful authentication message if authentication is required
+        if (result.requiresAuth && result.helpMessage) {
+          errorMessage += `\n\n${result.helpMessage}`;
+        }
+
+        if (result.stderr) {
+          errorMessage += `\n\nDetails: ${result.stderr}`;
+        }
+
         return {
           content: [
             {
               type: "text",
-              text: `✗ Failed to search docs\n\nError: ${result.error}\n${result.stderr ? `\nDetails: ${result.stderr}` : ""}`,
+              text: errorMessage,
             },
           ],
           isError: true,
