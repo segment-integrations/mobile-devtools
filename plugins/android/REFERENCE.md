@@ -64,7 +64,15 @@ Configure the plugin by setting environment variables in `plugin.json`. These ar
 - `devbox run start:app [apk_path] [device]`
   - Builds, installs, and launches the app on the emulator
   - If `apk_path` is provided, skips build step and installs provided APK
-  - If no arguments, builds project and installs APK matched by `ANDROID_APP_APK`
+  - If no arguments, builds project and auto-detects APK
+
+**APK resolution precedence (when no explicit path):**
+
+1. `ANDROID_APP_APK` env var — glob resolved relative to project root
+2. Recursive search of project root for `*.apk` files (excludes .gradle/, build/intermediates/, node_modules/, .devbox/)
+3. Recursive search of `$PWD` if different from project root (same exclusions)
+
+**Build script detection:** Tries `build:android` first, then falls back to `build`.
 
 ### Device management
 
@@ -111,4 +119,4 @@ Configure the plugin by setting environment variables in `plugin.json`. These ar
   - Cannot be set within script definitions (too late, init hook already ran)
 
 ### App configuration
-- `ANDROID_APP_APK` - Path or glob pattern for APK (relative to project root)
+- `ANDROID_APP_APK` - Path or glob pattern for APK (relative to project root; empty = auto-detect)

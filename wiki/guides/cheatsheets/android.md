@@ -64,7 +64,7 @@ devbox run android.sh run pixel_api30
 
 # User-defined scripts (add to your devbox.json shell.scripts):
 # "build": ["gradle assembleDebug --info"]
-# "start:app": ["android.sh run ${1:-}"]
+# "start:app": ["android.sh run ${1:-}"]   # ${1:-} passes optional device arg
 ```
 
 ## Configuration

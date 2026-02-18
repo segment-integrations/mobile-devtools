@@ -74,7 +74,7 @@ medium_phone_api36  36  medium_phone  google_apis  {...}
 pixel_api21         21  pixel         google_apis  {...}
 ```
 
-These come from `min.json` and `max.json` in your device definitions directory. The filenames (`min`, `max`) are short nicknames you use in commands. The names shown in the listing (`medium_phone_api36`, `pixel_api21`) are the full AVD names defined inside each JSON file.
+These come from `min.json` and `max.json` in your `devbox.d/` directory, which is the devbox plugin configuration folder. The plugin creates a subdirectory there with a `devices/` folder containing these files (e.g., `devbox.d/<plugin-dir>/devices/min.json`). The filenames (`min`, `max`) are short nicknames you use in commands. The names shown in the listing (`medium_phone_api36`, `pixel_api21`) are the full AVD names defined inside each JSON file.
 
 ### 4. Start the Emulator
 
@@ -113,14 +113,19 @@ The plugin provides emulator and device management. Build and deploy commands ar
 }
 ```
 
+The `${1:-}` syntax passes an optional argument through to the command. It means "use the first argument if provided, otherwise use nothing." This lets you run both `devbox run start:app` (uses the default device) and `devbox run start:app min` (targets a specific device).
+
 Now you can build and deploy:
 
 ```sh
 # Build the APK
 devbox run build
 
-# Build, install, and launch on the emulator
+# Build, install, and launch on the default device
 devbox run start:app
+
+# Or target a specific device by nickname
+devbox run start:app min
 ```
 
 The `android.sh run` command waits for the emulator to boot, installs the APK, and launches the app. The app's package name is auto-detected from the APK.
@@ -156,17 +161,11 @@ Replace the contents of your `devbox.json` with:
 
 ```json
 {
-  "include": ["github:segment-integrations/devbox-plugins?dir=plugins/ios"],
-  "env": {
-    "IOS_APP_PROJECT": "MyApp.xcodeproj",
-    "IOS_APP_SCHEME": "MyApp",
-    "IOS_APP_BUNDLE_ID": "com.example.myapp",
-    "IOS_APP_ARTIFACT": "DerivedData/Build/Products/Debug-iphonesimulator/MyApp.app"
-  }
+  "include": ["github:segment-integrations/devbox-plugins?dir=plugins/ios"]
 }
 ```
 
-The `include` line adds the iOS plugin from GitHub. The plugin discovers your Xcode installation and provides simulator management tools. Set the `env` variables to match your Xcode project.
+The `include` line adds the iOS plugin from GitHub. The plugin discovers your Xcode installation and provides simulator management tools. The Xcode project, build scheme, bundle ID, and app path are all auto-detected at runtime.
 
 > **Note:** Plugins are included via URL in `devbox.json`, not with `devbox add`.
 
@@ -193,7 +192,7 @@ iPhone 17   26.2
 iPhone 13   15.4
 ```
 
-These come from `min.json` (iOS 15.4) and `max.json` (iOS 26.2) in your device definitions directory. The filenames (`min`, `max`) are short nicknames you use in commands. The names shown (`iPhone 13`, `iPhone 17`) are the simulator display names defined inside each JSON file.
+These come from `min.json` (iOS 15.4) and `max.json` (iOS 26.2) in your `devbox.d/` directory, which is the devbox plugin configuration folder. The plugin creates a subdirectory there with a `devices/` folder containing these files (e.g., `devbox.d/<plugin-dir>/devices/min.json`). The filenames (`min`, `max`) are short nicknames you use in commands. The names shown (`iPhone 13`, `iPhone 17`) are the simulator display names defined inside each JSON file.
 
 ### 4. Start the Simulator
 
@@ -212,32 +211,28 @@ The plugin provides simulator and device management. Build and deploy commands a
 ```json
 {
   "include": ["github:segment-integrations/devbox-plugins?dir=plugins/ios"],
-  "env": {
-    "IOS_APP_PROJECT": "MyApp.xcodeproj",
-    "IOS_APP_SCHEME": "MyApp",
-    "IOS_APP_BUNDLE_ID": "com.example.myapp",
-    "IOS_APP_ARTIFACT": "DerivedData/Build/Products/Debug-iphonesimulator/MyApp.app"
-  },
   "shell": {
     "scripts": {
-      "build": [
-        "xcodebuild -project ${IOS_APP_PROJECT} -scheme ${IOS_APP_SCHEME} -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData build"
+      "build:ios": [
+        "env -u LD -u LDFLAGS -u NIX_LDFLAGS -u NIX_CFLAGS_COMPILE -u NIX_CFLAGS_LINK xcodebuild -project MyApp.xcodeproj -scheme MyApp -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData build"
       ],
       "start:app": [
-        "devbox run start:sim ${1:-}",
-        "xcrun simctl install booted ${IOS_APP_ARTIFACT}",
-        "xcrun simctl launch booted ${IOS_APP_BUNDLE_ID}"
+        "ios.sh run ${1:-}"
       ]
     }
   }
 }
 ```
 
+As with the Android example, `${1:-}` passes an optional device nickname through (e.g., `devbox run start:app min`). If omitted, the default device is used.
+
+The `ios.sh run` command starts the simulator, builds (via `build:ios`), auto-detects the .app bundle (via xcodebuild settings or recursive search), extracts the bundle ID from `Info.plist`, installs, and launches.
+
 Now you can build and deploy:
 
 ```sh
 # Build the app
-devbox run build
+devbox run build:ios
 
 # Start simulator, install, and launch
 devbox run start:app
@@ -284,16 +279,12 @@ Replace the contents of your `devbox.json` with:
     "gradle@latest"
   ],
   "env": {
-    "ANDROID_APP_APK": "android/app/build/outputs/apk/debug/app-debug.apk",
-    "IOS_APP_PROJECT": "MyApp.xcodeproj",
-    "IOS_APP_SCHEME": "MyApp",
-    "IOS_APP_BUNDLE_ID": "com.example.myapp",
-    "IOS_APP_ARTIFACT": ".devbox/virtenv/ios/DerivedData/Build/Products/Debug-iphonesimulator/MyApp.app"
+    "ANDROID_APP_APK": "android/app/build/outputs/apk/debug/app-debug.apk"
   }
 }
 ```
 
-The React Native plugin automatically includes both the Android and iOS plugins.
+The React Native plugin automatically includes both the Android and iOS plugins. The iOS app project, scheme, bundle ID, and artifact path are all auto-detected at runtime.
 
 > **Note:** Plugins are included via URL in `devbox.json`, not with `devbox add`.
 
@@ -319,11 +310,7 @@ The plugin provides emulator/simulator control, device management, and Metro bun
     "gradle@latest"
   ],
   "env": {
-    "ANDROID_APP_APK": "android/app/build/outputs/apk/debug/app-debug.apk",
-    "IOS_APP_PROJECT": "MyApp.xcodeproj",
-    "IOS_APP_SCHEME": "MyApp",
-    "IOS_APP_BUNDLE_ID": "com.example.myapp",
-    "IOS_APP_ARTIFACT": ".devbox/virtenv/ios/DerivedData/Build/Products/Debug-iphonesimulator/MyApp.app"
+    "ANDROID_APP_APK": "android/app/build/outputs/apk/debug/app-debug.apk"
   },
   "shell": {
     "scripts": {
@@ -334,7 +321,7 @@ The plugin provides emulator/simulator control, device management, and Metro bun
       "build:ios": [
         "npm install",
         "cd ios && pod install --repo-update",
-        "cd ios && xcodebuild -workspace MyApp.xcworkspace -scheme ${IOS_APP_SCHEME} -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath ${DEVBOX_PROJECT_ROOT}/.devbox/virtenv/ios/DerivedData -quiet build"
+        "env -u LD -u LDFLAGS -u NIX_LDFLAGS -u NIX_CFLAGS_COMPILE -u NIX_CFLAGS_LINK xcodebuild -workspace ios/MyApp.xcworkspace -scheme MyApp -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData -quiet build"
       ]
     }
   }

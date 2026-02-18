@@ -199,16 +199,16 @@ assert_equal "com.example.app/.MainActivity" "$component" "Should pass through c
 # Tests: APK Path Resolution
 # ============================================================================
 
-start_test "android_resolve_apk_path - finds APK by exact path"
-resolved=$(android_resolve_apk_path "$script_dir/fixtures" "test-app.apk")
+start_test "android_resolve_apk_glob - finds APK by exact path"
+resolved=$(android_resolve_apk_glob "$script_dir/fixtures" "test-app.apk")
 assert_equal "$fixture_apk" "$resolved" "Should resolve exact APK path"
 
-start_test "android_resolve_apk_path - finds APK by glob pattern"
-resolved=$(android_resolve_apk_path "$script_dir/fixtures" "*.apk")
+start_test "android_resolve_apk_glob - finds APK by glob pattern"
+resolved=$(android_resolve_apk_glob "$script_dir/fixtures" "*.apk")
 assert_equal "$fixture_apk" "$resolved" "Should resolve glob pattern"
 
-start_test "android_resolve_apk_path - fails on no match"
-assert_failure "android_resolve_apk_path '$script_dir/fixtures' 'nonexistent-*.apk'" "Should fail when no APK matches"
+start_test "android_resolve_apk_glob - fails on no match"
+assert_failure "android_resolve_apk_glob '$script_dir/fixtures' 'nonexistent-*.apk'" "Should fail when no APK matches"
 
 # ============================================================================
 # Tests: Auto-detection File Output

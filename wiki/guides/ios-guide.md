@@ -30,17 +30,11 @@ Create or modify your `devbox.json` to include the iOS plugin:
 
 ```json
 {
-  "include": ["github:segment-integrations/devbox-plugins?dir=plugins/ios"],
-  "env": {
-    "IOS_APP_PROJECT": "MyApp.xcodeproj",
-    "IOS_APP_SCHEME": "MyApp",
-    "IOS_APP_BUNDLE_ID": "com.example.myapp",
-    "IOS_APP_ARTIFACT": "DerivedData/Build/Products/Debug-iphonesimulator/MyApp.app"
-  }
+  "include": ["github:segment-integrations/devbox-plugins?dir=plugins/ios"]
 }
 ```
 
-Set the `env` variables to match your Xcode project. Use `-derivedDataPath DerivedData` in your xcodebuild command to keep build output project-local.
+The Xcode project, build scheme, bundle ID, and app path are all auto-detected at runtime. Use `-derivedDataPath DerivedData` in your xcodebuild command to keep build output project-local.
 
 ### Initial Setup
 
@@ -84,7 +78,7 @@ The plugin includes two default devices:
 - `min.json` - Minimum supported iOS version (iOS 15.4, named `iPhone 13`)
 - `max.json` - Latest iOS version (iOS 26.2, named `iPhone 17`)
 
-The filenames (`min`, `max`) are short nicknames you use in commands. The `name` field inside each JSON file is the simulator display name that appears in device listings.
+These files live in your `devbox.d/` directory, which is the devbox plugin configuration folder. The plugin creates a subdirectory there with a `devices/` folder containing them (e.g., `devbox.d/<plugin-dir>/devices/min.json`). The filenames (`min`, `max`) are short nicknames you use in commands. The `name` field inside each JSON file is the simulator display name that appears in device listings.
 
 ### Listing Devices
 
@@ -243,32 +237,26 @@ The plugin provides simulator and device management. Build and deploy commands a
 ```json
 {
   "include": ["github:segment-integrations/devbox-plugins?dir=plugins/ios"],
-  "env": {
-    "IOS_APP_PROJECT": "MyApp.xcodeproj",
-    "IOS_APP_SCHEME": "MyApp",
-    "IOS_APP_BUNDLE_ID": "com.example.myapp",
-    "IOS_APP_ARTIFACT": "DerivedData/Build/Products/Debug-iphonesimulator/MyApp.app"
-  },
   "shell": {
     "scripts": {
-      "build": [
-        "xcodebuild -project ${IOS_APP_PROJECT} -scheme ${IOS_APP_SCHEME} -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData build"
+      "build:ios": [
+        "env -u LD -u LDFLAGS -u NIX_LDFLAGS -u NIX_CFLAGS_COMPILE -u NIX_CFLAGS_LINK xcodebuild -project MyApp.xcodeproj -scheme MyApp -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData build"
       ],
       "start:app": [
-        "devbox run start:sim ${1:-}",
-        "xcrun simctl install booted ${IOS_APP_ARTIFACT}",
-        "xcrun simctl launch booted ${IOS_APP_BUNDLE_ID}"
+        "ios.sh run ${1:-}"
       ]
     }
   }
 }
 ```
 
+The `ios.sh run` command starts the simulator, builds (via `build:ios`), auto-detects the .app bundle, extracts the bundle ID, installs, and launches. The `${1:-}` syntax passes an optional device nickname through.
+
 With these scripts defined, you can:
 
 ```bash
 # Build the app
-devbox run build
+devbox run build:ios
 
 # Start simulator, install, and launch
 devbox run start:app
@@ -374,12 +362,6 @@ Configure for your app in `devbox.json`:
 ```json
 {
   "include": ["github:segment-integrations/devbox-plugins?dir=plugins/ios"],
-  "env": {
-    "IOS_APP_PROJECT": "YourApp.xcodeproj",
-    "IOS_APP_SCHEME": "YourApp",
-    "IOS_APP_BUNDLE_ID": "com.yourcompany.yourapp",
-    "IOS_APP_ARTIFACT": "DerivedData/Build/Products/Debug-iphonesimulator/YourApp.app"
-  },
   "shell": {
     "scripts": {
       "test:e2e": [
@@ -424,10 +406,7 @@ Environment variables:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `IOS_APP_PROJECT` | Path to .xcodeproj or .xcworkspace | Required |
-| `IOS_APP_SCHEME` | Xcode build scheme | Required |
-| `IOS_APP_BUNDLE_ID` | App bundle identifier | Required |
-| `IOS_APP_ARTIFACT` | Path to built .app bundle | Auto-detected |
+| `IOS_APP_ARTIFACT` | Path or glob for .app bundle | Auto-detect |
 | `IOS_DEFAULT_DEVICE` | Default simulator device | `max` |
 | `IOS_DOWNLOAD_RUNTIME` | Auto-download missing runtimes (0/1) | `1` |
 | `TEST_TUI` | Show process-compose TUI (true/false) | `false` |
@@ -445,10 +424,6 @@ Configure the plugin by setting environment variables in `devbox.json`:
   "env": {
     "IOS_DEFAULT_DEVICE": "max",
     "IOS_DEVICES": "min,max",
-    "IOS_APP_PROJECT": "ios.xcodeproj",
-    "IOS_APP_SCHEME": "ios",
-    "IOS_APP_BUNDLE_ID": "com.example.ios",
-    "IOS_APP_ARTIFACT": "DerivedData/Build/Products/Debug-iphonesimulator/ios.app",
     "IOS_DOWNLOAD_RUNTIME": "1"
   }
 }
@@ -457,10 +432,7 @@ Configure the plugin by setting environment variables in `devbox.json`:
 Key variables:
 - `IOS_DEFAULT_DEVICE` - Default device when none specified
 - `IOS_DEVICES` - Comma-separated device names to evaluate (empty = all)
-- `IOS_APP_PROJECT` - Path to .xcodeproj or .xcworkspace
-- `IOS_APP_SCHEME` - Xcode build scheme
-- `IOS_APP_BUNDLE_ID` - App bundle identifier
-- `IOS_APP_ARTIFACT` - Path to built .app bundle (auto-detected if not set)
+- `IOS_APP_ARTIFACT` - Path or glob for .app bundle (empty = auto-detect via xcodebuild + search)
 - `IOS_DOWNLOAD_RUNTIME` - Auto-download missing iOS runtimes (0/1, default: 1)
 
 ### Xcode Configuration
@@ -534,10 +506,7 @@ This shows:
 - Scripts directory
 - Default device
 - Selected devices (from `IOS_DEVICES`)
-- App project path
-- App scheme
-- App bundle ID
-- App artifact path
+- App artifact path (or auto-detect)
 - Runtime download setting
 
 ## Troubleshooting
@@ -634,9 +603,9 @@ This shows:
 
 **Solutions**:
 
-1. Verify app bundle exists:
+1. Verify app bundle exists (check your build output directory):
    ```bash
-   ls -la $IOS_APP_ARTIFACT
+   find . -name '*.app' -type d -not -path '*/.devbox/*'
    ```
 
 2. Check simulator is booted:
@@ -644,14 +613,18 @@ This shows:
    xcrun simctl list devices | grep Booted
    ```
 
-3. Verify bundle ID:
+3. Verify bundle ID from a .app bundle:
    ```bash
-   defaults read "$IOS_APP_ARTIFACT/Info.plist" CFBundleIdentifier
+   /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' /path/to/MyApp.app/Info.plist
    ```
 
-4. Check app bundle structure:
-   ```bash
-   ls -la "$IOS_APP_ARTIFACT/"
+4. If auto-detection fails, set `IOS_APP_ARTIFACT` explicitly in `devbox.json`:
+   ```json
+   {
+     "env": {
+       "IOS_APP_ARTIFACT": "DerivedData/Build/Products/Debug-iphonesimulator/MyApp.app"
+     }
+   }
    ```
 
 ### Build Failures with Nix Flags

@@ -55,16 +55,23 @@ devbox run stop:sim
 
 ## Build and Deploy
 
-Build and deploy scripts are project-specific. Define them in your `devbox.json`.
+```bash
+# Run app (starts simulator, builds, installs, launches)
+ios.sh run
+
+# Run on specific device
+ios.sh run max
+
+# Run pre-built app
+ios.sh run /path/to/MyApp.app
+```
+
+Build scripts are project-specific. Define `build:ios` in your `devbox.json`:
 
 ```bash
-# User-defined scripts (add to your devbox.json shell.scripts):
-# "build": ["xcodebuild -project ${IOS_APP_PROJECT} -scheme ${IOS_APP_SCHEME} ..."]
-# "start:app": [
-#   "ios.sh simulator start ${1:-}",
-#   "xcrun simctl install booted path/to/app.app",
-#   "xcrun simctl launch booted ${IOS_APP_BUNDLE_ID}"
-# ]
+# User-defined script (add to your devbox.json shell.scripts):
+# "build:ios": ["env -u LD -u LDFLAGS -u NIX_LDFLAGS xcodebuild -project MyApp.xcodeproj -scheme MyApp ..."]
+# "start:app": ["ios.sh run ${1:-}"]
 ```
 
 ## Configuration
@@ -96,9 +103,7 @@ IOS_DEFAULT_RUNTIME=""                # Default runtime (empty = latest)
 IOS_DEVELOPER_DIR=""                  # Xcode path (empty = auto-detect)
 IOS_DOWNLOAD_RUNTIME="1"              # Auto-download runtimes (1=yes, 0=no)
 IOS_SKIP_SETUP="0"                    # Skip setup during init (1=yes, 0=no)
-IOS_APP_PROJECT="ios.xcodeproj"       # Xcode project path
-IOS_APP_SCHEME="ios"                  # Build scheme
-IOS_APP_BUNDLE_ID="com.example.ios"   # App bundle ID
+IOS_APP_ARTIFACT=""                   # .app path/glob (empty = auto-detect)
 ```
 
 ## Device Definition Format

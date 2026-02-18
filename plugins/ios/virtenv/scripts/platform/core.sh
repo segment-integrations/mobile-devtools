@@ -279,36 +279,4 @@ ios_show_summary() {
   echo "  IOS_SIM_TARGET: device=${ios_target_device:-unknown} runtime=${ios_target_runtime:-not set}"
 }
 
-# ============================================================================
-# Requirement Functions
-# ============================================================================
-
-ios_require_tool() {
-  tool="$1"
-  message="${2:-Missing required tool: $tool. Ensure the Devbox shell is active and required packages are installed.}"
-  if ! command -v "$tool" >/dev/null 2>&1; then
-    echo "$message" >&2
-    exit 1
-  fi
-}
-
-ios_require_dir() {
-  path="$1"
-  message="${2:-Missing required directory: $path.}"
-  if [ ! -d "$path" ]; then
-    echo "$message" >&2
-    exit 1
-  fi
-}
-
-ios_require_dir_contains() {
-  base="$1"
-  subpath="$2"
-  message="${3:-Missing required path: $base/$subpath.}"
-  if [ ! -e "$base/$subpath" ]; then
-    echo "$message" >&2
-    exit 1
-  fi
-}
-
 ios_debug_log_script "core.sh"

@@ -114,32 +114,6 @@ resolve_runtime_strict() {
   return 1
 }
 
-# Resolve runtime name only
-# Args: preferred_version
-# Returns: runtime_name
-resolve_runtime_name() {
-  preferred="$1"
-  choice="$(resolve_runtime "$preferred" || true)"
-  if [ -n "$choice" ]; then
-    printf '%s\n' "$choice" | cut -d'|' -f2
-    return 0
-  fi
-  return 1
-}
-
-# Resolve runtime name strictly
-# Args: preferred_version
-# Returns: runtime_name
-resolve_runtime_name_strict() {
-  preferred="$1"
-  choice="$(resolve_runtime_strict "$preferred" || true)"
-  if [ -n "$choice" ]; then
-    printf '%s\n' "$choice" | cut -d'|' -f2
-    return 0
-  fi
-  return 1
-}
-
 # ============================================================================
 # Simulator Device Queries
 # ============================================================================

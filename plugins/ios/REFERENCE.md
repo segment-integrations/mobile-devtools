@@ -42,12 +42,8 @@ Configure the plugin by setting environment variables in `devbox.json` or `plugi
 - `IOS_XCODE_ENV_PATH` — Additional PATH entries for Xcode tools
 - `IOS_DOWNLOAD_RUNTIME` — Auto-download missing runtimes (1=yes, 0=no; default: 1)
 
-### App Build Settings
-- `IOS_APP_PROJECT` — Xcode project path (default: "ios.xcodeproj")
-- `IOS_APP_SCHEME` — Xcode build scheme (default: matches project name)
-- `IOS_APP_BUNDLE_ID` — App bundle identifier (default: "com.example.ios")
-- `IOS_APP_ARTIFACT` — App bundle path/glob after build (default: "DerivedData/Build/Products/Debug-iphonesimulator/*.app")
-- `IOS_APP_DERIVED_DATA` — Xcode derived data directory (default: ".devbox/virtenv/ios/DerivedData")
+### App Settings
+- `IOS_APP_ARTIFACT` — Path or glob pattern for .app bundle (relative to project root; empty = auto-detect)
 
 ### Performance Settings
 - `IOS_SKIP_SETUP` — Skip iOS environment setup during shell initialization (1=skip, 0=setup; default: 0)
@@ -72,25 +68,25 @@ devbox run --pure stop-sim
 ```
 - Shuts down all running simulators
 
-### Build and Run
+### Run App
 
-Build and run app:
 ```bash
-devbox run --pure start-ios [device]
+devbox run --pure ios.sh run [app_path] [device]
 ```
-- Runs `devbox run --pure build-ios` first
-- Installs app bundle matched by `IOS_APP_ARTIFACT`
-- Launches app on simulator
-- If `device` specified, uses that device; otherwise uses `IOS_DEFAULT_DEVICE`
+- Starts simulator, builds, resolves, installs, and launches the app
+- If `app_path` is provided, skips build step and installs the provided .app bundle
+- If no arguments, builds project and auto-detects the .app bundle
 
-Build only:
-```bash
-devbox run --pure build-ios
-```
-- Builds Xcode project using `IOS_APP_PROJECT` and `IOS_APP_SCHEME`
-- Outputs to `IOS_APP_DERIVED_DATA`
-- Configuration: Debug
-- Destination: iOS Simulator
+**.app resolution precedence (when no explicit path):**
+
+1. `IOS_APP_ARTIFACT` env var — glob resolved relative to project root
+2. `xcodebuild -showBuildSettings` — queries BUILT_PRODUCTS_DIR + FULL_PRODUCT_NAME from the Xcode project
+3. Recursive search of project root for `*.app` directories (excludes Pods/, .build/, SourcePackages/, node_modules/, .devbox/, DerivedData/ModuleCache/)
+4. Recursive search of `$PWD` if different from project root (same exclusions)
+
+Bundle ID is auto-extracted from the .app's `Info.plist` via PlistBuddy, or from `xcodebuild -showBuildSettings` if available.
+
+**Build script detection:** The `run` command tries `build:ios` first, then falls back to `build`. If neither script exists, it skips the build step (assumes pre-built).
 
 ### Device Management
 
@@ -314,7 +310,6 @@ Set during simulator/app operations:
 
 - `IOS_SIM_UDID` — UUID of running simulator
 - `IOS_SIM_NAME` — Name of running simulator
-- `IOS_APP_BUNDLE_PATH` — Resolved app bundle path after build
 
 ## Troubleshooting
 
@@ -379,10 +374,10 @@ devbox run --pure ios.sh devices eval
 **Symptom:** Xcode build errors
 
 **Checklist:**
-1. Check `IOS_APP_PROJECT` points to correct `.xcodeproj`
-2. Verify `IOS_APP_SCHEME` exists in project
+1. Check that your `.xcodeproj` or `.xcworkspace` exists in the project root
+2. Verify `build:ios` or `build` script in devbox.json is correct
 3. Ensure derived data directory is writable
-4. Clean build: `rm -rf .devbox/virtenv/ios/DerivedData`
+4. Clean build: `rm -rf DerivedData` or the path your build script uses
 
 ## Platform Requirements
 
@@ -410,9 +405,9 @@ devbox run --pure ios.sh devices eval
 - Keep command-line tools updated
 
 ### Build Configuration
-- Use project-relative paths for `IOS_APP_ARTIFACT`
-- Commit derived data to `.gitignore`
-- Use consistent scheme names across projects
+- Use project-relative paths for `IOS_APP_ARTIFACT` when auto-detect doesn't work
+- Commit derived data directories to `.gitignore`
+- Auto-detect works best when a single `.xcodeproj` or `.xcworkspace` exists in project root
 
 ## Example Workflows
 
@@ -445,7 +440,7 @@ ios.sh devices eval
 devbox run start-sim
 
 # Build and run app
-devbox run start-ios
+ios.sh run
 ```
 
 ### Adding New Device

@@ -385,8 +385,8 @@ devbox run --pure build:ios
 # Start simulator (plugin-provided)
 devbox run --pure start:sim [device]  # Defaults to IOS_DEFAULT_DEVICE
 
-# Build, install, and launch app on simulator (user-defined in example devbox.json)
-devbox run --pure start:ios [device]
+# Build, install, and launch app on simulator (plugin-provided via ios.sh run)
+devbox run --pure start:app [device]
 
 # Stop simulator (plugin-provided)
 devbox run --pure stop:sim
@@ -406,7 +406,7 @@ devbox run --pure stop:emu             # plugin-provided
 
 # iOS workflow
 devbox run --pure start:sim [device]   # plugin-provided
-devbox run --pure start:ios [device]   # user-defined
+devbox run --pure start:app [device]   # user-defined (calls ios.sh run)
 devbox run --pure stop:sim             # plugin-provided
 
 # Build for all platforms (user-defined)
@@ -826,9 +826,7 @@ Configuration for both Android and iOS plugins is now managed via environment va
 ### iOS Plugin Environment Variables
 - `IOS_DEFAULT_DEVICE` - Default simulator
 - `IOS_DEVICES` - Devices to evaluate (comma-separated, empty = all)
-- `IOS_APP_PROJECT` - Xcode project path
-- `IOS_APP_SCHEME` - Xcode build scheme
-- `IOS_APP_ARTIFACT` - App bundle path/glob
+- `IOS_APP_ARTIFACT` - Path or glob for .app bundle (empty = auto-detect via xcodebuild + search)
 - `IOS_DOWNLOAD_RUNTIME` - Auto-download runtimes (0/1)
 
 ## Important Implementation Notes

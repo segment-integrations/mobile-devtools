@@ -11,6 +11,7 @@
     "IOS_DEFAULT_RUNTIME": "",
     "IOS_DEVELOPER_DIR": "",
     "IOS_DOWNLOAD_RUNTIME": "1",
+    "IOS_APP_ARTIFACT": "",
     "IOS_XCODE_ENV_PATH": "",
     "REPORTS_DIR": "reports"
   },

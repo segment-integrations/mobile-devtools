@@ -44,44 +44,98 @@ android_run_build() {
 }
 
 # Resolve APK path from glob pattern
-android_resolve_apk_path() {
-  project_root="$1"
-  apk_pattern="$2"
+# Args: project_root, apk_pattern
+# Returns: first matching APK path
+android_resolve_apk_glob() {
+  _arg_root="$1"
+  _arg_pattern="$2"
 
-  if [ -z "$apk_pattern" ]; then
+  if [ -z "$_arg_pattern" ]; then
     return 1
   fi
 
   # Make pattern absolute if it's relative
-  if [ "${apk_pattern#/}" = "$apk_pattern" ]; then
-    apk_pattern="${project_root%/}/$apk_pattern"
+  if [ "${_arg_pattern#/}" = "$_arg_pattern" ]; then
+    _arg_pattern="${_arg_root%/}/$_arg_pattern"
   fi
 
-  # Find matching APK files
-  # Temporarily disable glob failure to check if any files match
   set +f
-  matched_apks=""
-  for apk_candidate in $apk_pattern; do
-    if [ -f "$apk_candidate" ]; then
-      matched_apks="${matched_apks}${matched_apks:+
-}$apk_candidate"
+  _matched=""
+  for _candidate in $_arg_pattern; do
+    if [ -f "$_candidate" ]; then
+      _matched="${_matched}${_matched:+
+}$_candidate"
     fi
   done
   set -f
 
-  if [ -z "$matched_apks" ]; then
+  if [ -z "$_matched" ]; then
     return 1
   fi
 
-  # Count matches
-  match_count="$(printf '%s\n' "$matched_apks" | wc -l | tr -d ' ')"
-  if [ "$match_count" -gt 1 ]; then
-    echo "WARNING: Multiple APKs matched pattern: $apk_pattern" >&2
-    echo "         Using first match" >&2
+  _count="$(printf '%s\n' "$_matched" | wc -l | tr -d ' ')"
+  if [ "$_count" -gt 1 ]; then
+    android_log_warn "deploy.sh" "Multiple APKs matched pattern: $_arg_pattern; using first match"
   fi
 
-  # Return first match
-  printf '%s\n' "$matched_apks" | head -n1
+  printf '%s\n' "$_matched" | head -n1
+}
+
+# Find APK using auto-detect precedence chain
+# Args: project_root
+# Precedence:
+#   1. ANDROID_APP_APK env var (glob resolved relative to project_root)
+#   2. Recursive search of project_root for *.apk
+#   3. Recursive search of $PWD (skipped if PWD == project_root)
+#   4. Error with guidance
+android_find_apk() {
+  _find_root="$1"
+
+  # 1. ANDROID_APP_APK env var
+  if [ -n "${ANDROID_APP_APK:-}" ]; then
+    _apk="$(android_resolve_apk_glob "$_find_root" "$ANDROID_APP_APK" || true)"
+    if [ -n "$_apk" ] && [ -f "$_apk" ]; then
+      android_log_info "deploy.sh" "APK resolved via ANDROID_APP_APK env var: $_apk"
+      printf '%s\n' "$_apk"
+      return 0
+    fi
+  fi
+
+  # 2. Recursive search of project_root
+  _apk="$(find "$_find_root" -name '*.apk' -type f \
+    -not -path '*/.gradle/*' \
+    -not -path '*/build/intermediates/*' \
+    -not -path '*/node_modules/*' \
+    -not -path '*/.devbox/*' \
+    2>/dev/null | head -n1)"
+  if [ -n "$_apk" ] && [ -f "$_apk" ]; then
+    android_log_info "deploy.sh" "APK resolved via project search: $_apk"
+    printf '%s\n' "$_apk"
+    return 0
+  fi
+
+  # 3. Recursive search of $PWD (skip if same as project_root)
+  _cwd="$(cd "$PWD" && pwd -P)"
+  _root_real="$(cd "$_find_root" && pwd -P)"
+  if [ "$_cwd" != "$_root_real" ]; then
+    _apk="$(find "$PWD" -name '*.apk' -type f \
+      -not -path '*/.gradle/*' \
+      -not -path '*/build/intermediates/*' \
+      -not -path '*/node_modules/*' \
+      -not -path '*/.devbox/*' \
+      2>/dev/null | head -n1)"
+    if [ -n "$_apk" ] && [ -f "$_apk" ]; then
+      android_log_info "deploy.sh" "APK resolved via directory search: $_apk"
+      printf '%s\n' "$_apk"
+      return 0
+    fi
+  fi
+
+  # 4. Error
+  android_log_error "deploy.sh" "No APK found. Searched: ANDROID_APP_APK env var, project root, current directory."
+  android_log_error "deploy.sh" "Set ANDROID_APP_APK in devbox.json env, or pass a path: android.sh run /path/to/app.apk"
+  android_log_error "deploy.sh" "See: plugins/android/REFERENCE.md for APK resolution details."
+  return 1
 }
 
 # Find aapt tool from Android SDK (PATH > SDK/build-tools)
@@ -323,13 +377,9 @@ android_run_app() {
     echo ""
     echo "Locating APK..."
 
-    apk_pattern="${ANDROID_APP_APK:-app/build/outputs/apk/debug/*.apk}"
-    apk_path="$(android_resolve_apk_path "$project_root" "$apk_pattern" || true)"
+    apk_path="$(android_find_apk "$project_root" || true)"
 
     if [ -z "$apk_path" ] || [ ! -f "$apk_path" ]; then
-      echo "ERROR: Unable to locate APK" >&2
-      echo "       Pattern: $apk_pattern" >&2
-      echo "       Set ANDROID_APP_APK to correct path or pattern" >&2
       exit 1
     fi
 

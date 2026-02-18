@@ -58,7 +58,7 @@ devbox run ios.sh devices eval
 ```sh
 devbox run start:sim [device]    # Start iOS simulator (defaults to IOS_DEFAULT_DEVICE)
 devbox run stop:sim              # Stop all running simulators
-devbox run start:ios [device]    # Build, install, and launch app on simulator
+ios.sh run [app_path] [device]   # Build, install, and launch app on simulator
 ```
 
 ### Device Management
@@ -91,10 +91,7 @@ devbox run ios.sh info           # Show Xcode and SDK info
 - `IOS_SCRIPTS_DIR` — runtime scripts directory (`.devbox/virtenv/ios/scripts`)
 - `IOS_DEFAULT_DEVICE` — used when no device name is provided (default: `max`)
 - `IOS_DEVICES` — comma-separated device names to evaluate (empty means all)
-- `IOS_APP_PROJECT` — path to .xcodeproj or .xcworkspace
-- `IOS_APP_SCHEME` — Xcode build scheme
-- `IOS_APP_BUNDLE_ID` — app bundle identifier
-- `IOS_APP_ARTIFACT` — path to built .app bundle (auto-detected if not set)
+- `IOS_APP_ARTIFACT` — path or glob for .app bundle (empty = auto-detect via xcodebuild + search)
 - `IOS_DEVELOPER_DIR` — path to Xcode developer directory (auto-detected if not set)
 - `IOS_DOWNLOAD_RUNTIME` — auto-download missing iOS runtimes (0/1, default: 0)
 

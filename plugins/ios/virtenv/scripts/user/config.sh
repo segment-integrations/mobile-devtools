@@ -42,10 +42,7 @@ ios_config_show() {
   echo "  IOS_DEFAULT_RUNTIME: ${IOS_DEFAULT_RUNTIME:-(auto)}"
   echo ""
   echo "Application:"
-  echo "  IOS_APP_PROJECT: ${IOS_APP_PROJECT:-*.xcodeproj}"
-  echo "  IOS_APP_SCHEME: ${IOS_APP_SCHEME:-(auto)}"
-  echo "  IOS_APP_BUNDLE_ID: ${IOS_APP_BUNDLE_ID:-com.example.ios}"
-  echo "  IOS_APP_ARTIFACT: ${IOS_APP_ARTIFACT:-.devbox/virtenv/ios/DerivedData/...}"
+  echo "  IOS_APP_ARTIFACT: ${IOS_APP_ARTIFACT:-(auto-detect)}"
   echo ""
   echo "Paths:"
   echo "  IOS_CONFIG_DIR: ${IOS_CONFIG_DIR:-.}"
@@ -55,51 +52,6 @@ ios_config_show() {
   echo "To override values, set environment variables in your devbox.json:"
   echo '  "env": {'
   echo '    "IOS_DEVICES": "min,max",'
-  echo '    "IOS_DEFAULT_DEVICE": "min",'
-  echo '    "IOS_APP_PROJECT": "MyApp.xcodeproj"'
+  echo '    "IOS_DEFAULT_DEVICE": "min"'
   echo '  }'
-}
-
-# Set configuration values
-# Args: key=value pairs
-ios_config_set() {
-  echo "Configuration is now managed via environment variables." >&2
-  echo "" >&2
-  echo "To override configuration values, add them to your devbox.json:" >&2
-  echo "" >&2
-  echo '{' >&2
-  echo '  "include": [' >&2
-  echo '    "plugin:ios"' >&2
-  echo '  ],' >&2
-  echo '  "env": {' >&2
-
-  # Show the key=value pairs they wanted to set as examples
-  if [ -n "${1-}" ]; then
-    echo "    # Add these overrides:" >&2
-    while [ "${1-}" != "" ]; do
-      pair="$1"
-      key="${pair%%=*}"
-      value="${pair#*=}"
-      echo "    \"${key}\": \"${value}\"," >&2
-      shift
-    done
-  fi
-
-  echo '  }' >&2
-  echo '}' >&2
-  echo "" >&2
-  echo "After updating devbox.json, run 'devbox shell' to apply changes." >&2
-  return 1
-}
-
-# Reset configuration to defaults
-ios_config_reset() {
-  echo "Configuration is now managed via environment variables." >&2
-  echo "" >&2
-  echo "To reset to defaults, remove any IOS_* environment variable" >&2
-  echo "overrides from your devbox.json env section." >&2
-  echo "" >&2
-  echo "Plugin defaults are defined in the ios plugin.json file." >&2
-  echo "Run 'ios.sh config show' to see current values." >&2
-  return 1
 }

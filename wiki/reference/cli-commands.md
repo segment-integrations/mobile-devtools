@@ -328,11 +328,15 @@ devbox run --pure ios.sh devices sync
 
 The iOS plugin does not provide built-in build or run commands. Instead, you define these as user scripts in your `devbox.json`.
 
+**Plugin-provided:**
+```bash
+ios.sh run [app_path] [device]         # Build, install, and launch app on simulator
+```
+
 **User-defined examples:**
 ```bash
-# These are NOT plugin commands - define them in your devbox.json
-devbox run --pure start-ios [device]   # Build and run iOS app
-devbox run --pure build-ios            # Build iOS app only
+# Define build script in your devbox.json
+devbox run --pure build:ios            # Build iOS app only
 ```
 
 **Example devbox.json scripts:**
@@ -340,14 +344,14 @@ devbox run --pure build-ios            # Build iOS app only
 {
   "shell": {
     "scripts": {
-      "build-ios": "xcodebuild -project $IOS_APP_PROJECT -scheme $IOS_APP_SCHEME -sdk iphonesimulator -configuration Debug",
-      "start-ios": "devbox run build-ios && ios.sh run"
+      "build:ios": "env -u LD -u LDFLAGS -u NIX_LDFLAGS xcodebuild -project MyApp.xcodeproj -scheme MyApp -sdk iphonesimulator -configuration Debug",
+      "start:app": "ios.sh run ${1:-}"
     }
   }
 }
 ```
 
-These scripts typically use the plugin-provided environment variables (`IOS_APP_PROJECT`, `IOS_APP_SCHEME`, `IOS_APP_ARTIFACT`, `IOS_APP_DERIVED_DATA`) for configuration.
+The `ios.sh run` command auto-detects the .app bundle (via `IOS_APP_ARTIFACT` env var, xcodebuild settings, or recursive search) and extracts the bundle ID from `Info.plist`.
 
 #### Configuration Management
 

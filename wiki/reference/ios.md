@@ -42,12 +42,8 @@ Configure the plugin by setting environment variables in `devbox.json` or `plugi
 - `IOS_XCODE_ENV_PATH` — Additional PATH entries for Xcode tools
 - `IOS_DOWNLOAD_RUNTIME` — Auto-download missing runtimes (1=yes, 0=no; default: 1)
 
-### App Build Settings
-- `IOS_APP_PROJECT` — Xcode project path (default: "ios.xcodeproj")
-- `IOS_APP_SCHEME` — Xcode build scheme (default: matches project name)
-- `IOS_APP_BUNDLE_ID` — App bundle identifier (default: "com.example.ios")
-- `IOS_APP_ARTIFACT` — App bundle path/glob after build (default: "DerivedData/Build/Products/Debug-iphonesimulator/*.app")
-- `IOS_APP_DERIVED_DATA` — Xcode derived data directory (default: ".devbox/virtenv/ios/DerivedData")
+### App Settings
+- `IOS_APP_ARTIFACT` — Path or glob pattern for .app bundle (relative to project root; empty = auto-detect via xcodebuild + search)
 
 ### Performance Settings
 - `IOS_SKIP_SETUP` — Skip iOS environment setup during shell initialization (1=skip, 0=setup; default: 0)
@@ -72,7 +68,16 @@ devbox run --pure stop:sim
 ```
 - Shuts down all running simulators
 
-Note: Build and run commands (e.g., `build:ios`, `start:ios`) are user-defined scripts configured in your project's `devbox.json`, not provided by the plugin. The plugin provides `start:sim` and `stop:sim` for simulator lifecycle management. See the example projects for typical build/run script definitions.
+Run app (starts simulator, builds, installs, launches):
+```bash
+ios.sh run [app_path] [device]
+```
+- If `app_path` is provided, skips build and installs the provided .app bundle directly
+- If no arguments, builds project (via `build:ios` or `build` scripts) and auto-detects the .app bundle
+- Auto-detection precedence: `IOS_APP_ARTIFACT` env var → xcodebuild settings → recursive search
+- Bundle ID is auto-extracted from `Info.plist`
+
+Note: Build scripts (e.g., `build:ios`) are user-defined in your project's `devbox.json`. The plugin provides `start:sim`, `stop:sim`, and `ios.sh run` for simulator lifecycle and app deployment. See the example projects for typical build script definitions.
 
 ### Device Management
 
@@ -361,10 +366,10 @@ devbox run --pure ios.sh devices eval
 **Symptom:** Xcode build errors
 
 **Checklist:**
-1. Check `IOS_APP_PROJECT` points to correct `.xcodeproj`
-2. Verify `IOS_APP_SCHEME` exists in project
+1. Check that your `.xcodeproj` or `.xcworkspace` exists in the project root
+2. Verify `build:ios` or `build` script in devbox.json is correct
 3. Ensure derived data directory is writable
-4. Clean build: `rm -rf .devbox/virtenv/ios/DerivedData`
+4. Clean build: `rm -rf DerivedData` or the path your build script uses
 
 ## Platform Requirements
 
@@ -392,9 +397,9 @@ devbox run --pure ios.sh devices eval
 - Keep command-line tools updated
 
 ### Build Configuration
-- Use project-relative paths for `IOS_APP_ARTIFACT`
-- Commit derived data to `.gitignore`
-- Use consistent scheme names across projects
+- Use project-relative paths for `IOS_APP_ARTIFACT` when auto-detect doesn't work
+- Commit derived data directories to `.gitignore`
+- Auto-detect works best when a single `.xcodeproj` or `.xcworkspace` exists in project root
 
 ## Example Workflows
 

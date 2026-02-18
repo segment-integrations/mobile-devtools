@@ -181,13 +181,9 @@ The Android plugin runs two initialization hooks:
 - `IOS_XCODE_ENV_PATH` - Additional PATH entries for Xcode tools
 - `IOS_DOWNLOAD_RUNTIME` - Auto-download missing runtimes (1=yes, 0=no, default: `1`)
 
-#### App Build Settings
+#### App Settings
 
-- `IOS_APP_PROJECT` - Xcode project path (default: `ios.xcodeproj`)
-- `IOS_APP_SCHEME` - Xcode build scheme (default: matches project name)
-- `IOS_APP_BUNDLE_ID` - App bundle identifier (default: `com.example.ios`)
-- `IOS_APP_ARTIFACT` - App bundle path/glob after build (default: `DerivedData/Build/Products/Debug-iphonesimulator/*.app`)
-- `IOS_APP_DERIVED_DATA` - Xcode derived data directory (default: `.devbox/virtenv/ios/DerivedData`)
+- `IOS_APP_ARTIFACT` - Path or glob pattern for .app bundle (relative to project root; empty = auto-detect via xcodebuild + search)
 
 #### Performance Settings
 
@@ -214,7 +210,6 @@ Set during simulator/app operations:
 
 - `IOS_SIM_UDID` - UUID of running simulator
 - `IOS_SIM_NAME` - Name of running simulator
-- `IOS_APP_BUNDLE_PATH` - Resolved app bundle path after build
 
 ### Included Packages
 
@@ -262,21 +257,15 @@ The iOS plugin runs two initialization hooks:
   },
   "env": {
     "IOS_DEFAULT_DEVICE": "max",
-    "IOS_DEVICES": "min,max",
-    "IOS_APP_PROJECT": "ios.xcodeproj",
-    "IOS_APP_SCHEME": "ios",
-    "IOS_APP_BUNDLE_ID": "com.example.ios",
-    "IOS_APP_ARTIFACT": ".devbox/virtenv/ios/DerivedData/Build/Products/Debug-iphonesimulator/ios.app"
+    "IOS_DEVICES": "min,max"
   },
   "shell": {
     "scripts": {
-      "build": [
-        "xcodebuild -project ${IOS_APP_PROJECT} -scheme ${IOS_APP_SCHEME} -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath .devbox/virtenv/ios/DerivedData build"
+      "build:ios": [
+        "env -u LD -u LDFLAGS -u NIX_LDFLAGS -u NIX_CFLAGS_COMPILE -u NIX_CFLAGS_LINK xcodebuild -project ios.xcodeproj -scheme ios -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath .devbox/virtenv/ios/DerivedData build"
       ],
-      "start:ios": [
-        "ios.sh simulator start ${1:-${IOS_DEFAULT_DEVICE:-max}}",
-        "xcrun simctl install booted ${IOS_APP_ARTIFACT}",
-        "xcrun simctl launch booted ${IOS_APP_BUNDLE_ID}"
+      "start:app": [
+        "ios.sh run ${1:-}"
       ]
     }
   }
@@ -364,10 +353,6 @@ Additional exports:
     "gradle@latest"
   ],
   "env": {
-    "IOS_APP_PROJECT": "ReactNativeExample.xcodeproj",
-    "IOS_APP_SCHEME": "ReactNativeExample",
-    "IOS_APP_BUNDLE_ID": "org.reactjs.native.example.ReactNativeExample",
-    "IOS_APP_ARTIFACT": ".devbox/virtenv/ios/DerivedData/Build/Products/Debug-iphonesimulator/ReactNativeExample.app",
     "ANDROID_APP_ID": "com.reactnativeexample",
     "ANDROID_APP_APK": "android/app/build/outputs/apk/debug/app-debug.apk",
     "ANDROID_MAX_API": "35",

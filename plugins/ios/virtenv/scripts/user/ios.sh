@@ -10,6 +10,7 @@ Commands:
   simulator start [device] [--pure]
   simulator stop
   simulator reset
+  run [app_path] [device]
   config show
   info
 
@@ -20,6 +21,9 @@ Examples:
   ios.sh simulator start max --pure
   ios.sh simulator stop
   ios.sh simulator reset
+  ios.sh run
+  ios.sh run max
+  ios.sh run /path/to/MyApp.app
   ios.sh config show
 USAGE
   exit 1
@@ -240,6 +244,11 @@ case "$command_name" in
         ;;
     esac
     ;;
+  run)
+    # shellcheck disable=SC1090
+    . "${script_dir}/domain/deploy.sh"
+    ios_run_app "$@"
+    ;;
   config)
     sub="${1-}"
     shift || true
@@ -248,12 +257,6 @@ case "$command_name" in
     case "$sub" in
       show)
         ios_config_show
-        ;;
-      set)
-        ios_config_set "$@"
-        ;;
-      reset)
-        ios_config_reset
         ;;
       *)
         usage

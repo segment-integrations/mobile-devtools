@@ -75,7 +75,7 @@ The plugin includes two default devices:
 - `min.json` - Minimum supported Android version (API 21, named `pixel_api21`)
 - `max.json` - Latest Android version (API 36, named `medium_phone_api36`)
 
-The filenames (`min`, `max`) are short nicknames you use in commands. The `name` field inside each JSON file is the full AVD name that appears in device listings.
+These files live in your `devbox.d/` directory, which is the devbox plugin configuration folder. The plugin creates a subdirectory there with a `devices/` folder containing them (e.g., `devbox.d/<plugin-dir>/devices/min.json`). The filenames (`min`, `max`) are short nicknames you use in commands. The `name` field inside each JSON file is the full AVD name that appears in device listings.
 
 ### Listing Devices
 
@@ -243,6 +243,8 @@ The plugin provides emulator and device management. Build and deploy commands ar
   }
 }
 ```
+
+The `${1:-}` syntax passes an optional argument through to the command — it means "use the first argument if provided, otherwise use nothing." This lets you run `devbox run start:app` (default device) or `devbox run start:app min` (specific device).
 
 With these scripts defined, you can:
 
