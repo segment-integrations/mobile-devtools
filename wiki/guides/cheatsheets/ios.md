@@ -44,26 +44,26 @@ devbox run ios.sh devices sync
 
 ```bash
 # Start simulator (default device)
-devbox run start-sim
+devbox run start:sim
 
 # Start specific device
-devbox run start-sim min
+devbox run start:sim min
 
 # Stop simulator
-devbox run stop-sim
+devbox run stop:sim
 ```
 
 ## Build and Deploy
 
 ```bash
 # Build app
-devbox run build-ios
+devbox run build
 
 # Build, install, and launch app
-devbox run start-ios
+devbox run start:ios
 
 # Build and run on specific device
-devbox run start-ios iphone15
+devbox run start:ios iphone15
 ```
 
 ## Configuration

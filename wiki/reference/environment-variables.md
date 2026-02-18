@@ -789,7 +789,7 @@ Set in project's `devbox.json`:
 Set for a single command execution:
 
 ```bash
-ANDROID_DEFAULT_DEVICE=pixel_api28 devbox run start-emu
+ANDROID_DEFAULT_DEVICE=pixel_api28 devbox run start:emu
 ```
 
 ### 3. Script-Level Override
@@ -800,7 +800,7 @@ Set in `devbox.json` script definitions:
 {
   "shell": {
     "scripts": {
-      "test-min": "ANDROID_DEFAULT_DEVICE=min devbox run start-app"
+      "test-min": "ANDROID_DEFAULT_DEVICE=min devbox run start"
     }
   }
 }

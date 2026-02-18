@@ -42,25 +42,25 @@ devbox run ios.sh devices eval
 
 ```bash
 # Android
-devbox run start-emu         # Start emulator
-devbox run start-app         # Build and run app
+devbox run start:emu         # Start emulator
+devbox run start:android     # Build and run app
 
 # iOS
-devbox run start-sim         # Start simulator
-devbox run start-ios         # Build and run app
+devbox run start:sim         # Start simulator
+devbox run start:ios         # Build and run app
 
 # Web
-devbox run start-web         # Start web dev server
+devbox run start:web         # Start web dev server
 ```
 
 ## Metro Bundler
 
 ```bash
 # Start Metro manually
-devbox run start-metro
+devbox run start:metro
 
 # Metro with custom port
-RN_METRO_PORT=8091 devbox run start-metro
+RN_METRO_PORT=8091 devbox run start:metro
 
 # Clean Metro cache
 devbox run clean-metro
@@ -180,22 +180,22 @@ rm -rf .devbox/virtenv/ios/DerivedData
 
 ```bash
 # Full Android workflow
-devbox run start-emu
+devbox run start:emu
 npm install
 devbox run build:android
-devbox run start-app
+devbox run start:android
 
 # Full iOS workflow
-devbox run start-sim
+devbox run start:sim
 npm install
 cd ios && pod install && cd ..
 devbox run build:ios
-devbox run start-ios
+devbox run start:ios
 
 # Development with hot reload
-devbox run start-metro &
-devbox run start-app    # Android
-devbox run start-ios    # iOS
+devbox run start:metro &
+devbox run start:android    # Android
+devbox run start:ios        # iOS
 ```
 
 ## Process Isolation

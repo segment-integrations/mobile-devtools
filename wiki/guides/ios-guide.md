@@ -205,8 +205,9 @@ Build the iOS app using Xcode:
 # Standard build
 devbox run build
 
-# Or build directly
-devbox run build-ios
+# Or build with xcodebuild directly
+xcodebuild -project ${IOS_APP_PROJECT} -scheme ${IOS_APP_SCHEME} -configuration Debug \
+  -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData build
 ```
 
 The plugin automatically configures the build environment, setting `DEVELOPER_DIR` and adding Xcode tools to PATH. Builds are configured for:
@@ -220,10 +221,10 @@ Start an iOS simulator for testing:
 
 ```bash
 # Start default device
-devbox run start-sim
+devbox run start:sim
 
 # Start specific device
-devbox run start-sim iphone15
+devbox run start:sim iphone15
 ```
 
 The simulator boots if not already running. The default device is configured via `IOS_DEFAULT_DEVICE` (defaults to `max`).
@@ -244,10 +245,10 @@ Build, install, and launch your app on the simulator:
 
 ```bash
 # Build and run on default device
-devbox run start-ios
+devbox run start:ios
 
 # Build and run on specific device
-devbox run start-ios iphone15
+devbox run start:ios iphone15
 ```
 
 The `start-ios` command:
@@ -270,7 +271,7 @@ The app artifact path is auto-detected based on your Xcode configuration. You ca
 Stop all running simulators:
 
 ```bash
-devbox run stop-sim
+devbox run stop:sim
 ```
 
 This shuts down all iOS simulators.
@@ -284,25 +285,25 @@ Typical development session:
 devbox shell
 
 # 2. Start simulator
-devbox run start-sim max
+devbox run start:sim max
 
 # 3. Build and run app
 devbox run build
-devbox run start-ios max
+devbox run start:ios max
 
 # 4. Make code changes, rebuild, and redeploy
 devbox run build
-devbox run start-ios max
+devbox run start:ios max
 
 # 5. Stop simulator when done
-devbox run stop-sim
+devbox run stop:sim
 ```
 
 For a streamlined workflow, use the combined command that handles everything:
 
 ```bash
 # Build, install, and launch in one command
-devbox run start-ios
+devbox run start:ios
 ```
 
 ## Testing
@@ -693,7 +694,7 @@ Commit the updated lock file to version control.
 
 1. Increase boot timeout:
    ```bash
-   BOOT_TIMEOUT=180 devbox run start-sim
+   BOOT_TIMEOUT=180 devbox run start:sim
    ```
 
 2. Check system resources (CPU, memory):
@@ -798,9 +799,9 @@ Test your app across multiple iOS versions:
 
 4. Test on each device:
    ```bash
-   devbox run start-ios iphone_ios15
-   devbox run start-ios iphone_ios17
-   devbox run start-ios iphone_ios18
+   devbox run start:ios iphone_ios15
+   devbox run start:ios iphone_ios17
+   devbox run start:ios iphone_ios18
    ```
 
 ### CI/CD Integration

@@ -34,7 +34,6 @@ Create or modify your `devbox.json` to include the Android plugin:
     "gradle": "latest"
   },
   "env": {
-    "ANDROID_APP_ID": "com.example.myapp",
     "ANDROID_APP_APK": "app/build/outputs/apk/debug/app-debug.apk"
   }
 }
@@ -134,17 +133,17 @@ devbox run android.sh devices delete pixel_api28
 
 ### Selecting Devices for Evaluation
 
-By default, the Android SDK flake evaluates all devices. To optimize evaluation time (especially in CI), select specific devices:
+By default, the Android SDK flake evaluates all devices. To optimize evaluation time (especially in CI), set the `ANDROID_DEVICES` environment variable in your `devbox.json`:
 
-```bash
-# Select only min and max devices
-devbox run android.sh devices select min max
-
-# Reset to evaluate all devices
-devbox run android.sh devices reset
+```json
+{
+  "env": {
+    "ANDROID_DEVICES": "min,max"
+  }
+}
 ```
 
-This updates the `ANDROID_DEVICES` configuration.
+Leave `ANDROID_DEVICES` unset or empty to evaluate all devices.
 
 ### Regenerating the Lock File
 
@@ -177,10 +176,10 @@ Build the Android app using Gradle:
 devbox run build
 
 # Build with full debug output
-devbox run build-debug
+gradle assembleDebug --debug
 
 # Clean build artifacts
-devbox run gradle-clean
+gradle clean
 ```
 
 Or use Gradle directly:
@@ -197,10 +196,10 @@ Start an Android emulator for testing:
 
 ```bash
 # Start default device
-devbox run start-emu
+devbox run start:emu
 
 # Start specific device
-devbox run start-emu pixel_api28
+devbox run start:emu pixel_api28
 
 # Start with clean state (wipe data)
 devbox run android.sh emulator start --pure pixel_api28
@@ -224,13 +223,13 @@ Build, install, and launch your app on the emulator:
 
 ```bash
 # Build and run on default device
-devbox run run
+devbox run start
 
 # Build and run on specific device
-devbox run run pixel_api28
+devbox run start pixel_api28
 
 # Install pre-built APK without building
-devbox run run path/to/app.apk
+devbox run start path/to/app.apk
 ```
 
 The `run` command:
@@ -244,7 +243,7 @@ The `run` command:
 Stop all running emulators:
 
 ```bash
-devbox run stop-emu
+devbox run stop:emu
 ```
 
 Or stop the emulator for a specific device:
@@ -258,11 +257,7 @@ devbox run android.sh emulator stop
 Reset AVD state (clears all data and app installations):
 
 ```bash
-# Reset all devices
-devbox run reset-emu
-
-# Reset specific device
-devbox run reset-emu-device max
+devbox run android.sh emulator reset
 ```
 
 This is useful after Nix package updates or when you need a clean slate.
@@ -276,25 +271,25 @@ Typical development session:
 devbox shell
 
 # 2. Start emulator
-devbox run start-emu max
+devbox run start:emu max
 
 # 3. Build and run app
 devbox run build
-devbox run run max
+devbox run start max
 
 # 4. Make code changes, rebuild, and redeploy
 devbox run build
-devbox run run max
+devbox run start max
 
 # 5. Stop emulator when done
-devbox run stop-emu
+devbox run stop:emu
 ```
 
 For a streamlined workflow, use the combined command:
 
 ```bash
 # Build, install, and launch in one command
-devbox run start-android
+devbox run start
 ```
 
 This starts the emulator, builds the app, and deploys it automatically.
@@ -487,17 +482,18 @@ Display all configuration settings:
 devbox run android.sh config show
 ```
 
-Update configuration values:
+Update configuration by editing your `devbox.json` env section:
 
-```bash
-devbox run android.sh config set ANDROID_DEFAULT_DEVICE=pixel_api28
+```json
+{
+  "env": {
+    "ANDROID_DEFAULT_DEVICE": "pixel_api28",
+    "ANDROID_DEVICES": "min,max"
+  }
+}
 ```
 
-Reset to default configuration:
-
-```bash
-devbox run android.sh config reset
-```
+Run `devbox shell` after changing `devbox.json` to apply the new values. To reset to defaults, remove the overrides from your `devbox.json`.
 
 ## Troubleshooting
 
@@ -514,17 +510,17 @@ devbox run android.sh config reset
 
 2. Try starting with snapshot disabled:
    ```bash
-   ANDROID_DISABLE_SNAPSHOTS=1 devbox run start-emu
+   ANDROID_DISABLE_SNAPSHOTS=1 devbox run start:emu
    ```
 
 3. Reset emulator state:
    ```bash
-   devbox run reset-emu-device max
+   devbox run android.sh emulator reset-device max
    ```
 
 4. Increase boot timeout:
    ```bash
-   BOOT_TIMEOUT=180 devbox run start-emu
+   BOOT_TIMEOUT=180 devbox run start:emu
    ```
 
 ### APK Installation Fails
@@ -596,18 +592,18 @@ Commit the updated `devices.lock` file.
 
 1. Stop all emulators:
    ```bash
-   devbox run stop-emu
+   devbox run stop:emu
    ```
 
 2. Specify different ports for each emulator:
    ```bash
-   EMU_PORT=5554 devbox run start-emu device1
-   EMU_PORT=5556 devbox run start-emu device2
+   EMU_PORT=5554 devbox run start:emu device1
+   EMU_PORT=5556 devbox run start:emu device2
    ```
 
 3. Use device serials explicitly:
    ```bash
-   ANDROID_SERIAL=emulator-5554 devbox run run
+   ANDROID_SERIAL=emulator-5554 devbox run start
    ```
 
 ### Build Fails with SDK Version Errors
@@ -681,9 +677,9 @@ Test your app across multiple Android versions:
 
 3. Test on each device:
    ```bash
-   devbox run run api21
-   devbox run run api28
-   devbox run run api36
+   devbox run start api21
+   devbox run start api28
+   devbox run start api36
    ```
 
 ### CI/CD Integration

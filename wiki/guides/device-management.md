@@ -747,12 +747,12 @@ Specify a default device used when no device is explicitly provided.
 **Usage:**
 ```bash
 # Uses default device
-devbox run start-android
-devbox run start-ios
+devbox run start
+devbox run start:ios
 
 # Override with specific device
-devbox run start-android min
-devbox run start-ios min
+devbox run start min
+devbox run start:ios min
 ```
 
 ### CI Device Selection
@@ -1030,14 +1030,14 @@ devbox.d/
 # Android testing
 devbox run android.sh devices list
 devbox run android.sh devices eval
-devbox run start-android min
-devbox run start-android max
+devbox run start min
+devbox run start max
 
 # iOS testing
 devbox run ios.sh devices list
 devbox run ios.sh devices eval
-devbox run start-ios min
-devbox run start-ios max
+devbox run start:ios min
+devbox run start:ios max
 ```
 
 ## Troubleshooting

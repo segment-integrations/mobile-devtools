@@ -22,9 +22,9 @@ Plugins use GitHub-based distribution without explicit version numbers.
 ```json
 {
   "include": [
-    "github:jetify-com/devbox-plugins?dir=plugins/android",
-    "github:jetify-com/devbox-plugins?dir=plugins/ios&ref=main",
-    "github:jetify-com/devbox-plugins?dir=plugins/react-native&ref=v1.2.0"
+    "github:segment-integrations/devbox-plugins?dir=plugins/android",
+    "github:segment-integrations/devbox-plugins?dir=plugins/ios&ref=main",
+    "github:segment-integrations/devbox-plugins?dir=plugins/react-native&ref=v1.2.0"
   ]
 }
 ```
@@ -206,7 +206,7 @@ The devbox-mcp package is released automatically via semantic-release when chang
    ```
    chore(release): 0.2.0 [skip ci]
 
-   ## [0.2.0](https://github.com/jetify-com/devbox-plugins/compare/v0.1.0...v0.2.0) (2026-02-12)
+   ## [0.2.0](https://github.com/segment-integrations/devbox-plugins/compare/v0.1.0...v0.2.0) (2026-02-12)
 
    ### Features
 
@@ -419,7 +419,7 @@ git push origin :refs/tags/v1.2.0
   ```json
   {
     "include": [
-      "github:jetify-com/devbox-plugins?dir=plugins/android&ref=v1.2.0"
+      "github:segment-integrations/devbox-plugins?dir=plugins/android&ref=v1.2.0"
     ]
   }
   ```
@@ -680,20 +680,20 @@ This repository does not maintain release branches. All fixes go to main branch.
 
 **MCP Package:**
 - NPM: https://www.npmjs.com/package/devbox-mcp
-- GitHub Releases: https://github.com/jetify-com/devbox-plugins/releases
-- CHANGELOG: https://github.com/jetify-com/devbox-plugins/blob/main/plugins/devbox-mcp/CHANGELOG.md
+- GitHub Releases: https://github.com/segment-integrations/devbox-plugins/releases
+- CHANGELOG: https://github.com/segment-integrations/devbox-plugins/blob/main/plugins/devbox-mcp/CHANGELOG.md
 
 **Plugins:**
-- Main branch: https://github.com/jetify-com/devbox-plugins
-- Tags: https://github.com/jetify-com/devbox-plugins/tags
-- Releases: https://github.com/jetify-com/devbox-plugins/releases
+- Main branch: https://github.com/segment-integrations/devbox-plugins
+- Tags: https://github.com/segment-integrations/devbox-plugins/tags
+- Releases: https://github.com/segment-integrations/devbox-plugins/releases
 
 **CI/CD:**
-- Publish workflow: https://github.com/jetify-com/devbox-plugins/actions/workflows/publish-mcp.yml
-- PR checks: https://github.com/jetify-com/devbox-plugins/actions/workflows/pr-checks.yml
+- Publish workflow: https://github.com/segment-integrations/devbox-plugins/actions/workflows/publish-mcp.yml
+- PR checks: https://github.com/segment-integrations/devbox-plugins/actions/workflows/pr-checks.yml
 
 **Documentation:**
-- Android Plugin: https://github.com/jetify-com/devbox-plugins/blob/main/plugins/android/REFERENCE.md
-- iOS Plugin: https://github.com/jetify-com/devbox-plugins/blob/main/plugins/ios/REFERENCE.md
-- React Native Plugin: https://github.com/jetify-com/devbox-plugins/blob/main/plugins/react-native/REFERENCE.md
-- MCP Package README: https://github.com/jetify-com/devbox-plugins/blob/main/plugins/devbox-mcp/README.md
+- Android Plugin: https://github.com/segment-integrations/devbox-plugins/blob/main/plugins/android/REFERENCE.md
+- iOS Plugin: https://github.com/segment-integrations/devbox-plugins/blob/main/plugins/ios/REFERENCE.md
+- React Native Plugin: https://github.com/segment-integrations/devbox-plugins/blob/main/plugins/react-native/REFERENCE.md
+- MCP Package README: https://github.com/segment-integrations/devbox-plugins/blob/main/plugins/devbox-mcp/README.md

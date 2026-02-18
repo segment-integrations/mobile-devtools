@@ -44,29 +44,26 @@ devbox run android.sh devices sync
 
 ```bash
 # Start emulator (default device)
-devbox run start-emu
+devbox run start:emu
 
 # Start specific device
-devbox run start-emu min
+devbox run start:emu min
 
 # Stop emulator
-devbox run stop-emu
-
-# Reset emulator (wipe data)
-devbox run reset-emu
+devbox run stop:emu
 ```
 
 ## Build and Deploy
 
 ```bash
 # Build app
-devbox run build-android
+devbox run build
 
 # Build, install, and launch app
-devbox run start-app
+devbox run start
 
 # Build and run on specific device
-devbox run start-app pixel_api30
+devbox run start pixel_api30
 ```
 
 ## Configuration

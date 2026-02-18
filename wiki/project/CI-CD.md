@@ -653,7 +653,7 @@ ERROR: Emulator failed to boot within 180 seconds
 1. Check `android-emulator.log` in artifacts
 2. Verify KVM is enabled: `ls -l /dev/kvm`
 3. Check system resources: `free -h`, `df -h`
-4. Try manually: `EMU_HEADLESS=1 devbox run start-emu min`
+4. Try manually: `EMU_HEADLESS=1 devbox run start:emu min`
 
 **Fix:**
 - Increase `BOOT_TIMEOUT` in workflow
@@ -677,7 +677,7 @@ ERROR: Build failed with exit code 1
 1. Check `build-app.log` in artifacts
 2. Look for compilation errors in logs
 3. Check dependency resolution issues
-4. Try locally: `devbox run build-android` or `devbox run build-ios`
+4. Try locally: `devbox run build` in the appropriate example project
 
 **Fix:**
 - Update dependencies in `build.gradle` or `Podfile`

@@ -288,17 +288,17 @@ Use Ctrl/Cmd+F to search for specific error messages or symptoms.
 
 2. Try starting with snapshot disabled:
    ```bash
-   ANDROID_DISABLE_SNAPSHOTS=1 devbox run start-emu
+   ANDROID_DISABLE_SNAPSHOTS=1 devbox run start:emu
    ```
 
 3. Reset emulator state:
    ```bash
-   devbox run reset-emu-device max
+   devbox run android.sh emulator reset max
    ```
 
 4. Increase boot timeout:
    ```bash
-   BOOT_TIMEOUT=180 devbox run start-emu
+   BOOT_TIMEOUT=180 devbox run start:emu
    ```
 
 5. Check system resources:
@@ -313,7 +313,7 @@ Use Ctrl/Cmd+F to search for specific error messages or symptoms.
 
 7. Try headless mode:
    ```bash
-   EMU_HEADLESS=1 devbox run start-emu
+   EMU_HEADLESS=1 devbox run start:emu
    ```
 
 **Prevention**: Ensure virtualization is enabled in BIOS and sufficient RAM available (4GB+ recommended).
@@ -370,7 +370,7 @@ Use Ctrl/Cmd+F to search for specific error messages or symptoms.
 
 1. Increase boot timeout:
    ```bash
-   BOOT_TIMEOUT=180 devbox run start-sim
+   BOOT_TIMEOUT=180 devbox run start:sim
    ```
 
 2. Check system resources:
@@ -408,18 +408,18 @@ Use Ctrl/Cmd+F to search for specific error messages or symptoms.
 
 1. Stop all emulators:
    ```bash
-   devbox run stop-emu
+   devbox run stop:emu
    ```
 
 2. Specify different ports for each emulator:
    ```bash
-   EMU_PORT=5554 devbox run start-emu device1
-   EMU_PORT=5556 devbox run start-emu device2
+   EMU_PORT=5554 devbox run start:emu device1
+   EMU_PORT=5556 devbox run start:emu device2
    ```
 
 3. Use device serials explicitly:
    ```bash
-   ANDROID_SERIAL=emulator-5554 devbox run run
+   ANDROID_SERIAL=emulator-5554 devbox run start
    ```
 
 4. List running emulators:
@@ -442,7 +442,7 @@ Use Ctrl/Cmd+F to search for specific error messages or symptoms.
 1. Clean Gradle build:
    ```bash
    cd android && gradle clean
-   devbox run build-android
+   devbox run build
    ```
 
 2. Clear Gradle cache:
@@ -489,7 +489,7 @@ Use Ctrl/Cmd+F to search for specific error messages or symptoms.
 
 3. Rebuild:
    ```bash
-   devbox run build-ios
+   devbox run build
    ```
 
 4. Check code signing:
@@ -641,8 +641,8 @@ Use Ctrl/Cmd+F to search for specific error messages or symptoms.
 
 4. Debug in development mode:
    ```bash
-   BUILD_CONFIG=Debug devbox run start-android
-   BUILD_CONFIG=Debug devbox run start-ios
+   BUILD_CONFIG=Debug devbox run start
+   BUILD_CONFIG=Debug devbox run start:ios
    ```
 
 5. Check for missing native libraries or frameworks.
@@ -928,7 +928,7 @@ Use Ctrl/Cmd+F to search for specific error messages or symptoms.
 2. Use incremental builds:
    ```bash
    # Don't clean between builds
-   devbox run build-android
+   devbox run build
    # Subsequent builds are faster
    ```
 
@@ -945,7 +945,7 @@ Use Ctrl/Cmd+F to search for specific error messages or symptoms.
 
 5. Use Debug builds in development:
    ```bash
-   BUILD_CONFIG=Debug devbox run build-android
+   BUILD_CONFIG=Debug devbox run build
    ```
 
 **Prevention**: Keep build caches and use incremental builds.
@@ -965,12 +965,12 @@ Use Ctrl/Cmd+F to search for specific error messages or symptoms.
 
 2. Use headless mode to save resources:
    ```bash
-   EMU_HEADLESS=1 devbox run start-emu
+   EMU_HEADLESS=1 devbox run start:emu
    ```
 
 3. Disable snapshots for better performance:
    ```bash
-   ANDROID_DISABLE_SNAPSHOTS=1 devbox run start-emu
+   ANDROID_DISABLE_SNAPSHOTS=1 devbox run start:emu
    ```
 
 4. Allocate more RAM to emulator (edit device JSON):
@@ -1117,7 +1117,7 @@ Standard debugging approach:
 
 1. Enable debug logging:
    ```bash
-   DEBUG=1 ANDROID_DEBUG=1 devbox run start-android
+   DEBUG=1 ANDROID_DEBUG=1 devbox run start
    ```
 
 2. Check environment:

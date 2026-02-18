@@ -37,7 +37,8 @@ metro_start() {
   echo "Cache dir: ${REACT_NATIVE_VIRTENV}/metro/cache"
 
   # Start Metro with allocated port
-  npx react-native start \
+  # Use exec to replace shell process - avoids "Terminated: 15" message on shutdown
+  exec npx react-native start \
     --port "$metro_port" \
     --reset-cache
 }

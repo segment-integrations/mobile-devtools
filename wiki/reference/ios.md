@@ -442,10 +442,10 @@ ios.sh devices list
 ios.sh devices eval
 
 # Start simulator
-devbox run start-sim
+devbox run start:sim
 
 # Build and run app
-devbox run start-ios
+devbox run start:ios
 ```
 
 ### Adding New Device

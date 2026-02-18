@@ -52,8 +52,8 @@ Configure the plugin by setting environment variables in `plugin.json`. These ar
 - `devbox run --pure android.sh emulator reset [device]`
 
 **Convenience aliases:**
-- `devbox run --pure start-emu [device]` (equivalent to `android.sh emulator start` without `--pure`)
-- `devbox run --pure stop-emu` (equivalent to `android.sh emulator stop`)
+- `devbox run --pure start:emu [device]` (equivalent to `android.sh emulator start` without `--pure`)
+- `devbox run --pure stop:emu` (equivalent to `android.sh emulator stop`)
 
 **Behavior:**
 - Without `--pure`: Checks if an emulator with the same AVD is already running and reuses it
@@ -61,7 +61,7 @@ Configure the plugin by setting environment variables in `plugin.json`. These ar
 
 ### Run app
 
-- `devbox run run [apk_path] [device]`
+- `devbox run start [apk_path] [device]`
   - Builds, installs, and launches the app on the emulator
   - If `apk_path` is provided, skips build step and installs provided APK
   - If no arguments, builds project and installs APK matched by `ANDROID_APP_APK`
@@ -93,7 +93,7 @@ Configuration is managed via environment variables in `devbox.json`, not via CLI
 ### Device selection
 - `ANDROID_DEFAULT_DEVICE` - Default device name when none specified (set in devbox.json)
 - `ANDROID_DEVICES` - Device names to evaluate in flake (comma-separated, empty = all; set in devbox.json)
-- `ANDROID_DEVICE_NAME` - Override device selection at runtime (e.g., `ANDROID_DEVICE_NAME=min devbox run start-emu`)
+- `ANDROID_DEVICE_NAME` - Override device selection at runtime (e.g., `ANDROID_DEVICE_NAME=min devbox run start:emu`)
 - `TARGET_DEVICE` - Alias for ANDROID_DEVICE_NAME (legacy, prefer ANDROID_DEVICE_NAME)
 
 ### Emulator configuration

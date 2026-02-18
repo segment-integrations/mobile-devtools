@@ -173,12 +173,19 @@ processes:
       . ${ANDROID_RUNTIME_DIR}/scripts/init/setup.sh
       serial=$(cat ${ANDROID_RUNTIME_DIR}/emulator-serial.txt 2>/dev/null || echo emulator-5554)
 
-      echo "Waiting for app to start..."
+      # Resolve app ID: env var > auto-detected from APK > fail
+      app_id="${ANDROID_APP_ID:-$(cat ${ANDROID_RUNTIME_DIR}/app-id.txt 2>/dev/null || true)}"
+      if [ -z "$app_id" ]; then
+        echo "ERROR: Cannot determine app ID. Set ANDROID_APP_ID or run deploy first." >&2
+        exit 1
+      fi
+
+      echo "Waiting for app to start ($app_id)..."
       max_attempts=10
       attempt=0
       while [ $attempt -lt $max_attempts ]; do
-        if adb -s $serial shell pidof ${ANDROID_APP_ID:-com.reactnativeexample} >/dev/null 2>&1; then
-          echo "✓ App process running (PID: $(adb -s $serial shell pidof ${ANDROID_APP_ID:-com.reactnativeexample}))"
+        if adb -s $serial shell pidof "$app_id" >/dev/null 2>&1; then
+          echo "✓ App process running (PID: $(adb -s $serial shell pidof "$app_id"))"
           exit 0
         fi
         attempt=$((attempt + 1))
@@ -210,7 +217,8 @@ processes:
 
       if [ "${IN_NIX_SHELL:-}" = "pure" ]; then
         echo "🧹 Cleaning up (pure mode)..."
-        adb -s $serial shell am force-stop ${ANDROID_APP_ID:-com.reactnativeexample} 2>/dev/null || true
+        app_id="${ANDROID_APP_ID:-$(cat ${ANDROID_RUNTIME_DIR}/app-id.txt 2>/dev/null || true)}"
+        [ -n "$app_id" ] && adb -s $serial shell am force-stop "$app_id" 2>/dev/null || true
         android.sh emulator stop || true
         echo "✓ App stopped, emulator stopped"
       else

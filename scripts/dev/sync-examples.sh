@@ -1,43 +1,22 @@
 #!/usr/bin/env bash
-# Sync plugin scripts to example projects
-# Run this after modifying plugin scripts during development
+# Sync example projects with latest plugin sources
+# Deletes .devbox and regenerates from plugin sources via devbox install
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
-echo "Syncing plugin scripts to examples..."
+echo "Syncing example projects with latest plugin sources..."
 echo ""
 
-echo "Android plugin:"
-# Sync to android example
-if [ -d "$REPO_ROOT/examples/android/.devbox/virtenv/android/scripts" ]; then
-  echo "  → examples/android"
-  cp -r "$REPO_ROOT/plugins/android/virtenv/scripts/"* "$REPO_ROOT/examples/android/.devbox/virtenv/android/scripts/"
-fi
-
-# Sync to react-native example
-if [ -d "$REPO_ROOT/examples/react-native/.devbox/virtenv/android/scripts" ]; then
-  echo "  → examples/react-native"
-  cp -r "$REPO_ROOT/plugins/android/virtenv/scripts/"* "$REPO_ROOT/examples/react-native/.devbox/virtenv/android/scripts/"
-fi
+for example in android ios react-native; do
+  example_dir="$REPO_ROOT/examples/$example"
+  if [ -d "$example_dir" ]; then
+    echo "  $example: removing .devbox and reinstalling..."
+    (cd "$example_dir" && rm -rf .devbox && devbox install)
+    echo "  ✓ $example synced"
+  fi
+done
 
 echo ""
-echo "iOS plugin:"
-# Sync to ios example
-if [ -d "$REPO_ROOT/examples/ios/.devbox/virtenv/ios/scripts" ]; then
-  echo "  → examples/ios"
-  cp -r "$REPO_ROOT/plugins/ios/virtenv/scripts/"* "$REPO_ROOT/examples/ios/.devbox/virtenv/ios/scripts/"
-fi
-
-# Sync to react-native example
-if [ -d "$REPO_ROOT/examples/react-native/.devbox/virtenv/ios/scripts" ]; then
-  echo "  → examples/react-native"
-  cp -r "$REPO_ROOT/plugins/ios/virtenv/scripts/"* "$REPO_ROOT/examples/react-native/.devbox/virtenv/ios/scripts/"
-fi
-
-echo ""
-echo "✓ Plugin scripts synced"
-echo ""
-echo "Note: This is a development-only helper. In production, devbox"
-echo "      automatically installs plugin scripts during 'devbox shell'."
+echo "✓ All examples synced"

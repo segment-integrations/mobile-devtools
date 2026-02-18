@@ -5,18 +5,38 @@ Reproducible, project-local development environments for Android, iOS, and React
 ## Quick Start
 
 ```bash
-# Add Android plugin to your project
-echo '{
-  "include": ["github:segment-integrations/devbox-plugins?dir=plugins/android"]
-}' > devbox.json
+# Initialize devbox in your project
+devbox init
 
+# Add the Android plugin include to your devbox.json
+# (devbox add only works for packages, not plugins — edit devbox.json manually)
+```
+
+Add the plugin to your `devbox.json`:
+
+```json
+{
+  "include": ["github:segment-integrations/devbox-plugins?dir=plugins/android"],
+  "packages": {
+    "jdk17": "latest",
+    "gradle": "latest"
+  },
+  "env": {
+    "ANDROID_APP_APK": "app/build/outputs/apk/debug/app-debug.apk"
+  }
+}
+```
+
+```bash
 # Enter development environment
 devbox shell
 
 # Start emulator and run app
-devbox run start-emu
-devbox run start-app
+devbox run start:emu
+devbox run start
 ```
+
+The app's package name is auto-detected from the APK at install time.
 
 **New to devbox-plugins?** Check out the [Quick Start Guide](wiki/guides/quick-start.md) for detailed setup instructions.
 
@@ -103,14 +123,14 @@ Each example includes device definitions, test suites, and build scripts.
 
 ```bash
 # Android
-devbox run start-emu        # Start Android emulator
-devbox run start-app        # Build and launch app
-devbox run stop-emu         # Stop emulator
+devbox run start:emu        # Start Android emulator
+devbox run start            # Build, install, and launch app
+devbox run stop:emu         # Stop emulator
 
 # iOS
-devbox run start-sim        # Start iOS simulator
-devbox run start-ios        # Build and launch app
-devbox run stop-sim         # Stop simulator
+devbox run start:sim        # Start iOS simulator
+devbox run start:ios        # Build and launch app
+devbox run stop:sim         # Stop simulator
 
 # Device management
 devbox run android.sh devices list

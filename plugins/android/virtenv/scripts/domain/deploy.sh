@@ -348,6 +348,15 @@ android_run_app() {
   echo "  Package: $package_name"
   echo "  Activity: $activity_name"
 
+  # Save extracted metadata for other processes (test scripts, etc.)
+  # This enables auto-detection of ANDROID_APP_ID without manual configuration
+  runtime_dir="${ANDROID_RUNTIME_DIR:-${ANDROID_USER_HOME:-}}"
+  if [ -n "$runtime_dir" ]; then
+    mkdir -p "$runtime_dir"
+    echo "$package_name" > "$runtime_dir/app-id.txt"
+    echo "$activity_name" > "$runtime_dir/app-activity.txt"
+  fi
+
   # ---- Deploy to Emulator ----
 
   emulator_serial="${ANDROID_EMULATOR_SERIAL:-emulator-${EMU_PORT:-5554}}"

@@ -73,7 +73,7 @@
 {"level":"info","process":"test-tools","replica":0,"message":"===================================="}
 {"level":"info","process":"test-mcp-tools","replica":0,"message":"Testing MCP tools functionality..."}
 {"level":"info","process":"test-mcp-tools","replica":0}
-{"level":"info","process":"test-mcp-tools","replica":0,"message":"Test directory: /var/folders/4k/82wjl0fd5zvgtwh3hbcrh3rm0000gn/T/devbox-mcp-test-1771433379830"}
+{"level":"info","process":"test-mcp-tools","replica":0,"message":"Test directory: /var/folders/4k/82wjl0fd5zvgtwh3hbcrh3rm0000gn/T/devbox-mcp-test-1771436721137"}
 {"level":"info","process":"test-mcp-tools","replica":0}
 {"level":"info","process":"test-mcp-tools","replica":0}
 {"level":"info","process":"test-mcp-tools","replica":0,"message":"Test 1: devbox init"}
