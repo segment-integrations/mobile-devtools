@@ -3,8 +3,8 @@
   "version": "0.0.3",
   "description": "Aggregates the Android and iOS Devbox plugins for React Native projects.",
   "include": [
-    "github:segment-integrations/devbox-plugins?dir=plugins/android",
-    "github:segment-integrations/devbox-plugins?dir=plugins/ios"
+    "github:segment-integrations/devbox-plugins?dir=plugins/android&ref=main",
+    "github:segment-integrations/devbox-plugins?dir=plugins/ios&ref=main"
   ],
   "packages": {
     "curl": "latest",
