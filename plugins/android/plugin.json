@@ -23,7 +23,7 @@
     "ANDROID_CMAKE_VERSION": "3.22.1",
     "ANDROID_CMDLINE_TOOLS_VERSION": "19.0",
     "ANDROID_DISABLE_SNAPSHOTS": "0",
-    "ANDROID_SKIP_DOWNLOADS": "0",
+    "ANDROID_SKIP_SETUP": "0",
     "REPORTS_DIR": "reports"
   },
   "packages": {

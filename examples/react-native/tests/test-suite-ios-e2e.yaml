@@ -4,7 +4,7 @@ environment:
   - "IOS_DEVICE=${IOS_DEFAULT_DEVICE:-max}"
   - "TEST_TIMEOUT=300"
   - "BOOT_TIMEOUT=120"
-  - "ANDROID_SKIP_DOWNLOADS=1"
+  - "ANDROID_SKIP_SETUP=1"
   - "TEST_TUI=${TEST_TUI:-false}"
   - "LANG=en_US.UTF-8"
   - "LC_ALL=en_US.UTF-8"

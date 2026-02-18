@@ -105,11 +105,11 @@ Or use path-based inclusion:
 
 #### Performance Settings
 
-- `ANDROID_SKIP_DOWNLOADS` - Skip Android SDK downloads/evaluation during shell initialization (0/1, default: `0`)
+- `ANDROID_SKIP_SETUP` - Skip Android SDK downloads/evaluation during shell initialization (0/1, default: `0`)
   - Useful for iOS-only contexts in React Native projects to speed up initialization
   - When set to 1, skips Nix flake evaluation, SDK resolution, and environment configuration
-  - Set before shell initialization: `devbox run -e ANDROID_SKIP_DOWNLOADS=1 build:ios`
-  - With --pure flag: `devbox run --pure -e ANDROID_SKIP_DOWNLOADS=1 build:ios`
+  - Set before shell initialization: `devbox run -e ANDROID_SKIP_SETUP=1 build:ios`
+  - With --pure flag: `devbox run --pure -e ANDROID_SKIP_SETUP=1 build:ios`
 
 #### Testing and Reporting
 
@@ -457,7 +457,7 @@ React Native projects can skip unused platform setup:
   "shell": {
     "scripts": {
       "build:ios": [
-        "ANDROID_SKIP_DOWNLOADS=1 devbox run --pure xcodebuild ..."
+        "ANDROID_SKIP_SETUP=1 devbox run --pure xcodebuild ..."
       ],
       "build:android": [
         "IOS_SKIP_SETUP=1 devbox run --pure gradle assembleDebug"
@@ -473,7 +473,7 @@ Or set in process-compose test suites:
 processes:
   build-ios:
     environment:
-      - ANDROID_SKIP_DOWNLOADS=1
+      - ANDROID_SKIP_SETUP=1
     command: devbox run build:ios
 ```
 

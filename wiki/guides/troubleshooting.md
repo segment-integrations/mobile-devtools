@@ -40,7 +40,7 @@ Use Ctrl/Cmd+F to search for specific error messages or symptoms.
    ```json
    {
      "env": {
-       "ANDROID_SKIP_DOWNLOADS": "1",
+       "ANDROID_SKIP_SETUP": "1",
        "IOS_SKIP_SETUP": "1"
      }
    }
@@ -891,7 +891,7 @@ Use Ctrl/Cmd+F to search for specific error messages or symptoms.
    ```json
    {
      "env": {
-       "ANDROID_SKIP_DOWNLOADS": "1",
+       "ANDROID_SKIP_SETUP": "1",
        "IOS_SKIP_SETUP": "1"
      }
    }

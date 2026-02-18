@@ -119,10 +119,10 @@ devbox run test:e2e:ios  # Runs with --pure by default
 
 ```bash
 # Correct
-devbox run --pure -e ANDROID_SKIP_DOWNLOADS=1 test:e2e:ios
+devbox run --pure -e ANDROID_SKIP_SETUP=1 test:e2e:ios
 
 # Incorrect (variable gets reset)
-ANDROID_SKIP_DOWNLOADS=1 devbox run --pure test:e2e:ios
+ANDROID_SKIP_SETUP=1 devbox run --pure test:e2e:ios
 ```
 
 ## Android Testing
@@ -288,7 +288,7 @@ These scripts use the correct `-e` flag syntax to pass environment variables in 
 
 ```bash
 # iOS wrapper skips Android
-devbox run --pure -e ANDROID_SKIP_DOWNLOADS=1 test:e2e:ios
+devbox run --pure -e ANDROID_SKIP_SETUP=1 test:e2e:ios
 
 # Android wrapper skips iOS
 devbox run --pure -e IOS_SKIP_SETUP=1 test:e2e:android
@@ -663,7 +663,7 @@ TUI automatically falls back to non-interactive mode when running in CI or non-i
 |----------|-------------|---------|
 | `BUILD_CONFIG` | Build configuration (Debug/Release) | `Debug` for dev, `Release` for E2E |
 | `IOS_BUILD_CONFIG` | iOS-specific build config | `$BUILD_CONFIG` |
-| `ANDROID_SKIP_DOWNLOADS` | Skip Android SDK evaluation | `0` |
+| `ANDROID_SKIP_SETUP` | Skip Android SDK evaluation | `0` |
 | `IOS_SKIP_SETUP` | Skip iOS environment setup | `0` |
 
 ## Debugging Test Failures
@@ -881,7 +881,7 @@ When testing both platforms, skip the unused platform for faster startup:
 
 ```bash
 # iOS only (skip Android SDK)
-devbox run --pure -e ANDROID_SKIP_DOWNLOADS=1 test:e2e:ios
+devbox run --pure -e ANDROID_SKIP_SETUP=1 test:e2e:ios
 
 # Android only (skip iOS setup)
 devbox run --pure -e IOS_SKIP_SETUP=1 test:e2e:android
@@ -955,7 +955,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - run: devbox run --pure -e ANDROID_SKIP_DOWNLOADS=1 test:e2e:ios
+      - run: devbox run --pure -e ANDROID_SKIP_SETUP=1 test:e2e:ios
 ```
 
 ### Artifact Logs

@@ -418,7 +418,7 @@ Android and iOS initialization scripts check for platform-specific skip flags:
 
 ```bash
 # Skip expensive operations in CI
-if [ "${ANDROID_SKIP_DOWNLOADS:-0}" = "1" ]; then
+if [ "${ANDROID_SKIP_SETUP:-0}" = "1" ]; then
   # Skip SDK component downloads
 fi
 

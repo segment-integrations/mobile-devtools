@@ -386,7 +386,7 @@ This document provides an exhaustive reference of all environment variables used
 }
 ```
 
-### ANDROID_SKIP_DOWNLOADS
+### ANDROID_SKIP_SETUP
 
 **Plugin:** Android
 
@@ -401,7 +401,7 @@ This document provides an exhaustive reference of all environment variables used
 # Set in devbox.json
 {
   "env": {
-    "ANDROID_SKIP_DOWNLOADS": "1"
+    "ANDROID_SKIP_SETUP": "1"
   }
 }
 ```

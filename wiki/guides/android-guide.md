@@ -414,7 +414,7 @@ In React Native projects or iOS-only contexts, skip Android SDK evaluation:
 ```json
 {
   "env": {
-    "ANDROID_SKIP_DOWNLOADS": "1"
+    "ANDROID_SKIP_SETUP": "1"
   }
 }
 ```

@@ -86,7 +86,7 @@
         "bash tests/run-android-tests.sh && bash tests/run-ios-tests.sh"
       ],
       "test:e2e:web": [
-        "bash -c \"ANDROID_SKIP_DOWNLOADS=1 IOS_SKIP_SETUP=1 devbox run --pure bash -c 'process-compose -f tests/test-suite-web-e2e.yaml --no-server --tui=${TEST_TUI:-false}'\""
+        "bash -c \"ANDROID_SKIP_SETUP=1 IOS_SKIP_SETUP=1 devbox run --pure bash -c 'process-compose -f tests/test-suite-web-e2e.yaml --no-server --tui=${TEST_TUI:-false}'\""
       ]
     }
   }

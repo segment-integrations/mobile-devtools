@@ -36,7 +36,7 @@ Configure the plugin by setting environment variables in `plugin.json`. These ar
 - `ANDROID_CMDLINE_TOOLS_VERSION` — Command-line tools version (e.g., "19.0")
 
 ### Performance Settings
-- `ANDROID_SKIP_DOWNLOADS` — Skip Android SDK downloads/evaluation during shell initialization (1=skip, 0=evaluate; default: 0)
+- `ANDROID_SKIP_SETUP` — Skip Android SDK downloads/evaluation during shell initialization (1=skip, 0=evaluate; default: 0)
   - Useful for iOS-only contexts in React Native projects to speed up initialization
   - When set to 1, skips Nix flake evaluation, SDK resolution, and environment configuration
   - Android commands will fail if SDK is actually needed, but iOS workflows run without delay
@@ -103,10 +103,10 @@ Configuration is managed via environment variables in `devbox.json`, not via CLI
 - `ANDROID_SKIP_CLEANUP` - Skip offline emulator cleanup during startup (0/1, default: 0)
   - Set to 1 in multi-emulator scenarios to prevent cleanup from killing emulators that are still booting
 - `ANDROID_DISABLE_SNAPSHOTS` - Disable snapshot boots, force cold boot (0/1, default: 0)
-- `ANDROID_SKIP_DOWNLOADS` - Skip all Android setup and SDK evaluation (0/1, default: 0)
+- `ANDROID_SKIP_SETUP` - Skip all Android setup and SDK evaluation (0/1, default: 0)
   - Useful in React Native plugin when running iOS-only workflows to avoid downloading Android SDK
-  - Set before shell initialization: `devbox run -e ANDROID_SKIP_DOWNLOADS=1 build:ios`
-  - With --pure flag: `devbox run --pure -e ANDROID_SKIP_DOWNLOADS=1 build:ios`
+  - Set before shell initialization: `devbox run -e ANDROID_SKIP_SETUP=1 build:ios`
+  - With --pure flag: `devbox run --pure -e ANDROID_SKIP_SETUP=1 build:ios`
   - Or set in test suite environment sections (process-compose spawns new shells)
   - Cannot be set within script definitions (too late, init hook already ran)
 

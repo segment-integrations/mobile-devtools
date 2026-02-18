@@ -377,17 +377,17 @@ devbox run test:e2e:android
 ```
 
 The test commands automatically set optimization flags:
-- `ANDROID_SKIP_DOWNLOADS=1` - Skip Android SDK Nix flake evaluation (iOS tests)
+- `ANDROID_SKIP_SETUP=1` - Skip Android SDK Nix flake evaluation (iOS tests)
 - `IOS_SKIP_SETUP=1` - Skip iOS environment setup (Android tests)
 
 **Important:** When using `--pure` mode manually, pass environment variables with `-e` flag:
 
 ```bash
 # Correct way to skip Android SDK in pure mode
-devbox run --pure -e ANDROID_SKIP_DOWNLOADS=1 test:e2e:ios
+devbox run --pure -e ANDROID_SKIP_SETUP=1 test:e2e:ios
 
 # Incorrect - env var gets reset to default
-ANDROID_SKIP_DOWNLOADS=1 devbox run --pure test:e2e:ios
+ANDROID_SKIP_SETUP=1 devbox run --pure test:e2e:ios
 ```
 
 ### Parallel Testing Multiple Versions
@@ -584,7 +584,7 @@ ls -la reports/react-native-ios-e2e-logs/
 - `ANDROID_COMPILE_SDK` - Compile SDK version
 - `ANDROID_TARGET_SDK` - Target SDK version
 - `ANDROID_BUILD_TOOLS_VERSION` - Build tools version
-- `ANDROID_SKIP_DOWNLOADS` - Skip SDK downloads (1=skip, 0=evaluate)
+- `ANDROID_SKIP_SETUP` - Skip SDK downloads (1=skip, 0=evaluate)
 
 **iOS settings** (see [iOS Reference](../reference/ios.md)):
 - `IOS_DEFAULT_DEVICE` - Default simulator

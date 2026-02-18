@@ -97,7 +97,7 @@ ANDROID_TARGET_SDK="36"                # Target SDK version
 ANDROID_LOCAL_SDK="0"                  # Use local SDK (1=yes, 0=no)
 EMU_HEADLESS="0"                       # Run headless (1=yes, 0=no)
 ANDROID_DISABLE_SNAPSHOTS="0"          # Disable snapshots (1=yes, 0=no)
-ANDROID_SKIP_DOWNLOADS="0"             # Skip SDK downloads (1=yes, 0=no)
+ANDROID_SKIP_SETUP="0"             # Skip SDK downloads (1=yes, 0=no)
 ```
 
 ## Device Definition Format

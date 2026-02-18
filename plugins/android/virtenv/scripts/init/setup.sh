@@ -15,10 +15,10 @@ if ! (return 0 2>/dev/null); then
   exit 1
 fi
 
-# Skip all Android setup if ANDROID_SKIP_DOWNLOADS=1
+# Skip all Android setup if ANDROID_SKIP_SETUP=1
 # Useful for iOS-only contexts in React Native plugin to avoid SDK downloads
-if [ "${ANDROID_SKIP_DOWNLOADS:-0}" = "1" ]; then
-  [ -n "${ANDROID_DEBUG_SETUP:-}" ] && echo "[SETUP-$$] Skipping Android setup (ANDROID_SKIP_DOWNLOADS=1)" >&2
+if [ "${ANDROID_SKIP_SETUP:-0}" = "1" ]; then
+  [ -n "${ANDROID_DEBUG_SETUP:-}" ] && echo "[SETUP-$$] Skipping Android setup (ANDROID_SKIP_SETUP=1)" >&2
   return 0
 fi
 

@@ -5,9 +5,9 @@
 
 set -e
 
-# Skip all Android initialization if ANDROID_SKIP_DOWNLOADS=1
+# Skip all Android initialization if ANDROID_SKIP_SETUP=1
 # Useful for iOS-only contexts in React Native plugin to avoid SDK downloads
-if [ "${ANDROID_SKIP_DOWNLOADS:-0}" = "1" ]; then
+if [ "${ANDROID_SKIP_SETUP:-0}" = "1" ]; then
   exit 0
 fi
 

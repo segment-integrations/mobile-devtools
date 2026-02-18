@@ -128,7 +128,7 @@ ANDROID_APP_ID="com.reactnativeexample"
 ANDROID_APP_APK="android/app/build/outputs/apk/debug/app-debug.apk"
 ANDROID_COMPILE_SDK="35"
 ANDROID_TARGET_SDK="35"
-ANDROID_SKIP_DOWNLOADS="0"              # Skip Android for iOS-only
+ANDROID_SKIP_SETUP="0"              # Skip Android for iOS-only
 ```
 
 ### iOS
