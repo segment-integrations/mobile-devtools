@@ -10,7 +10,9 @@ jobs:
       contents: write
     outputs:
       is_release: ${{ steps.check.outputs.is_release }}
-      tag: ${{ steps.check.outputs.tag }}
+      tags: ${{ steps.check.outputs.tags }}
+      first_tag: ${{ steps.check.outputs.first_tag }}
+      title: ${{ steps.check.outputs.title }}
       mcp_bumped: ${{ steps.check-mcp.outputs.mcp_bumped }}
       mcp_version: ${{ steps.check-mcp.outputs.mcp_version }}
     steps:
@@ -24,8 +26,14 @@ jobs:
           MSG=$(git log -1 --format=%s)
           if echo "$MSG" | grep -qE '^chore\(release\):'; then
             echo "is_release=true" >> "$GITHUB_OUTPUT"
-            TAG=$(echo "$MSG" | grep -oE 'v[0-9]+\.[0-9]+\.[0-9]+')
-            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+            TAGS=$(echo "$MSG" | grep -oE '[a-z][-a-z]*/v[0-9]+\.[0-9]+\.[0-9]+')
+            echo "tags<<EOF" >> "$GITHUB_OUTPUT"
+            echo "$TAGS" >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
+            FIRST_TAG=$(echo "$TAGS" | head -1)
+            echo "first_tag=$FIRST_TAG" >> "$GITHUB_OUTPUT"
+            TITLE=$(echo "$MSG" | sed 's/^chore(release): //')
+            echo "title=$TITLE" >> "$GITHUB_OUTPUT"
             BODY=$(git log -1 --format=%b)
             echo "body<<EOF" >> "$GITHUB_OUTPUT"
             echo "$BODY" >> "$GITHUB_OUTPUT"
@@ -38,8 +46,10 @@ jobs:
         id: check-mcp
         if: steps.check.outputs.is_release == 'true'
         run: |
-          if git diff --name-only HEAD~1 HEAD | grep -q '^plugins/devbox-mcp/package.json$'; then
-            VERSION=$(jq -r '.version' plugins/devbox-mcp/package.json)
+          MSG=$(git log -1 --format=%s)
+          MCP_TAG=$(echo "$MSG" | grep -oE 'devbox-mcp/v[0-9]+\.[0-9]+\.[0-9]+' || true)
+          if [ -n "$MCP_TAG" ]; then
+            VERSION=$(echo "$MCP_TAG" | sed 's|devbox-mcp/v||')
             echo "mcp_bumped=true" >> "$GITHUB_OUTPUT"
             echo "mcp_version=$VERSION" >> "$GITHUB_OUTPUT"
             echo "devbox-mcp version bumped to $VERSION"
@@ -48,19 +58,23 @@ jobs:
             echo "devbox-mcp not changed in this release"
           fi
 
-      - name: Create git tag
-        if: steps.check.outputs.is_release == 'true' && steps.check.outputs.tag != ''
+      - name: Create git tags
+        if: steps.check.outputs.is_release == 'true' && steps.check.outputs.tags != ''
         run: |
-          git tag "${{ steps.check.outputs.tag }}"
-          git push origin "${{ steps.check.outputs.tag }}"
+          echo "${{ steps.check.outputs.tags }}" | while read -r TAG; do
+            [ -z "$TAG" ] && continue
+            echo "Creating tag: $TAG"
+            git tag "$TAG"
+            git push origin "$TAG"
+          done
 
       - name: Create GitHub Release
-        if: steps.check.outputs.is_release == 'true' && steps.check.outputs.tag != ''
+        if: steps.check.outputs.is_release == 'true' && steps.check.outputs.first_tag != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "${{ steps.check.outputs.tag }}" \
-            --title "${{ steps.check.outputs.tag }}" \
+          gh release create "${{ steps.check.outputs.first_tag }}" \
+            --title "${{ steps.check.outputs.title }}" \
             --notes "${{ steps.check.outputs.body }}"
 
   npm-publish:

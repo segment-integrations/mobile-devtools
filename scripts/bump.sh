@@ -68,7 +68,7 @@ fi
 # Step 2: Find last release tag
 # ---------------------------------------------------------------------------
 
-LAST_TAG=$(git tag -l 'v*' --sort=-v:refname | head -1 || true)
+LAST_TAG=$(git tag -l --sort=-creatordate | grep -E '(^v[0-9]|/v[0-9])' | head -1 || true)
 if [ -z "$LAST_TAG" ]; then
   LAST_TAG=$(git rev-list --max-parents=0 HEAD)
   echo "No release tags found, using initial commit: ${LAST_TAG:0:8}"
@@ -173,10 +173,6 @@ BUMPED_LIST=$(printf '%s\n' "${BUMPED_SUMMARY[@]}")
 LOG_OUTPUT=$(git log --oneline "$LAST_TAG"..HEAD -- "${CHANGED_DIRS[@]}")
 TEMPLATE=$(cat "$REPO_ROOT/scripts/bump-template.md")
 
-# Determine the representative new version (use the first bumped plugin's new version)
-IFS=':' read -r _ first_file first_path <<< "${CHANGED_PLUGINS[0]}"
-NEW_VERSION=$(jq -r "$first_path" "$first_file")
-
 echo "Generating release summary with Claude..."
 
 RELEASE_SUMMARY=$(claude -p --model sonnet <<PROMPT
@@ -205,33 +201,33 @@ echo ""
 # Step 7: Stage, commit, and tag
 # ---------------------------------------------------------------------------
 
-# Build plugin name list for commit message
-PLUGIN_NAMES=""
+# Build scoped tag list for commit message (e.g. android/v0.0.3, devbox-mcp/v0.1.3)
+SCOPED_TAGS=""
 for entry in "${CHANGED_PLUGINS[@]}"; do
-  IFS=':' read -r plugin_dir _ _ <<< "$entry"
+  IFS=':' read -r plugin_dir version_file jq_path <<< "$entry"
   name=$(basename "$plugin_dir")
-  if [ -z "$PLUGIN_NAMES" ]; then
-    PLUGIN_NAMES="$name"
+  version=$(jq -r "$jq_path" "$version_file")
+  tag="${name}/v${version}"
+  if [ -z "$SCOPED_TAGS" ]; then
+    SCOPED_TAGS="$tag"
   else
-    PLUGIN_NAMES="$PLUGIN_NAMES, $name"
+    SCOPED_TAGS="$SCOPED_TAGS, $tag"
   fi
 done
 
 git add "${CHANGED_FILES[@]}"
 
 git commit -m "$(cat <<EOF
-chore(release): bump ${PLUGIN_NAMES} to v${NEW_VERSION}
+chore(release): ${SCOPED_TAGS}
 
 ${RELEASE_SUMMARY}
 EOF
 )"
 
-TAG="v${NEW_VERSION}"
-
-echo "Committed: $TAG"
+echo "Committed: ${SCOPED_TAGS}"
 echo ""
 echo "To publish this release:"
 echo "  1. Push your branch and open a PR:"
 echo "     git push -u origin HEAD"
-echo "     gh pr create --title 'chore(release): bump ${PLUGIN_NAMES} to ${TAG}'"
-echo "  2. After CI passes and the PR is merged, release.yml will create the tag and GitHub Release."
+echo "     gh pr create --title 'chore(release): ${SCOPED_TAGS}'"
+echo "  2. After CI passes and the PR is merged, release.yml will create the tags and GitHub Release."

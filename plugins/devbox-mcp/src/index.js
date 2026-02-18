@@ -110,7 +110,8 @@ async function searchDocs(query, options = {}) {
 
   try {
     // Use GitHub's code search API
-    const searchQuery = `${query} repo:jetify-com/docs path:*.md path:*.mdx`;
+    // Search in the docs repo - most files are markdown anyway
+    const searchQuery = `${query} repo:jetify-com/docs`;
     const url = new URL("https://api.github.com/search/code");
     url.searchParams.set("q", searchQuery);
     url.searchParams.set("per_page", String(maxResults));
@@ -320,11 +321,19 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       {
         name: "devbox_docs_search",
         description:
-          "Search devbox documentation for a keyword or phrase. " +
-          "Returns matching lines from the official devbox docs repository.\n\n" +
-          "Requires: GitHub Personal Access Token (PAT) set as GITHUB_TOKEN or GITHUB_PAT environment variable. " +
-          "Create a token at https://github.com/settings/tokens with public_repo read access.\n\n" +
-          "Alternative: Use devbox_docs_list to browse files, then devbox_docs_read to read specific docs.",
+          "Search devbox documentation for a keyword or phrase. Returns matching lines from the official devbox docs repository.\n\n" +
+          "IMPORTANT - Authentication Required:\n" +
+          "This tool requires a GitHub Personal Access Token (PAT) configured in the MCP server environment. " +
+          "If the user hasn't configured their GITHUB_TOKEN, this tool will fail with a 403 error. " +
+          "When this happens, inform the user they need to reconfigure their MCP server:\n\n" +
+          "  claude mcp remove devbox-mcp -s user\n" +
+          "  claude mcp add devbox-mcp -s user -e GITHUB_TOKEN=\"your_token\" -- node /path/to/devbox-mcp/src/index.js\n\n" +
+          "To create a GitHub PAT:\n" +
+          "1. Visit https://github.com/settings/tokens\n" +
+          "2. Create a fine-grained token or classic token\n" +
+          "3. Grant 'public_repo' or 'repo' read access\n" +
+          "4. Set it as GITHUB_TOKEN environment variable in MCP config\n\n" +
+          "Alternative: Use devbox_docs_list (no auth required) to browse files, then devbox_docs_read to read specific docs.",
         inputSchema: {
           type: "object",
           properties: {
