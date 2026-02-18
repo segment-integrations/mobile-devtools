@@ -68,10 +68,10 @@ You'll see the default devices: `min` (API 21) and `max` (API 35).
 
 ```sh
 # Build, install, and launch on the default emulator
-devbox run start
+devbox run start:app
 
 # Or specify a device
-devbox run start max
+devbox run start:app max
 ```
 
 This command:
@@ -287,7 +287,7 @@ devbox run ios.sh config show
 ```sh
 # Android
 devbox run build                # Build APK
-devbox run start                # Build, install, and launch app
+devbox run start:app            # Build, install, and launch app
 
 # iOS
 devbox run build                # Build app

@@ -33,7 +33,7 @@ devbox shell
 
 # Start emulator and run app
 devbox run start:emu
-devbox run start
+devbox run start:app
 ```
 
 The app's package name is auto-detected from the APK at install time.
@@ -124,7 +124,7 @@ Each example includes device definitions, test suites, and build scripts.
 ```bash
 # Android
 devbox run start:emu        # Start Android emulator
-devbox run start            # Build, install, and launch app
+devbox run start:app        # Build, install, and launch app
 devbox run stop:emu         # Stop emulator
 
 # iOS

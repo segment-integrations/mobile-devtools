@@ -419,7 +419,7 @@ Use Ctrl/Cmd+F to search for specific error messages or symptoms.
 
 3. Use device serials explicitly:
    ```bash
-   ANDROID_SERIAL=emulator-5554 devbox run start
+   ANDROID_SERIAL=emulator-5554 devbox run start:app
    ```
 
 4. List running emulators:
@@ -641,7 +641,7 @@ Use Ctrl/Cmd+F to search for specific error messages or symptoms.
 
 4. Debug in development mode:
    ```bash
-   BUILD_CONFIG=Debug devbox run start
+   BUILD_CONFIG=Debug devbox run start:app
    BUILD_CONFIG=Debug devbox run start:ios
    ```
 
@@ -1117,7 +1117,7 @@ Standard debugging approach:
 
 1. Enable debug logging:
    ```bash
-   DEBUG=1 ANDROID_DEBUG=1 devbox run start
+   DEBUG=1 ANDROID_DEBUG=1 devbox run start:app
    ```
 
 2. Check environment:

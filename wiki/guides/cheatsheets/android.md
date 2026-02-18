@@ -60,10 +60,10 @@ devbox run stop:emu
 devbox run build
 
 # Build, install, and launch app
-devbox run start
+devbox run start:app
 
 # Build and run on specific device
-devbox run start pixel_api30
+devbox run start:app pixel_api30
 ```
 
 ## Configuration

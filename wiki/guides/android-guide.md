@@ -223,13 +223,13 @@ Build, install, and launch your app on the emulator:
 
 ```bash
 # Build and run on default device
-devbox run start
+devbox run start:app
 
 # Build and run on specific device
-devbox run start pixel_api28
+devbox run start:app pixel_api28
 
 # Install pre-built APK without building
-devbox run start path/to/app.apk
+devbox run start:app path/to/app.apk
 ```
 
 The `run` command:
@@ -275,11 +275,11 @@ devbox run start:emu max
 
 # 3. Build and run app
 devbox run build
-devbox run start max
+devbox run start:app max
 
 # 4. Make code changes, rebuild, and redeploy
 devbox run build
-devbox run start max
+devbox run start:app max
 
 # 5. Stop emulator when done
 devbox run stop:emu
@@ -289,7 +289,7 @@ For a streamlined workflow, use the combined command:
 
 ```bash
 # Build, install, and launch in one command
-devbox run start
+devbox run start:app
 ```
 
 This starts the emulator, builds the app, and deploys it automatically.
@@ -603,7 +603,7 @@ Commit the updated `devices.lock` file.
 
 3. Use device serials explicitly:
    ```bash
-   ANDROID_SERIAL=emulator-5554 devbox run start
+   ANDROID_SERIAL=emulator-5554 devbox run start:app
    ```
 
 ### Build Fails with SDK Version Errors
@@ -677,9 +677,9 @@ Test your app across multiple Android versions:
 
 3. Test on each device:
    ```bash
-   devbox run start api21
-   devbox run start api28
-   devbox run start api36
+   devbox run start:app api21
+   devbox run start:app api28
+   devbox run start:app api36
    ```
 
 ### CI/CD Integration

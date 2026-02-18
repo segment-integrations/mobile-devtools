@@ -20,6 +20,7 @@
     "gnused": "latest",
     "gnugrep": "latest",
     "gawk": "latest",
+    "findutils": "latest",
     "jq": "latest",
     "process-compose": "latest",
     "cocoapods": {

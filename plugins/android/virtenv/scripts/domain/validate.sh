@@ -3,7 +3,7 @@
 # See SCRIPTS.md for detailed documentation
 # Philosophy: Warn, don't block
 
-set -euo pipefail
+set -eu
 
 # Validate that ANDROID_SDK_ROOT points to an existing directory (non-blocking)
 android_validate_sdk() {

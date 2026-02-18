@@ -20,7 +20,7 @@
       "stop:emu": [
         "android.sh emulator stop"
       ],
-      "start": [
+      "start:app": [
         "android.sh run ${1:-${ANDROID_DEFAULT_DEVICE:-max}}"
       ],
       "test": [

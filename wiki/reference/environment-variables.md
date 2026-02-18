@@ -800,7 +800,7 @@ Set in `devbox.json` script definitions:
 {
   "shell": {
     "scripts": {
-      "test-min": "ANDROID_DEFAULT_DEVICE=min devbox run start"
+      "test-min": "ANDROID_DEFAULT_DEVICE=min devbox run start:app"
     }
   }
 }

@@ -189,7 +189,7 @@ devbox run --pure android.sh config reset
 
 **Run app:**
 ```bash
-devbox run start [apk_path] [device]
+devbox run start:app [apk_path] [device]
 ```
 - Builds, installs, and launches app on emulator
 - `apk_path`: Path to APK (optional, skips build if provided)
@@ -199,13 +199,13 @@ devbox run start [apk_path] [device]
 **Examples:**
 ```bash
 # Build and run on default device
-devbox run start
+devbox run start:app
 
 # Install specific APK on default device
-devbox run start app/build/outputs/apk/debug/app-debug.apk
+devbox run start:app app/build/outputs/apk/debug/app-debug.apk
 
 # Install APK on specific device
-devbox run start app/build/outputs/apk/debug/app-debug.apk pixel_api30
+devbox run start:app app/build/outputs/apk/debug/app-debug.apk pixel_api30
 ```
 
 #### Diagnostics

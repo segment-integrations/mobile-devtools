@@ -21,14 +21,14 @@
       "stop:sim": [
         "ios.sh simulator stop"
       ],
-      "start:ios": [
+      "start:app": [
         "ios.sh simulator start ${1:-${IOS_DEFAULT_DEVICE:-max}}",
         "xcrun simctl install booted ${IOS_APP_ARTIFACT}",
         "xcrun simctl launch booted ${IOS_APP_BUNDLE_ID}"
       ],
       "deploy": [
         "devbox run build",
-        "devbox run start:ios"
+        "devbox run start:app"
       ],
       "test": [
         "env -u LD -u LDFLAGS -u NIX_LDFLAGS -u NIX_CFLAGS_COMPILE -u NIX_CFLAGS_LINK xcodebuild -project ${IOS_APP_PROJECT} -scheme ${IOS_APP_SCHEME} -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath .devbox/virtenv/ios/DerivedData test"

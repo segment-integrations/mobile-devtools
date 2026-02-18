@@ -3,3 +3,6 @@
 
 # Ignore Gradle build output directory
 build
+
+# Runtime-generated config (created by init-hook.sh from env vars)
+android.json

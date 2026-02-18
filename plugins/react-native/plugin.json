@@ -7,6 +7,8 @@
     "path:../ios/plugin.json"
   ],
   "packages": {
+    "curl": "latest",
+    "lsof": "latest",
     "nodejs": "20",
     "watchman": "latest",
     "process-compose": "latest"

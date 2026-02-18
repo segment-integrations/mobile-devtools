@@ -1,16 +1,18 @@
 {
   "packages": {
     "process-compose": "latest",
-    "act": "latest",
-    "shellcheck": "latest",
-    "nodejs": "latest",
-    "treefmt": "latest"
+    "act":             "latest",
+    "shellcheck":      "latest",
+    "nodejs":          "latest",
+    "treefmt":         "latest",
+    "gh":              "latest",
+    "claude-code":     "latest"
   },
   "env": {
-    "REPORTS_DIR": "reports",
+    "REPORTS_DIR":      "reports",
     "TEST_RESULTS_DIR": "reports/results",
-    "TEST_LOGS_DIR": "reports/logs",
-    "TEST_TUI": "false"
+    "TEST_LOGS_DIR":    "reports/logs",
+    "TEST_TUI":         "false"
   },
   "shell": {
     "scripts": {
@@ -180,6 +182,9 @@
         "/bin/bash tests/integration/android/test-validation.sh",
         "/bin/bash tests/integration/ios/test-device-mgmt.sh",
         "/bin/bash tests/integration/ios/test-cache.sh"
+      ],
+      "bump": [
+        "bash scripts/bump.sh \"${@}\""
       ],
       "test:fast": [
         "echo 'Running fast tests (lint + unit + integration)...'",

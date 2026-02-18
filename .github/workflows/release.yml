@@ -1,0 +1,39 @@
+name: Create Release
+on:
+  push:
+    branches: [main]
+
+jobs:
+  check-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for version bump commit
+        id: check
+        run: |
+          MSG=$(git log -1 --format=%s)
+          if echo "$MSG" | grep -qE '^chore\(release\):'; then
+            echo "is_release=true" >> "$GITHUB_OUTPUT"
+            TAG=$(git describe --tags --exact-match HEAD 2>/dev/null || echo "")
+            echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+            BODY=$(git log -1 --format=%b)
+            echo "body<<EOF" >> "$GITHUB_OUTPUT"
+            echo "$BODY" >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_release=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub Release
+        if: steps.check.outputs.is_release == 'true' && steps.check.outputs.tag != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${{ steps.check.outputs.tag }}" \
+            --title "${{ steps.check.outputs.tag }}" \
+            --notes "${{ steps.check.outputs.body }}"
