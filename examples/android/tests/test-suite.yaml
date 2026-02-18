@@ -3,7 +3,7 @@ version: "0.5"
 environment:
   - "TEST_TIMEOUT=300"
   - "BOOT_TIMEOUT=90"
-  - "TEST_TUI=false"
+  - "TEST_TUI=${TEST_TUI:-false}"
   - "ANDROID_DEBUG_SETUP=${ANDROID_DEBUG_SETUP:-}"
 
 log_location: "reports/android-e2e-logs"

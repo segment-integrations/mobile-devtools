@@ -5,7 +5,7 @@ environment:
   - "IOS_DEVICE=${IOS_DEFAULT_DEVICE:-max}"
   - "TEST_TIMEOUT=300"
   - "BOOT_TIMEOUT=180"
-  - "TEST_TUI=false"
+  - "TEST_TUI=${TEST_TUI:-false}"
 
 log_location: "reports/react-native-all-e2e-logs"
 log_level: info

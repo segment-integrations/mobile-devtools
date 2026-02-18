@@ -1,7 +1,7 @@
 version: "0.5"
 
 environment:
-  - "TEST_TUI=false"
+  - "TEST_TUI=${TEST_TUI:-false}"
   - "WEB_PORT=8081"
   - "TEST_TIMEOUT=60"
 

@@ -1,7 +1,7 @@
 version: "0.5"
 
 environment:
-  - "TEST_TUI=false"
+  - "TEST_TUI=${TEST_TUI:-false}"
   - "ANDROID_SERIAL=emulator-5554"
   - "TEST_TIMEOUT=300"
   - "BOOT_TIMEOUT=180"
