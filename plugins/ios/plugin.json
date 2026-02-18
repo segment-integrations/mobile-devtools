@@ -1,6 +1,6 @@
 {
   "name": "ios",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Configures iOS tooling inside Devbox and ensures Xcode toolchain usage.",
   "env": {
     "IOS_CONFIG_DIR": "{{ .DevboxDir }}",
@@ -25,7 +25,10 @@
     "process-compose": "latest",
     "cocoapods": {
       "version": "latest",
-      "platforms": ["x86_64-darwin", "aarch64-darwin"]
+      "platforms": [
+        "x86_64-darwin",
+        "aarch64-darwin"
+      ]
     }
   },
   "create_files": {
