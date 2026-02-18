@@ -227,9 +227,11 @@ EOF
 )"
 
 TAG="v${NEW_VERSION}"
-git tag "$TAG"
 
-echo "Committed and tagged: $TAG"
+echo "Committed: $TAG"
 echo ""
 echo "To publish this release:"
-echo "  git push origin main --tags"
+echo "  1. Push your branch and open a PR:"
+echo "     git push -u origin HEAD"
+echo "     gh pr create --title 'chore(release): bump ${PLUGIN_NAMES} to ${TAG}'"
+echo "  2. After CI passes and the PR is merged, release.yml will create the tag and GitHub Release."
