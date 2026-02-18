@@ -137,10 +137,17 @@
         "echo 'Running devbox-mcp plugin tests (interactive mode)...'",
         "TEST_TUI=true process-compose -f plugins/devbox-mcp/tests/test-suite.yaml"
       ],
+      "test:plugin:rn:lib": [
+        "bash plugins/tests/react-native/test-lib.sh"
+      ],
+      "test:plugin:rn": [
+        "devbox run test:plugin:rn:lib"
+      ],
       "test:plugin:unit": [
         "echo 'Running plugin unit tests...'",
         "devbox run test:plugin:android",
         "devbox run test:plugin:ios",
+        "devbox run test:plugin:rn",
         "devbox run test:plugin:devbox-mcp"
       ],
       "test:integration:android:device-mgmt": [

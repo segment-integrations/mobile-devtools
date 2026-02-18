@@ -151,7 +151,7 @@ done
 
 # Test 4: Check switch cases for all tools
 echo "Checking tool handlers..."
-tools="devbox_run devbox_list devbox_add devbox_info devbox_search devbox_docs_search devbox_docs_list devbox_docs_read"
+tools="devbox_run devbox_list devbox_add devbox_info devbox_search devbox_docs_search devbox_docs_list devbox_docs_read devbox_init devbox_shell_env devbox_sync"
 for tool in $tools; do
   if echo "$server_content" | grep -q "case \"$tool\":"; then
     TEST_PASS=$((TEST_PASS + 1))

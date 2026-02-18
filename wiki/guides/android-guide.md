@@ -144,7 +144,7 @@ devbox run android.sh devices select min max
 devbox run android.sh devices reset
 ```
 
-This updates the `EVALUATE_DEVICES` configuration.
+This updates the `ANDROID_DEVICES` configuration.
 
 ### Regenerating the Lock File
 
@@ -154,7 +154,7 @@ After creating, updating, or deleting devices, regenerate the lock file:
 devbox run android.sh devices eval
 ```
 
-The lock file (`devbox.d/android/devices.lock.json`) optimizes CI builds by limiting which SDK versions are downloaded. Commit this file to version control.
+The lock file (`devbox.d/android/devices.lock`) optimizes CI builds by limiting which SDK versions are downloaded. Commit this file to version control.
 
 ### Syncing AVDs
 
@@ -453,7 +453,7 @@ Or set in `devbox.json`:
 ```json
 {
   "env": {
-    "EVALUATE_DEVICES": "min,max"
+    "ANDROID_DEVICES": "min,max"
   }
 }
 ```
@@ -586,7 +586,7 @@ Regenerate the lock file:
 devbox run android.sh devices eval
 ```
 
-Commit the updated `devices.lock.json` file.
+Commit the updated `devices.lock` file.
 
 ### Multiple Emulators Conflict
 
@@ -738,10 +738,10 @@ devbox run android.sh devices create minimal --api 34 --device pixel --tag defau
 
 ### Learn More
 
-- **Complete API Reference**: See [plugins/android/REFERENCE.md](../../plugins/android/REFERENCE.md) for exhaustive documentation of all commands, environment variables, and configuration options
+- **Complete API Reference**: See [Android Reference](../reference/android.md) for exhaustive documentation of all commands, environment variables, and configuration options
 - **Plugin Testing**: See [plugins/tests/android/](../../plugins/tests/android/) for plugin unit tests
 - **CI/CD Workflows**: See [.github/workflows/](../../.github/workflows/) for CI integration examples
-- **Plugin Development**: See [plugins/CONVENTIONS.md](../../plugins/CONVENTIONS.md) for plugin development patterns
+- **Plugin Development**: See [Conventions](../project/CONVENTIONS.md) for plugin development patterns
 
 ### Related Guides
 

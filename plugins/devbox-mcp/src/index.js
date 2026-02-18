@@ -305,6 +305,27 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         },
       },
       {
+        name: "devbox_docs_search",
+        description:
+          "Search devbox documentation for a keyword or phrase. " +
+          "Returns matching lines from the official devbox docs repository.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            query: {
+              type: "string",
+              description: "Search query (keyword or phrase)",
+            },
+            maxResults: {
+              type: "number",
+              description: "Maximum number of results to return (default: 10)",
+              default: 10,
+            },
+          },
+          required: ["query"],
+        },
+      },
+      {
         name: "devbox_docs_list",
         description: "List all available documentation files in the devbox documentation repository. Returns a list of file paths that can be read with devbox_docs_read.",
         inputSchema: {
@@ -473,6 +494,36 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           },
         ],
         isError: !result.success,
+      };
+    }
+
+    case "devbox_docs_search": {
+      const { query, maxResults = 10 } = args;
+      const result = await searchDocs(query, { maxResults });
+
+      if (!result.success) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `✗ Failed to search docs\n\nError: ${result.error}\n${result.stderr ? `\nDetails: ${result.stderr}` : ""}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const formatted = result.results
+        .map((r) => `${r.file}:${r.line}: ${r.content}`)
+        .join("\n");
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Found ${result.total} match(es) for "${query}" (showing ${result.results.length}):\n\n${formatted}`,
+          },
+        ],
       };
     }
 

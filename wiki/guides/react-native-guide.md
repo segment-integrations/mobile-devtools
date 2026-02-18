@@ -63,7 +63,7 @@ The React Native plugin inherits configuration from both Android and iOS plugins
 }
 ```
 
-**Android configuration** - See [Android Guide](/Users/abueide/code/devbox-plugins/wiki/guides/android-guide.md) for details:
+**Android configuration** - See [Android Guide](android-guide.md) for details:
 - `ANDROID_DEFAULT_DEVICE` - Default emulator (e.g., "max", "min", "pixel_api30")
 - `ANDROID_DEVICES` - Comma-separated devices to evaluate (empty = all)
 - `ANDROID_APP_ID` - Android package identifier
@@ -71,7 +71,7 @@ The React Native plugin inherits configuration from both Android and iOS plugins
 - `ANDROID_COMPILE_SDK` - Compile SDK version
 - `ANDROID_TARGET_SDK` - Target SDK version
 
-**iOS configuration** - See [iOS Guide](/Users/abueide/code/devbox-plugins/wiki/guides/ios-guide.md) for details:
+**iOS configuration** - See [iOS Guide](ios-guide.md) for details:
 - `IOS_DEFAULT_DEVICE` - Default simulator (e.g., "max", "min", "iphone15")
 - `IOS_DEVICES` - Comma-separated devices to evaluate (empty = all)
 - `IOS_APP_PROJECT` - Xcode project path
@@ -218,8 +218,8 @@ devbox run start:sim iphone14
 ```
 
 For complete device management documentation, see:
-- [Android Guide - Device Management](/Users/abueide/code/devbox-plugins/wiki/guides/android-guide.md#device-management)
-- [iOS Guide - Device Management](/Users/abueide/code/devbox-plugins/wiki/guides/ios-guide.md#device-management)
+- [Android Guide - Device Management](android-guide.md#device-management)
+- [iOS Guide - Device Management](ios-guide.md#device-management)
 
 ### Metro Bundler Management
 
@@ -533,9 +533,9 @@ devbox run build:ios
 ### Platform-Specific Issues
 
 For platform-specific troubleshooting, see:
-- [Android Troubleshooting Guide](/Users/abueide/code/devbox-plugins/wiki/guides/android-guide.md#troubleshooting)
-- [iOS Troubleshooting Guide](/Users/abueide/code/devbox-plugins/wiki/guides/ios-guide.md#troubleshooting)
-- [General Troubleshooting Guide](/Users/abueide/code/devbox-plugins/wiki/guides/troubleshooting.md)
+- [Android Troubleshooting Guide](android-guide.md#troubleshooting)
+- [iOS Troubleshooting Guide](ios-guide.md#troubleshooting)
+- [General Troubleshooting Guide](troubleshooting.md)
 
 ### Debug Logging
 
@@ -576,7 +576,7 @@ ls -la reports/react-native-ios-e2e-logs/
 **React Native settings:**
 - `WEB_BUILD_PATH` - Web bundle output directory (default: "web/build")
 
-**Android settings** (see [Android Reference](/Users/abueide/code/devbox-plugins/plugins/android/REFERENCE.md)):
+**Android settings** (see [Android Reference](../reference/android.md)):
 - `ANDROID_DEFAULT_DEVICE` - Default emulator
 - `ANDROID_DEVICES` - Devices to evaluate (comma-separated, empty = all)
 - `ANDROID_APP_ID` - Android package identifier
@@ -586,7 +586,7 @@ ls -la reports/react-native-ios-e2e-logs/
 - `ANDROID_BUILD_TOOLS_VERSION` - Build tools version
 - `ANDROID_SKIP_DOWNLOADS` - Skip SDK downloads (1=skip, 0=evaluate)
 
-**iOS settings** (see [iOS Reference](/Users/abueide/code/devbox-plugins/plugins/ios/REFERENCE.md)):
+**iOS settings** (see [iOS Reference](../reference/ios.md)):
 - `IOS_DEFAULT_DEVICE` - Default simulator
 - `IOS_DEVICES` - Devices to evaluate (comma-separated, empty = all)
 - `IOS_APP_PROJECT` - Xcode project path
@@ -658,17 +658,17 @@ ls -la reports/react-native-ios-e2e-logs/
 
 ### Learn More
 
-- [Android Development Guide](/Users/abueide/code/devbox-plugins/wiki/guides/android-guide.md) - Platform-specific Android details
-- [iOS Development Guide](/Users/abueide/code/devbox-plugins/wiki/guides/ios-guide.md) - Platform-specific iOS details
-- [Device Management Guide](/Users/abueide/code/devbox-plugins/wiki/guides/device-management.md) - Cross-platform device management
-- [Testing Guide](/Users/abueide/code/devbox-plugins/wiki/guides/testing.md) - E2E testing patterns
-- [Troubleshooting Guide](/Users/abueide/code/devbox-plugins/wiki/guides/troubleshooting.md) - Common issues and solutions
+- [Android Development Guide](android-guide.md) - Platform-specific Android details
+- [iOS Development Guide](ios-guide.md) - Platform-specific iOS details
+- [Device Management Guide](device-management.md) - Cross-platform device management
+- [Testing Guide](testing.md) - E2E testing patterns
+- [Troubleshooting Guide](troubleshooting.md) - Common issues and solutions
 
 ### Reference Documentation
 
-- [React Native Plugin Reference](/Users/abueide/code/devbox-plugins/plugins/react-native/REFERENCE.md) - Complete API reference
-- [Android Plugin Reference](/Users/abueide/code/devbox-plugins/plugins/android/REFERENCE.md) - Android configuration options
-- [iOS Plugin Reference](/Users/abueide/code/devbox-plugins/plugins/ios/REFERENCE.md) - iOS configuration options
+- [React Native Plugin Reference](../reference/react-native.md) - Complete API reference
+- [Android Plugin Reference](../reference/android.md) - Android configuration options
+- [iOS Plugin Reference](../reference/ios.md) - iOS configuration options
 
 ### Example Projects
 

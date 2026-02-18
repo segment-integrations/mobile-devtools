@@ -147,6 +147,33 @@ if [ $ios_passed -gt 0 ] || [ $ios_failed -gt 0 ]; then
   suite_count=$((suite_count + 1))
 fi
 
+# Parse React Native plugin unit tests
+echo ""
+echo -e "${BOLD}React Native Plugin Tests:${NC}"
+rn_passed=0
+rn_failed=0
+
+if [ -f "$TEST_RESULTS_DIR/react-native-lib.json" ]; then
+  passed=$(jq -r '.passed' $TEST_RESULTS_DIR/react-native-lib.json)
+  failed=$(jq -r '.failed' $TEST_RESULTS_DIR/react-native-lib.json)
+  rn_passed=$((rn_passed + passed))
+  rn_failed=$((rn_failed + failed))
+
+  if [ "$failed" -eq 0 ]; then
+    echo -e "  ${GREEN}✓${NC} lib.sh: ${passed} tests passed"
+  else
+    echo -e "  ${RED}✗${NC} lib.sh: ${passed} passed, ${failed} failed"
+  fi
+else
+  echo -e "  ${NC}⚠ lib.sh: no results found${NC}"
+fi
+
+total_passed=$((total_passed + rn_passed))
+total_failed=$((total_failed + rn_failed))
+if [ $rn_passed -gt 0 ] || [ $rn_failed -gt 0 ]; then
+  suite_count=$((suite_count + 1))
+fi
+
 # Parse integration tests
 echo ""
 echo -e "${BOLD}Integration Tests:${NC}"
@@ -278,6 +305,7 @@ echo "  $REPORTS_DIR/logs/ios-test-lib.txt"
 echo "  $REPORTS_DIR/logs/ios-test-devices.txt"
 echo "  $REPORTS_DIR/logs/ios-test-device-mgmt.txt"
 echo "  $REPORTS_DIR/logs/ios-test-cache.txt"
+echo "  $REPORTS_DIR/logs/react-native-test-lib.txt"
 echo "  $REPORTS_DIR/logs/summary.txt"
 echo ""
 echo "Lint Logs:"
@@ -331,6 +359,13 @@ $(if [ $ios_passed -gt 0 ] || [ $ios_failed -gt 0 ]; then
   echo "- lib.sh: $(if [ $ios_failed -eq 0 ]; then echo "✅"; else echo "❌"; fi) (Passed: $ios_passed, Failed: $ios_failed)"
 else
   echo "No iOS test results found"
+fi)
+
+### React Native Plugin Tests
+$(if [ $rn_passed -gt 0 ] || [ $rn_failed -gt 0 ]; then
+  echo "- lib.sh: $(if [ $rn_failed -eq 0 ]; then echo "✅"; else echo "❌"; fi) (Passed: $rn_passed, Failed: $rn_failed)"
+else
+  echo "No React Native test results found"
 fi)
 
 ### Integration Tests

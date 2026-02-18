@@ -47,9 +47,9 @@ Default devices are `min.json` and `max.json`.
 
 ## Selecting devices for evaluation
 
-The flake evaluates all device APIs by default. To restrict it, set:
+The flake evaluates all device APIs by default. To restrict it, set `ANDROID_DEVICES` in your `devbox.json`:
 ```json
-{"EVALUATE_DEVICES": ["max"]}
+{"env": {"ANDROID_DEVICES": "max"}}
 ```
 Use `devbox run android.sh devices select max` to update this value.
 
@@ -73,7 +73,7 @@ devbox run android.sh devices update pixel_api28 --api 29
 devbox run android.sh devices delete pixel_api28
 devbox run android.sh devices select max min  # Select specific devices
 devbox run android.sh devices reset           # Reset to all devices
-devbox run android.sh devices eval            # Generate devices.lock.json
+devbox run android.sh devices eval            # Generate devices.lock
 ```
 
 Build commands:

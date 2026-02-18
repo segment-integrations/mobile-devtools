@@ -28,12 +28,6 @@ ios_debug_enabled() {
   [ "${IOS_DEBUG:-}" = "1" ] || [ "${DEBUG:-}" = "1" ]
 }
 
-ios_debug_log() {
-  if ios_debug_enabled; then
-    printf '%s\n' "DEBUG: $*" >&2
-  fi
-}
-
 ios_debug_log_script() {
   if ios_debug_enabled; then
     if (return 0 2>/dev/null); then
@@ -41,7 +35,7 @@ ios_debug_log_script() {
     else
       context="run"
     fi
-    ios_debug_log "$1 ($context)"
+    ios_log_debug "$1 ($context)"
   fi
 }
 
@@ -49,7 +43,7 @@ ios_debug_dump_vars() {
   if ios_debug_enabled; then
     for var in "$@"; do
       value="$(eval "printf '%s' \"\${$var-}\"")"
-      printf 'DEBUG: %s=%s\n' "$var" "$value"
+      ios_log_debug "${var}=${value}"
     done
   fi
 }
@@ -151,7 +145,7 @@ devbox_omit_nix_env() {
   export DEVBOX_OMIT_NIX_ENV_APPLIED=1
   devbox_bin="$(ios_resolve_devbox_bin 2>/dev/null || true)"
   if [ -z "$devbox_bin" ]; then
-    ios_debug_log "devbox not found; skipping omit-nix-env setup."
+    ios_log_debug "devbox not found; skipping omit-nix-env setup."
     return 0
   fi
 
@@ -216,7 +210,7 @@ ios_setup_environment() {
   if [ "$(uname -s)" = "Darwin" ]; then
     PATH="/usr/bin:${PATH}"
     export PATH
-    ios_debug_log "Added /usr/bin to PATH for macOS system tools"
+    ios_log_debug "Added /usr/bin to PATH for macOS system tools"
   fi
 
   # Setup omit-nix-env

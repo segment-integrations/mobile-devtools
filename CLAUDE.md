@@ -509,7 +509,7 @@ scripts/
 
 **Critical**: Domain layer scripts cannot call each other. If two domain scripts need the same functionality, that functionality must be moved to the platform or lib layer. The user layer orchestrates multiple domain operations.
 
-See `plugins/android/scripts/LAYERS.md` for complete documentation.
+See `wiki/project/ARCHITECTURE.md` for complete documentation.
 
 ### Device Management Workflow
 

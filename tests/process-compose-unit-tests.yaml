@@ -4,7 +4,7 @@ log_location: "${REPORTS_DIR:-reports}/devbox-unit-tests-logs"
 log_level: info
 
 processes:
-  # Android unit tests (run in parallel)
+  # Android plugin unit tests
   test-android-lib:
     command: "bash plugins/tests/android/test-lib.sh"
     availability:
@@ -15,29 +15,42 @@ processes:
     availability:
       restart: "no"
 
+  # Android integration tests
   test-android-device-mgmt:
-    command: "bash plugins/tests/android/test-device-mgmt.sh"
+    command: "bash tests/integration/android/test-device-mgmt.sh"
     availability:
       restart: "no"
 
   test-android-validation:
-    command: "bash plugins/tests/android/test-validation.sh"
+    command: "bash tests/integration/android/test-validation.sh"
     availability:
       restart: "no"
 
-  # iOS unit tests (run in parallel)
+  # iOS plugin unit tests
   test-ios-lib:
     command: "sh plugins/tests/ios/test-lib.sh"
     availability:
       restart: "no"
 
-  test-ios-device-mgmt:
-    command: "bash plugins/tests/ios/test-device-mgmt.sh"
+  test-ios-devices:
+    command: "sh plugins/tests/ios/test-devices.sh"
     availability:
       restart: "no"
 
-  test-ios-validation:
-    command: "bash plugins/tests/ios/test-cache.sh"
+  # iOS integration tests
+  test-ios-device-mgmt:
+    command: "bash tests/integration/ios/test-device-mgmt.sh"
+    availability:
+      restart: "no"
+
+  test-ios-cache:
+    command: "bash tests/integration/ios/test-cache.sh"
+    availability:
+      restart: "no"
+
+  # React Native plugin unit tests
+  test-rn-lib:
+    command: "bash plugins/tests/react-native/test-lib.sh"
     availability:
       restart: "no"
 
@@ -50,18 +63,22 @@ processes:
       echo "========================================"
       echo ""
       echo "Android Tests:"
-      echo "  ✓ lib.sh"
-      echo "  ✓ devices.sh"
-      echo "  ✓ device-mgmt"
-      echo "  ✓ validation"
+      echo "  - lib.sh"
+      echo "  - devices.sh"
+      echo "  - device-mgmt (integration)"
+      echo "  - validation (integration)"
       echo ""
       echo "iOS Tests:"
-      echo "  ✓ lib.sh"
-      echo "  ✓ device-mgmt"
-      echo "  ✓ validation"
+      echo "  - lib.sh"
+      echo "  - devices.sh"
+      echo "  - device-mgmt (integration)"
+      echo "  - cache (integration)"
+      echo ""
+      echo "React Native Tests:"
+      echo "  - lib.sh"
       echo ""
       echo "========================================"
-      echo "     ALL UNIT TESTS PASSED ✓"
+      echo "     ALL UNIT TESTS COMPLETE"
       echo "========================================"
       echo ""
 
@@ -84,9 +101,13 @@ processes:
         condition: process_completed
       test-ios-lib:
         condition: process_completed
+      test-ios-devices:
+        condition: process_completed
       test-ios-device-mgmt:
         condition: process_completed
-      test-ios-validation:
+      test-ios-cache:
+        condition: process_completed
+      test-rn-lib:
         condition: process_completed
     availability:
       restart: "no"

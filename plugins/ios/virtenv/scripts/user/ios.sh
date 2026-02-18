@@ -11,8 +11,6 @@ Commands:
   simulator stop
   simulator reset
   config show
-  config set key=value [key=value...]
-  config reset
   info
 
 Examples:
@@ -22,7 +20,7 @@ Examples:
   ios.sh simulator start max --pure
   ios.sh simulator stop
   ios.sh simulator reset
-  ios.sh config set IOS_DEFAULT_DEVICE=max
+  ios.sh config show
 USAGE
   exit 1
 }
@@ -216,7 +214,7 @@ case "$command_name" in
           matching_udids="$(xcrun simctl list devices -j | jq -r --arg name "$device_name" '.devices[]?[]? | select(.name == $name) | .udid' || true)"
 
           if [ -n "$matching_udids" ]; then
-            echo "$matching_udids" | while read -r udid; do
+            for udid in $matching_udids; do
               if [ -n "$udid" ]; then
                 echo "  Deleting: $device_name ($udid)"
                 xcrun simctl delete "$udid" >/dev/null 2>&1 || true

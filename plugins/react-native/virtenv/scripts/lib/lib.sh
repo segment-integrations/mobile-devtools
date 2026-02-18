@@ -20,8 +20,8 @@ RN_LIB_LOADED_PID="$$"
 
 # Find available port in range
 rn_find_available_port() {
-  start_port="${1:-8091}"
-  end_port="${2:-8199}"
+  start_port="${1:-${RN_METRO_PORT_START:-8091}}"
+  end_port="${2:-${RN_METRO_PORT_END:-8199}}"
 
   for port in $(seq "$start_port" "$end_port"); do
     # Check if port is available (works on macOS and Linux)
@@ -94,7 +94,7 @@ rn_allocate_metro_port() {
   fi
 
   # Find new port
-  available_port=$(rn_find_available_port 8091 8199)
+  available_port=$(rn_find_available_port)
   if [ -z "$available_port" ]; then
     echo "ERROR: No available ports in range 8091-8199" >&2
     return 1

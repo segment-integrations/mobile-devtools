@@ -90,9 +90,9 @@ devices_array="${devices_array}]"
 
 # Calculate checksum of all device files (sorted for stability)
 if command -v sha256sum >/dev/null 2>&1; then
-  checksum="$(find "$DEVICES_DIR" -name "*.json" -type f 2>/dev/null | sort | xargs cat 2>/dev/null | sha256sum | cut -d' ' -f1)"
+  checksum="$(find "$DEVICES_DIR" -name "*.json" -type f -exec cat {} + 2>/dev/null | sha256sum | cut -d' ' -f1)"
 elif command -v shasum >/dev/null 2>&1; then
-  checksum="$(find "$DEVICES_DIR" -name "*.json" -type f 2>/dev/null | sort | xargs cat 2>/dev/null | shasum -a 256 | cut -d' ' -f1)"
+  checksum="$(find "$DEVICES_DIR" -name "*.json" -type f -exec cat {} + 2>/dev/null | shasum -a 256 | cut -d' ' -f1)"
 else
   checksum=""
 fi

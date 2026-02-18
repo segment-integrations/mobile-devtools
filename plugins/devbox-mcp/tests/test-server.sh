@@ -42,7 +42,7 @@ cd "${SCRIPT_DIR}" || exit 1
 
 # Test 6: Check all required tools are defined
 echo "Checking required tools are defined..."
-required_tools="devbox_run devbox_list devbox_add devbox_info devbox_search devbox_docs_search devbox_docs_list devbox_docs_read"
+required_tools="devbox_run devbox_list devbox_add devbox_info devbox_search devbox_docs_search devbox_docs_list devbox_docs_read devbox_init devbox_shell_env devbox_sync"
 for tool in $required_tools; do
   if grep -q "name: \"$tool\"" "${MCP_DIR}/src/index.js"; then
     TEST_PASS=$((TEST_PASS + 1))

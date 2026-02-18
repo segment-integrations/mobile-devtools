@@ -28,7 +28,7 @@ if [ -n "${IOS_SCRIPTS_DIR:-}" ]; then
   fi
 fi
 
-ios_debug_log "simulator.sh loaded"
+ios_log_debug "simulator.sh loaded"
 
 # ============================================================================
 # Simulator Health Functions

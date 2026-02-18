@@ -24,7 +24,7 @@ fi
 # shellcheck disable=SC1090
 . "$script_dir/lib/lib.sh"
 
-ios_debug_log "config.sh loaded"
+ios_log_debug "config.sh loaded"
 
 # ============================================================================
 # Config Management Functions

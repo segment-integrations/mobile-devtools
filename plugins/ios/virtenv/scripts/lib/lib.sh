@@ -69,11 +69,6 @@ ios_log_error() {
   _ios_log "ERROR" "$@"
 }
 
-# Legacy debug logging helper (deprecated, use ios_log_debug instead)
-ios_debug_log() {
-  ios_log_debug "$@"
-}
-
 # Sanitize device name for iOS simulator (allows ._- and spaces)
 ios_sanitize_device_name() {
   raw_name="$1"
@@ -96,10 +91,10 @@ ios_compute_devices_checksum() {
   fi
 
   if command -v sha256sum >/dev/null 2>&1; then
-    find "$devices_dir" -name "*.json" -type f -exec cat {} \; 2>/dev/null | \
+    find "$devices_dir" -name "*.json" -type f -exec cat {} + 2>/dev/null | \
       sha256sum | cut -d' ' -f1
   elif command -v shasum >/dev/null 2>&1; then
-    find "$devices_dir" -name "*.json" -type f -exec cat {} \; 2>/dev/null | \
+    find "$devices_dir" -name "*.json" -type f -exec cat {} + 2>/dev/null | \
       shasum -a 256 | cut -d' ' -f1
   else
     return 1
@@ -198,4 +193,4 @@ ios_require_dir_contains() {
   fi
 }
 
-ios_debug_log "lib.sh loaded"
+ios_log_debug "lib.sh loaded"

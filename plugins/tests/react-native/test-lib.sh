@@ -163,13 +163,14 @@ assert_success "[ '$port' -le 8199 ]" "Port should be <= 8199"
 start_test "rn_allocate_metro_port - allocates port"
 port=$(rn_allocate_metro_port "test1")
 assert_success "[ -n '$port' ]" "Should return non-empty port"
-assert_success "[ -f '$test_virtenv/metro/port-test1.txt' ]" "Should create port file"
+# Port file uses run-id in name: port-{suite}-{run_id}.txt
+assert_success "ls '$test_virtenv/metro/port-test1-'*.txt >/dev/null 2>&1" "Should create port file with run-id"
 
 start_test "rn_allocate_metro_port - creates suite-specific port file"
 port1=$(rn_allocate_metro_port "android")
 port2=$(rn_allocate_metro_port "ios")
-assert_success "[ -f '$test_virtenv/metro/port-android.txt' ]" "Should create android port file"
-assert_success "[ -f '$test_virtenv/metro/port-ios.txt' ]" "Should create ios port file"
+assert_success "ls '$test_virtenv/metro/port-android-'*.txt >/dev/null 2>&1" "Should create android port file"
+assert_success "ls '$test_virtenv/metro/port-ios-'*.txt >/dev/null 2>&1" "Should create ios port file"
 
 start_test "rn_allocate_metro_port - reuses allocated port"
 port1=$(rn_allocate_metro_port "test2")
@@ -184,7 +185,7 @@ assert_equal "$allocated_port" "$retrieved_port" "Should retrieve same port that
 start_test "rn_get_metro_port - allocates if not exists"
 port=$(rn_get_metro_port "test4")
 assert_success "[ -n '$port' ]" "Should allocate new port if none exists"
-assert_success "[ -f '$test_virtenv/metro/port-test4.txt' ]" "Should create port file"
+assert_success "ls '$test_virtenv/metro/port-test4-'*.txt >/dev/null 2>&1" "Should create port file"
 
 # ============================================================================
 # Tests: Metro Environment Files
@@ -193,18 +194,19 @@ assert_success "[ -f '$test_virtenv/metro/port-test4.txt' ]" "Should create port
 start_test "rn_save_metro_env - creates environment file"
 env_file=$(rn_save_metro_env "test5" "8095")
 assert_success "[ -f '$env_file' ]" "Should create environment file"
-assert_equal "$test_virtenv/metro/env-test5.sh" "$env_file" "Should return correct env file path"
+# Env file uses run-id: env-{suite}-{run_id}.sh, with symlink at env-{suite}.sh
+assert_success "[ -L '$test_virtenv/metro/env-test5.sh' ]" "Should create symlink at simple name"
 
 start_test "rn_save_metro_env - sets correct variables"
-rn_save_metro_env "test6" "8096" >/dev/null
-env_content=$(cat "$test_virtenv/metro/env-test6.sh")
+env_file_test6=$(rn_save_metro_env "test6" "8096")
+env_content=$(cat "$env_file_test6")
 assert_contains "$env_content" "RCT_METRO_PORT=\"8096\"" "Should set RCT_METRO_PORT"
 assert_contains "$env_content" "METRO_PORT=\"8096\"" "Should set METRO_PORT"
 assert_contains "$env_content" "REACT_NATIVE_PACKAGER_HOSTNAME=\"localhost\"" "Should set hostname"
 
 start_test "rn_save_metro_env - file is executable"
-rn_save_metro_env "test7" "8097" >/dev/null
-assert_success "[ -x '$test_virtenv/metro/env-test7.sh' ]" "Environment file should be executable"
+env_file_test7=$(rn_save_metro_env "test7" "8097")
+assert_success "[ -x '$env_file_test7' ]" "Environment file should be executable"
 
 start_test "rn_export_metro_env - exports variables"
 test_port="8098"
@@ -224,12 +226,12 @@ assert_equal "localhost" "$REACT_NATIVE_PACKAGER_HOSTNAME" "Should export hostna
 start_test "rn_clean_metro - removes port file"
 rn_allocate_metro_port "test9" >/dev/null
 rn_clean_metro "test9"
-assert_success "[ ! -f '$test_virtenv/metro/port-test9.txt' ]" "Should remove port file"
+assert_success "! ls '$test_virtenv/metro/port-test9-'*.txt >/dev/null 2>&1" "Should remove port file"
 
 start_test "rn_clean_metro - removes env file"
 rn_save_metro_env "test10" "8099" >/dev/null
 rn_clean_metro "test10"
-assert_success "[ ! -f '$test_virtenv/metro/env-test10.sh' ]" "Should remove env file"
+assert_success "[ ! -L '$test_virtenv/metro/env-test10.sh' ]" "Should remove env symlink"
 
 start_test "rn_clean_metro - handles missing files gracefully"
 assert_success "rn_clean_metro 'nonexistent'" "Should not fail on nonexistent suite"
@@ -240,11 +242,12 @@ assert_success "rn_clean_metro 'nonexistent'" "Should not fail on nonexistent su
 
 start_test "rn_track_metro_pid - creates pid file"
 rn_track_metro_pid "test11" "12345"
-assert_success "[ -f '$test_virtenv/metro/pid-test11.txt' ]" "Should create pid file"
+assert_success "ls '$test_virtenv/metro/pid-test11-'*.txt >/dev/null 2>&1" "Should create pid file with run-id"
 
 start_test "rn_track_metro_pid - stores correct pid"
 rn_track_metro_pid "test12" "67890"
-stored_pid=$(cat "$test_virtenv/metro/pid-test12.txt")
+pid_file_test12=$(ls "$test_virtenv/metro/pid-test12-"*.txt 2>/dev/null | head -1)
+stored_pid=$(cat "$pid_file_test12")
 assert_equal "67890" "$stored_pid" "Should store correct PID"
 
 start_test "rn_get_metro_pid - retrieves stored pid"
@@ -266,9 +269,9 @@ start_test "Suite isolation - separate port files per suite"
 rn_allocate_metro_port "android" >/dev/null
 rn_allocate_metro_port "ios" >/dev/null
 rn_allocate_metro_port "all" >/dev/null
-assert_success "[ -f '$test_virtenv/metro/port-android.txt' ]" "Android port file should exist"
-assert_success "[ -f '$test_virtenv/metro/port-ios.txt' ]" "iOS port file should exist"
-assert_success "[ -f '$test_virtenv/metro/port-all.txt' ]" "All port file should exist"
+assert_success "ls '$test_virtenv/metro/port-android-'*.txt >/dev/null 2>&1" "Android port file should exist"
+assert_success "ls '$test_virtenv/metro/port-ios-'*.txt >/dev/null 2>&1" "iOS port file should exist"
+assert_success "ls '$test_virtenv/metro/port-all-'*.txt >/dev/null 2>&1" "All port file should exist"
 
 start_test "Suite isolation - separate env files per suite"
 rn_save_metro_env "android" "8100" >/dev/null
@@ -288,10 +291,10 @@ assert_equal "8102" "$all_env_port" "All env file should have port 8102"
 
 start_test "Suite isolation - clean one suite doesn't affect others"
 rn_clean_metro "android"
-assert_success "[ ! -f '$test_virtenv/metro/port-android.txt' ]" "Android port file should be removed"
-assert_success "[ ! -f '$test_virtenv/metro/env-android.sh' ]" "Android env file should be removed"
-assert_success "[ -f '$test_virtenv/metro/port-ios.txt' ]" "iOS port file should still exist"
-assert_success "[ -f '$test_virtenv/metro/env-ios.sh' ]" "iOS env file should still exist"
+assert_success "! ls '$test_virtenv/metro/port-android-'*.txt >/dev/null 2>&1" "Android port file should be removed"
+assert_success "[ ! -L '$test_virtenv/metro/env-android.sh' ]" "Android env symlink should be removed"
+assert_success "ls '$test_virtenv/metro/port-ios-'*.txt >/dev/null 2>&1" "iOS port file should still exist"
+assert_success "[ -L '$test_virtenv/metro/env-ios.sh' ]" "iOS env symlink should still exist"
 
 # ============================================================================
 # Cleanup and Summary

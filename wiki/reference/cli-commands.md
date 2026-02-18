@@ -746,8 +746,8 @@ devbox run android.sh devices list
 
 ## Related Documentation
 
-- Android Plugin Reference: `/plugins/android/REFERENCE.md`
-- iOS Plugin Reference: `/plugins/ios/REFERENCE.md`
-- React Native Plugin Reference: `/plugins/react-native/REFERENCE.md`
-- Environment Variables: `/wiki/reference/environment-variables.md`
-- Plugin Conventions: `/plugins/CONVENTIONS.md`
+- [Android Plugin Reference](android.md)
+- [iOS Plugin Reference](ios.md)
+- [React Native Plugin Reference](react-native.md)
+- [Environment Variables](environment-variables.md)
+- [Plugin Conventions](../project/CONVENTIONS.md)

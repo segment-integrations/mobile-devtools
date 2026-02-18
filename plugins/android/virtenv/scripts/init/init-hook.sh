@@ -36,7 +36,7 @@ mkdir -p "$VIRTENV_DIR" 2>/dev/null || exit 0
 # ============================================================================
 
 GENERATED_CONFIG="${VIRTENV_DIR}/android.json"
-VIRTENV_DEVICES_LOCK="${VIRTENV_DIR}/devices.lock.json"
+VIRTENV_DEVICES_LOCK="${VIRTENV_DIR}/devices.lock"
 
 CONFIG_KEYS=(
   "ANDROID_LOCAL_SDK"
@@ -121,9 +121,9 @@ if [ -d "$DEVICES_DIR" ]; then
   devices_array="${devices_array}]"
 
   if command -v sha256sum >/dev/null 2>&1; then
-    checksum="$(find "$DEVICES_DIR" -name "*.json" -type f 2>/dev/null | sort | xargs cat 2>/dev/null | sha256sum | cut -d' ' -f1)"
+    checksum="$(find "$DEVICES_DIR" -name "*.json" -type f -exec cat {} + 2>/dev/null | sha256sum | cut -d' ' -f1)"
   elif command -v shasum >/dev/null 2>&1; then
-    checksum="$(find "$DEVICES_DIR" -name "*.json" -type f 2>/dev/null | sort | xargs cat 2>/dev/null | shasum -a 256 | cut -d' ' -f1)"
+    checksum="$(find "$DEVICES_DIR" -name "*.json" -type f -exec cat {} + 2>/dev/null | shasum -a 256 | cut -d' ' -f1)"
   else
     checksum=""
   fi

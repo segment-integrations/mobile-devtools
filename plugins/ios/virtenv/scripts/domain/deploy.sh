@@ -28,7 +28,7 @@ if [ -n "${IOS_SCRIPTS_DIR:-}" ]; then
   fi
 fi
 
-ios_debug_log "deploy.sh loaded"
+ios_log_debug "deploy.sh loaded"
 
 # ============================================================================
 # Project and Path Resolution Functions

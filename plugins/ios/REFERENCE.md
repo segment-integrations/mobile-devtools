@@ -272,7 +272,7 @@ The `devices.lock` file tracks which devices should be created:
 
 ## Script Architecture
 
-Scripts are organized in 5 layers (see `LAYERS.md` for details):
+Scripts are organized in 5 layers (see `wiki/project/ARCHITECTURE.md` for details):
 
 **Layer 1 - lib/**: Pure utility functions
 - `lib/lib.sh` — path resolution, checksums, validation utilities
@@ -478,7 +478,7 @@ ios.sh devices list
 
 ## See Also
 
-- `LAYERS.md` — Script architecture and layer dependencies
+- `wiki/project/ARCHITECTURE.md` — Script architecture and layer dependencies
 - `plugins/CONVENTIONS.md` — Plugin development patterns
 - `examples/ios/` — Example iOS project
 - `examples/react-native/` — React Native with iOS

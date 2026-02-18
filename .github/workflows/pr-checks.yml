@@ -33,7 +33,6 @@ jobs:
         with:
           name: fast-test-reports
           path: |
-            test-results/
             reports/
           retention-days: 7
 

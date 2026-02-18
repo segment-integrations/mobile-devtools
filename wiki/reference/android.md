@@ -4,7 +4,7 @@
 
 - `.devbox/virtenv/android/android.json` — generated config (created from env vars for Nix flake evaluation)
 - `devbox.d/android/devices/*.json` — device definitions
-- `devbox.d/android/devices.lock.json` — resolved API list for the SDK flake
+- `devbox.d/android/devices.lock` — resolved API list for the SDK flake
 - `.devbox/virtenv/android/scripts` — runtime scripts (added to PATH)
 - `devbox.d/android/flake.nix` — SDK flake (device APIs drive evaluation)
 
@@ -24,7 +24,7 @@ Configure the plugin by setting environment variables in `plugin.json`. These ar
 - `ANDROID_LOCAL_SDK` — Use local SDK instead of Nix-managed SDK (0=false, 1=true)
 - `ANDROID_COMPILE_SDK` — Compile SDK version (e.g., "36")
 - `ANDROID_TARGET_SDK` — Target SDK version (e.g., "36")
-- `EVALUATE_DEVICES` — Array of device names to evaluate in flake (empty = all devices)
+- `ANDROID_DEVICES` — Array of device names to evaluate in flake (empty = all devices)
 - `ANDROID_DEFAULT_DEVICE` — Default device name when none specified
 - `ANDROID_SYSTEM_IMAGE_TAG` — System image tag (e.g., "google_apis", "google_apis_playstore")
 - `ANDROID_APP_APK` — Path or glob pattern for APK (relative to project root)
@@ -80,8 +80,8 @@ Configure the plugin by setting environment variables in `plugin.json`. These ar
 ### Config management
 
 - `devbox run --pure android.sh config show`
-- `devbox run --pure android.sh config set KEY=VALUE [KEY=VALUE...]`
-- `devbox run --pure android.sh config reset`
+
+Configuration is managed via environment variables in `devbox.json`, not via CLI commands. Run `config show` to see current values and how to override them.
 
 ## Environment variables
 
@@ -91,10 +91,10 @@ Configure the plugin by setting environment variables in `plugin.json`. These ar
 - `ANDROID_SCRIPTS_DIR` - Runtime scripts directory
 
 ### Device selection
-- `ANDROID_DEFAULT_DEVICE` - Default device name when none specified
-- `EVALUATE_DEVICES` - Device names to evaluate in flake (comma-separated, empty = all)
-- `ANDROID_DEVICE_NAME` - Override device selection for current command
-- `TARGET_DEVICE` - Alternative device selection (deprecated, use ANDROID_DEVICE_NAME)
+- `ANDROID_DEFAULT_DEVICE` - Default device name when none specified (set in devbox.json)
+- `ANDROID_DEVICES` - Device names to evaluate in flake (comma-separated, empty = all; set in devbox.json)
+- `ANDROID_DEVICE_NAME` - Override device selection at runtime (e.g., `ANDROID_DEVICE_NAME=min devbox run start-emu`)
+- `TARGET_DEVICE` - Alias for ANDROID_DEVICE_NAME (legacy, prefer ANDROID_DEVICE_NAME)
 
 ### Emulator configuration
 - `EMU_HEADLESS` - Run emulator headless (no GUI window)

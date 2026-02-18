@@ -177,5 +177,4 @@ env -u LD -u LDFLAGS -u NIX_LDFLAGS xcodebuild ...
 ## Reference
 
 - **Complete API reference**: `plugins/ios/REFERENCE.md`
-- **Script architecture**: `plugins/ios/SCRIPTS.md`
-- **Layer documentation**: `plugins/ios/virtenv/scripts/LAYERS.md`
+- **Architecture**: `wiki/project/ARCHITECTURE.md`

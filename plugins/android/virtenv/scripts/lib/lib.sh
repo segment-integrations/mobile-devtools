@@ -98,10 +98,10 @@ android_compute_devices_checksum() {
 
   # Sort files to ensure consistent ordering (filesystem order is non-deterministic)
   if command -v sha256sum >/dev/null 2>&1; then
-    find "$devices_dir" -name "*.json" -type f 2>/dev/null | sort | xargs cat 2>/dev/null | \
+    find "$devices_dir" -name "*.json" -type f -exec cat {} \; 2>/dev/null | \
       sha256sum | cut -d' ' -f1
   elif command -v shasum >/dev/null 2>&1; then
-    find "$devices_dir" -name "*.json" -type f 2>/dev/null | sort | xargs cat 2>/dev/null | \
+    find "$devices_dir" -name "*.json" -type f -exec cat {} \; 2>/dev/null | \
       shasum -a 256 | cut -d' ' -f1
   else
     return 1

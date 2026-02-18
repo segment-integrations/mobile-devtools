@@ -884,12 +884,11 @@ The device name in the JSON file should match the device type from `xcrun simctl
 
 ### Learn More
 
-- **Complete API Reference**: See [plugins/ios/REFERENCE.md](../../plugins/ios/REFERENCE.md) for exhaustive documentation of all commands, environment variables, and configuration options
-- **Script Architecture**: See [plugins/ios/SCRIPTS.md](../../plugins/ios/SCRIPTS.md) for script organization and layer documentation
-- **Layer Documentation**: See [plugins/ios/virtenv/scripts/LAYERS.md](../../plugins/ios/virtenv/scripts/LAYERS.md) for understanding script dependencies
+- **Complete API Reference**: See [iOS Reference](../reference/ios.md) for exhaustive documentation of all commands, environment variables, and configuration options
+- **Architecture**: See [Architecture](../project/ARCHITECTURE.md) for script organization and layer documentation
 - **Plugin Testing**: See [plugins/tests/ios/](../../plugins/tests/ios/) for plugin unit tests
-- **CI/CD Workflows**: See [.github/workflows/](../../.github/workflows/) for CI integration examples
-- **Plugin Development**: See [plugins/CONVENTIONS.md](../../plugins/CONVENTIONS.md) for plugin development patterns
+- **CI/CD Workflows**: See [CI/CD](../project/CI-CD.md) for CI integration examples
+- **Plugin Development**: See [Conventions](../project/CONVENTIONS.md) for plugin development patterns
 
 ### Related Guides
 

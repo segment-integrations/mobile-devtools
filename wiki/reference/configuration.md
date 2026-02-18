@@ -662,8 +662,8 @@ devbox run sync  # If sync script is defined
 
 ## See Also
 
-- `/Users/abueide/code/devbox-plugins/plugins/android/REFERENCE.md` - Complete Android API reference
-- `/Users/abueide/code/devbox-plugins/plugins/ios/REFERENCE.md` - Complete iOS API reference
-- `/Users/abueide/code/devbox-plugins/plugins/react-native/REFERENCE.md` - Complete React Native API reference
-- `/Users/abueide/code/devbox-plugins/plugins/CONVENTIONS.md` - Plugin development patterns
-- `/Users/abueide/code/devbox-plugins/CLAUDE.md` - Repository overview and development rules
+- [Android Reference](android.md) - Complete Android API reference
+- [iOS Reference](ios.md) - Complete iOS API reference
+- [React Native Reference](react-native.md) - Complete React Native API reference
+- [Plugin Conventions](../project/CONVENTIONS.md) - Plugin development patterns
+- [CLAUDE.md](../../CLAUDE.md) - Repository overview and development rules

@@ -540,11 +540,11 @@ Both workflows use matrix execution to test multiple platforms and devices in pa
 ## Additional Resources
 
 For complete command and configuration references, see:
-- `plugins/android/REFERENCE.md` - Android plugin API reference
-- `plugins/ios/REFERENCE.md` - iOS plugin API reference
-- `plugins/react-native/REFERENCE.md` - React Native plugin API reference
-- `plugins/CONVENTIONS.md` - Plugin development patterns and best practices
-- `.github/workflows/README.md` - CI/CD workflow documentation
+- `../reference/android.md` - Android plugin API reference
+- `../reference/ios.md` - iOS plugin API reference
+- `../reference/react-native.md` - React Native plugin API reference
+- `../../CONVENTIONS.md` - Plugin development patterns and best practices
+- `../../.github/workflows/README.md` - CI/CD workflow documentation
 
 ## Questions and Support
 

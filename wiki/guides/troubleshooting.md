@@ -1145,9 +1145,9 @@ Standard debugging approach:
 If issues persist after troubleshooting:
 
 1. **Check documentation**:
-   - [Android Reference](../../plugins/android/REFERENCE.md)
-   - [iOS Reference](../../plugins/ios/REFERENCE.md)
-   - [React Native Reference](../../plugins/react-native/REFERENCE.md)
+   - [Android Reference](../reference/android.md)
+   - [iOS Reference](../reference/ios.md)
+   - [React Native Reference](../reference/react-native.md)
 
 2. **Review example projects**:
    - `examples/android/` - Working Android setup

@@ -19,13 +19,16 @@
 {"level":"info","process":"test-server","replica":0,"message":"✓ Tool defined: devbox_docs_search"}
 {"level":"info","process":"test-server","replica":0,"message":"✓ Tool defined: devbox_docs_list"}
 {"level":"info","process":"test-server","replica":0,"message":"✓ Tool defined: devbox_docs_read"}
+{"level":"info","process":"test-server","replica":0,"message":"✓ Tool defined: devbox_init"}
+{"level":"info","process":"test-server","replica":0,"message":"✓ Tool defined: devbox_shell_env"}
+{"level":"info","process":"test-server","replica":0,"message":"✓ Tool defined: devbox_sync"}
 {"level":"info","process":"test-server","replica":0,"message":"✓ Server imports MCP SDK"}
 {"level":"info","process":"test-server","replica":0,"message":"✓ Server imports StdioServerTransport"}
 {"level":"info","process":"test-server","replica":0,"message":"✓ Server has error handling"}
 {"level":"info","process":"test-server","replica":0}
 {"level":"info","process":"test-server","replica":0,"message":"===================================="}
 {"level":"info","process":"test-server","replica":0,"message":"Test Results:"}
-{"level":"info","process":"test-server","replica":0,"message":"  Passed: 21"}
+{"level":"info","process":"test-server","replica":0,"message":"  Passed: 24"}
 {"level":"info","process":"test-server","replica":0,"message":"  Failed: 0"}
 {"level":"info","process":"test-server","replica":0,"message":"===================================="}
 {"level":"info","process":"test-tools","replica":0,"message":"Testing devbox-mcp tools..."}
@@ -59,15 +62,18 @@
 {"level":"info","process":"test-tools","replica":0,"message":"✓ Handler exists for devbox_docs_search"}
 {"level":"info","process":"test-tools","replica":0,"message":"✓ Handler exists for devbox_docs_list"}
 {"level":"info","process":"test-tools","replica":0,"message":"✓ Handler exists for devbox_docs_read"}
+{"level":"info","process":"test-tools","replica":0,"message":"✓ Handler exists for devbox_init"}
+{"level":"info","process":"test-tools","replica":0,"message":"✓ Handler exists for devbox_shell_env"}
+{"level":"info","process":"test-tools","replica":0,"message":"✓ Handler exists for devbox_sync"}
 {"level":"info","process":"test-tools","replica":0}
 {"level":"info","process":"test-tools","replica":0,"message":"===================================="}
 {"level":"info","process":"test-tools","replica":0,"message":"Test Results:"}
-{"level":"info","process":"test-tools","replica":0,"message":"  Passed: 26"}
+{"level":"info","process":"test-tools","replica":0,"message":"  Passed: 29"}
 {"level":"info","process":"test-tools","replica":0,"message":"  Failed: 0"}
 {"level":"info","process":"test-tools","replica":0,"message":"===================================="}
 {"level":"info","process":"test-mcp-tools","replica":0,"message":"Testing MCP tools functionality..."}
 {"level":"info","process":"test-mcp-tools","replica":0}
-{"level":"info","process":"test-mcp-tools","replica":0,"message":"Test directory: /var/folders/4k/82wjl0fd5zvgtwh3hbcrh3rm0000gn/T/devbox-mcp-test-1770757871646"}
+{"level":"info","process":"test-mcp-tools","replica":0,"message":"Test directory: /var/folders/4k/82wjl0fd5zvgtwh3hbcrh3rm0000gn/T/devbox-mcp-test-1771433379830"}
 {"level":"info","process":"test-mcp-tools","replica":0}
 {"level":"info","process":"test-mcp-tools","replica":0}
 {"level":"info","process":"test-mcp-tools","replica":0,"message":"Test 1: devbox init"}
@@ -109,50 +115,12 @@
 {"level":"info","process":"test-mcp-tools","replica":0,"message":"===================================="}
 {"level":"info","process":"test-mcp-tools","replica":0}
 {"level":"info","process":"summary","replica":0}
-{"level":"info","process":"summary","replica":0,"message":"========================================"}
-{"level":"info","process":"summary","replica":0,"message":"     TEST SUITE SUMMARY"}
-{"level":"info","process":"summary","replica":0,"message":"========================================"}
+{"level":"info","process":"summary","replica":0,"message":"===================================="}
+{"level":"info","process":"summary","replica":0,"message":"Devbox MCP Test Suite Summary"}
+{"level":"info","process":"summary","replica":0,"message":"===================================="}
 {"level":"info","process":"summary","replica":0}
+{"level":"info","process":"summary","replica":0,"message":"Test Logs:"}
+{"level":"info","process":"summary","replica":0,"message":"  test-results/devbox-mcp-logs"}
 {"level":"info","process":"summary","replica":0}
-{"level":"info","process":"summary","replica":0,"message":"\u001b[1mAndroid Plugin Tests:\u001b[0m"}
-{"level":"info","process":"summary","replica":0,"message":"  \u001b[0;32m✓\u001b[0m lib.sh: 20 tests passed"}
-{"level":"info","process":"summary","replica":0,"message":"  \u001b[0;32m✓\u001b[0m devices.sh: 12 tests passed"}
-{"level":"info","process":"summary","replica":0}
-{"level":"info","process":"summary","replica":0,"message":"\u001b[1miOS Plugin Tests:\u001b[0m"}
-{"level":"info","process":"summary","replica":0,"message":"  \u001b[0;32m✓\u001b[0m lib.sh: 8 tests passed"}
-{"level":"info","process":"summary","replica":0,"message":"  \u001b[0;32m✓\u001b[0m devices.sh: 15 tests passed"}
-{"level":"info","process":"summary","replica":0}
-{"level":"info","process":"summary","replica":0,"message":"\u001b[1mIntegration Tests:\u001b[0m"}
-{"level":"info","process":"summary","replica":0,"message":"  \u001b[0m⚠ android device mgmt: no results found\u001b[0m"}
-{"level":"info","process":"summary","replica":0,"message":"  \u001b[0m⚠ android validation: no results found\u001b[0m"}
-{"level":"info","process":"summary","replica":0,"message":"  \u001b[0m⚠ ios device mgmt: no results found\u001b[0m"}
-{"level":"info","process":"summary","replica":0,"message":"  \u001b[0m⚠ ios cache: no results found\u001b[0m"}
-{"level":"info","process":"summary","replica":0}
-{"level":"info","process":"summary","replica":0,"message":"========================================"}
-{"level":"info","process":"summary","replica":0,"message":"\u001b[0;32m\u001b[1m     ALL TESTS PASSED ✓\u001b[0m"}
-{"level":"info","process":"summary","replica":0,"message":"========================================"}
-{"level":"info","process":"summary","replica":0}
-{"level":"info","process":"summary","replica":0,"message":"Results:"}
-{"level":"info","process":"summary","replica":0,"message":"  Test Suites: 2"}
-{"level":"info","process":"summary","replica":0,"message":"  \u001b[0;32mPassed: 55\u001b[0m"}
-{"level":"info","process":"summary","replica":0,"message":"  Failed: 0"}
-{"level":"info","process":"summary","replica":0}
-{"level":"info","process":"summary","replica":0,"message":"Test Log Files:"}
-{"level":"info","process":"summary","replica":0,"message":"  reports/logs/android-test-lib.txt"}
-{"level":"info","process":"summary","replica":0,"message":"  reports/logs/android-test-devices.txt"}
-{"level":"info","process":"summary","replica":0,"message":"  reports/logs/android-test-device-mgmt.txt"}
-{"level":"info","process":"summary","replica":0,"message":"  reports/logs/android-test-validation.txt"}
-{"level":"info","process":"summary","replica":0,"message":"  reports/logs/ios-test-lib.txt"}
-{"level":"info","process":"summary","replica":0,"message":"  reports/logs/ios-test-devices.txt"}
-{"level":"info","process":"summary","replica":0,"message":"  reports/logs/ios-test-device-mgmt.txt"}
-{"level":"info","process":"summary","replica":0,"message":"  reports/logs/ios-test-cache.txt"}
-{"level":"info","process":"summary","replica":0,"message":"  reports/logs/summary.txt"}
-{"level":"info","process":"summary","replica":0}
-{"level":"info","process":"summary","replica":0,"message":"Lint Logs:"}
-{"level":"info","process":"summary","replica":0,"message":"  reports/devbox-lint-logs/"}
-{"level":"info","process":"summary","replica":0}
-{"level":"info","process":"summary","replica":0,"message":"Result Files:"}
-{"level":"info","process":"summary","replica":0,"message":"  reports/results/*.json"}
-{"level":"info","process":"summary","replica":0}
-{"level":"info","process":"summary","replica":0,"message":"Summary written to: reports/summary.md"}
-{"level":"info","process":"summary","replica":0}
+{"level":"info","process":"summary","replica":0,"message":"All tests completed!"}
+{"level":"info","process":"summary","replica":0,"message":"===================================="}

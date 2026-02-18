@@ -265,7 +265,7 @@ devbox run test                 # Run tests
 
 ## Getting Help
 
-- **Reference Docs** - See `plugins/{android|ios|react-native}/REFERENCE.md`
+- **Reference Docs** - See [Android Reference](../reference/android.md), [iOS Reference](../reference/ios.md), or [React Native Reference](../reference/react-native.md)
 - **Examples** - Explore `examples/{android|ios|react-native}/`
 - **Issues** - [GitHub Issues](https://github.com/jetify-com/devbox-plugins/issues)
 - **Community** - [Devbox Discord](https://discord.gg/jetify)

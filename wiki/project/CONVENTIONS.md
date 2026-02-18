@@ -15,7 +15,7 @@ The `config/` directory contains **only** files that are copied to the user's pr
 - Internal plugin files (flake.nix, scripts, tests)
 - Process management files (process-compose.yaml)
 - Test suites (test-suite.yaml)
-- Generated files (android.json, devices.lock.json)
+- Generated files (android.json, devices.lock)
 
 ### Plugin Root - Internal Files
 Internal plugin files that get copied to `.devbox/virtenv/{platform}` should be at the plugin root or in their respective directories:
@@ -57,7 +57,7 @@ All plugins follow these patterns:
 
 ### Platform-Specific Configuration
 - `{PLATFORM}_DEFAULT_DEVICE` - Default device name when none specified
-- `EVALUATE_DEVICES` - Array of device names to evaluate (empty = all)
+- `ANDROID_DEVICES` - Array of device names to evaluate (empty = all)
 
 ### Build/App Configuration
 - `{PLATFORM}_APP_*` - Application-specific paths (APK, bundle, derived data, etc.)
@@ -68,7 +68,7 @@ All plugins follow these patterns:
 - `README.md` - User-facing plugin overview
 - `REFERENCE.md` - Complete API reference
 - `{platform}.json` - Platform configuration defaults
-- `devices.lock.json` - Generated lock file (optimization for CI)
+- `devices.lock` - Generated lock file (optimization for CI)
 - `process-compose.yaml` - Service definitions
 
 ## Script Conventions
@@ -108,7 +108,7 @@ Lock files are generated from device definitions to optimize CI builds:
 
 **Purpose**: CI optimization - only evaluate/download SDK for selected device APIs instead of all devices
 
-**Android**: `devices.lock.json`
+**Android**: `devices.lock`
 ```json
 {
   "api_versions": [28, 35, 36],
@@ -116,7 +116,7 @@ Lock files are generated from device definitions to optimize CI builds:
 }
 ```
 
-**iOS**: `devices.lock.json`
+**iOS**: `devices.lock`
 ```json
 {
   "devices": ["min", "max"],
@@ -138,7 +138,7 @@ All plugins implement TTL-based caching (1 hour) for expensive operations:
 
 ### Cache Invalidation
 - Time-based: 1 hour TTL for all caches
-- Event-based: Android Nix cache invalidates when `devices.lock.json` changes
+- Event-based: Android Nix cache invalidates when `devices.lock` changes
 - Location: Cache files stored in `.devbox/virtenv/{platform}/` (git-ignored)
 
 ### Cache Files
@@ -321,6 +321,6 @@ DEBUG=1 devbox shell
 
 ### Performance Tips
 - Select specific devices: `devices select min` reduces evaluation time
-- Use lock files: Commit `devices.lock.json` to avoid regeneration
+- Use lock files: Commit `devices.lock` to avoid regeneration
 - Cache Devbox: Cache `.devbox` directory in CI for faster startups
 - Parallel jobs: Test different platforms in parallel

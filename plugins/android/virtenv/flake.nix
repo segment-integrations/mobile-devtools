@@ -41,8 +41,8 @@
         ) [ ] list;
 
       lockData =
-        if builtins.pathExists ./devices.lock.json
-        then builtins.fromJSON (builtins.readFile ./devices.lock.json)
+        if builtins.pathExists ./devices.lock
+        then builtins.fromJSON (builtins.readFile ./devices.lock)
         else { devices = [ ]; };
 
       # Extract API versions from lock file devices array, default to latest if empty
