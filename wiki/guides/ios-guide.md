@@ -10,8 +10,9 @@ The iOS plugin enables reproducible iOS development by automatically discovering
 - **Automatic Xcode discovery**: Multi-strategy detection with caching for fast shell initialization
 - **Device management**: JSON-based device definitions with CLI commands for creating, updating, and managing simulators
 - **Simulator control**: Scripts for starting and stopping simulators
+- **App deployment**: `ios.sh run` auto-detects your `.app` bundle, extracts the bundle ID, and deploys to the simulator
 
-The plugin does **not** provide build or deploy commands. Every project has different Xcode configurations (project vs. workspace, different schemes, different derived data paths), so you define those in your own `devbox.json`. See [Adding Build Scripts](#adding-build-and-deploy-scripts) for patterns.
+The plugin auto-detects your Xcode project, `.app` path, and bundle ID at runtime. You define a `build:ios` script in your `devbox.json` to handle the actual Xcode build, then `ios.sh run` handles everything else. See [Adding Build Scripts](#adding-build-and-deploy-scripts) for patterns.
 
 Pure shells with `devbox run --pure` create test-specific simulators and clean up after execution, ensuring isolated, reproducible testing.
 
@@ -34,7 +35,7 @@ Create or modify your `devbox.json` to include the iOS plugin:
 }
 ```
 
-The Xcode project, build scheme, bundle ID, and app path are all auto-detected at runtime. Use `-derivedDataPath DerivedData` in your xcodebuild command to keep build output project-local.
+Use `-derivedDataPath DerivedData` in your xcodebuild command to keep build output project-local.
 
 ### Initial Setup
 
@@ -250,9 +251,26 @@ The plugin provides simulator and device management. Build and deploy commands a
 }
 ```
 
-The `ios.sh run` command starts the simulator, builds (via `build:ios`), auto-detects the .app bundle, extracts the bundle ID, installs, and launches. The `${1:-}` syntax passes an optional device nickname through.
+The `ios.sh run` command handles the full deployment pipeline: starts the simulator, runs your `build:ios` script, auto-detects the `.app` bundle, extracts the bundle ID from `Info.plist`, installs, and launches. The `${1:-}` syntax passes an optional device nickname through.
 
-With these scripts defined, you can:
+**How app auto-detection works:** After building, `ios.sh run` finds your `.app` bundle using this precedence chain:
+
+1. `IOS_APP_ARTIFACT` env var — if set, resolves the path/glob relative to project root
+2. `xcodebuild -showBuildSettings` — queries your Xcode project for BUILT_PRODUCTS_DIR + FULL_PRODUCT_NAME
+3. Recursive search of the project directory for `.app` bundles, skipping `Pods/`, `.build/`, `node_modules/`, `.devbox/`, and similar directories
+4. Recursive search of the current working directory (if different from project root)
+
+In most projects, step 2 or 3 finds the right `.app` automatically with no configuration needed. If auto-detection doesn't work (e.g., multiple `.app` bundles, non-standard project layout), set `IOS_APP_ARTIFACT` explicitly:
+
+```json
+{
+  "env": {
+    "IOS_APP_ARTIFACT": "DerivedData/Build/Products/Debug-iphonesimulator/MyApp.app"
+  }
+}
+```
+
+With the scripts defined above, you can:
 
 ```bash
 # Build the app
@@ -275,16 +293,11 @@ Typical development session:
 # 1. Enter devbox shell
 devbox shell
 
-# 2. Start simulator
-devbox run start:sim max
+# 2. Build and deploy (starts simulator, builds, installs, and launches)
+devbox run start:app
 
-# 3. Build and deploy app (using your custom scripts)
-devbox run build
-devbox run start:app max
-
-# 4. Make code changes, rebuild, and redeploy
-devbox run build
-devbox run start:app max
+# 3. Make code changes, rebuild, and redeploy
+devbox run start:app
 
 # 5. Stop simulator when done
 devbox run stop:sim

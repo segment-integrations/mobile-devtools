@@ -33,14 +33,11 @@ Create or modify your `devbox.json` to include the Android plugin:
   "packages": {
     "jdk17": "latest",
     "gradle": "latest"
-  },
-  "env": {
-    "ANDROID_APP_APK": "app/build/outputs/apk/debug/app-debug.apk"
   }
 }
 ```
 
-The `include` line adds the plugin. The `packages` section adds your build tooling. Set `ANDROID_APP_APK` to where your build outputs the APK.
+The `include` line adds the plugin. The `packages` section adds your build tooling. APK paths are auto-detected at runtime when you deploy.
 
 ### Initial Setup
 
@@ -228,12 +225,9 @@ The plugin provides emulator and device management. Build and deploy commands ar
     "jdk17": "latest",
     "gradle": "latest"
   },
-  "env": {
-    "ANDROID_APP_APK": "app/build/outputs/apk/debug/app-debug.apk"
-  },
   "shell": {
     "scripts": {
-      "build": [
+      "build:android": [
         "gradle assembleDebug --info"
       ],
       "start:app": [
@@ -250,7 +244,7 @@ With these scripts defined, you can:
 
 ```bash
 # Build the APK
-devbox run build
+devbox run build:android
 
 # Build, install, and launch on the emulator
 devbox run start:app
@@ -259,7 +253,23 @@ devbox run start:app
 devbox run start:app min
 ```
 
-The `android.sh run` command waits for the emulator to boot, installs the APK, and launches the app. The app's package name is auto-detected from the APK.
+**How APK auto-detection works:** The `android.sh run` command waits for the emulator to boot, then auto-detects the APK using this precedence chain:
+
+1. `ANDROID_APP_APK` env var — if set, resolves the path/glob relative to project root
+2. Recursive search of the project directory for `.apk` files, skipping `.gradle/`, `build/intermediates/`, `node_modules/`, and `.devbox/`
+3. Recursive search of the current working directory (if different from project root)
+
+The app's package name and launch activity are extracted from the APK automatically.
+
+In most projects, step 2 finds the right APK with no configuration. If auto-detection picks the wrong APK (e.g., multiple build variants), set `ANDROID_APP_APK` explicitly:
+
+```json
+{
+  "env": {
+    "ANDROID_APP_APK": "app/build/outputs/apk/debug/app-debug.apk"
+  }
+}
+```
 
 See the [Android example project](../../examples/android/) for a complete working setup.
 
@@ -360,7 +370,6 @@ Configure the plugin by setting environment variables in `devbox.json`:
 {
   "env": {
     "ANDROID_DEFAULT_DEVICE": "max",
-    "ANDROID_APP_APK": "app/build/outputs/apk/debug/app-debug.apk",
     "ANDROID_BUILD_TOOLS_VERSION": "36.1.0",
     "ANDROID_COMPILE_SDK": "36",
     "ANDROID_TARGET_SDK": "36"
@@ -370,7 +379,7 @@ Configure the plugin by setting environment variables in `devbox.json`:
 
 Key variables:
 - `ANDROID_DEFAULT_DEVICE` - Default device when none specified
-- `ANDROID_APP_APK` - Path or glob pattern for APK
+- `ANDROID_APP_APK` - Path or glob pattern for APK (empty = auto-detect)
 - `ANDROID_BUILD_TOOLS_VERSION` - Build tools version
 - `ANDROID_COMPILE_SDK` - Compile SDK version
 - `ANDROID_TARGET_SDK` - Target SDK version
@@ -482,10 +491,9 @@ Run `devbox shell` after changing `devbox.json` to apply the new values. To rese
 
 **Solutions**:
 
-1. Verify APK path is correct:
+1. Verify the APK exists (check your build output directory):
    ```bash
-   echo $ANDROID_APP_APK
-   ls -l $ANDROID_APP_APK
+   find . -name '*.apk' -not -path '*/.gradle/*' -not -path '*/intermediates/*'
    ```
 
 2. Check if app is already installed:

@@ -38,14 +38,11 @@ Replace the contents of your `devbox.json` with:
   "packages": {
     "jdk17": "latest",
     "gradle": "latest"
-  },
-  "env": {
-    "ANDROID_APP_APK": "app/build/outputs/apk/debug/app-debug.apk"
   }
 }
 ```
 
-The `include` line adds the Android plugin from GitHub. Devbox downloads the Android SDK, emulator, and device management tools automatically. The `packages` section adds JDK and Gradle for building your app. Set `ANDROID_APP_APK` to the path where your build outputs the APK.
+The `include` line adds the Android plugin from GitHub. Devbox downloads the Android SDK, emulator, and device management tools automatically. The `packages` section adds JDK and Gradle for building your app.
 
 > **Note:** Plugins are included via URL in `devbox.json`, not with `devbox add`. You cannot use `devbox add plugin:android`.
 
@@ -97,12 +94,9 @@ The plugin provides emulator and device management. Build and deploy commands ar
     "jdk17": "latest",
     "gradle": "latest"
   },
-  "env": {
-    "ANDROID_APP_APK": "app/build/outputs/apk/debug/app-debug.apk"
-  },
   "shell": {
     "scripts": {
-      "build": [
+      "build:android": [
         "gradle assembleDebug --info"
       ],
       "start:app": [
@@ -119,7 +113,7 @@ Now you can build and deploy:
 
 ```sh
 # Build the APK
-devbox run build
+devbox run build:android
 
 # Build, install, and launch on the default device
 devbox run start:app
@@ -128,7 +122,19 @@ devbox run start:app
 devbox run start:app min
 ```
 
-The `android.sh run` command waits for the emulator to boot, installs the APK, and launches the app. The app's package name is auto-detected from the APK.
+The `android.sh run` command waits for the emulator to boot, then auto-detects, installs, and launches the APK. The app's package name is extracted from the APK automatically.
+
+**How APK auto-detection works:** The `run` command searches your project for `.apk` files, skipping build caches like `.gradle/`, `build/intermediates/`, `node_modules/`, and `.devbox/`. If your build outputs the APK to a standard location (e.g., `app/build/outputs/apk/`), it will be found automatically.
+
+If auto-detection picks the wrong APK or you want to be explicit, set `ANDROID_APP_APK` in your `devbox.json` env. This accepts a path or glob pattern relative to your project root:
+
+```json
+{
+  "env": {
+    "ANDROID_APP_APK": "app/build/outputs/apk/debug/app-debug.apk"
+  }
+}
+```
 
 ### 6. Stop the Emulator
 
@@ -165,7 +171,7 @@ Replace the contents of your `devbox.json` with:
 }
 ```
 
-The `include` line adds the iOS plugin from GitHub. The plugin discovers your Xcode installation and provides simulator management tools. The Xcode project, build scheme, bundle ID, and app path are all auto-detected at runtime.
+The `include` line adds the iOS plugin from GitHub. The plugin discovers your Xcode installation, manages simulators, and auto-detects your Xcode project, `.app` bundle, and bundle ID when deploying.
 
 > **Note:** Plugins are included via URL in `devbox.json`, not with `devbox add`.
 
@@ -226,8 +232,6 @@ The plugin provides simulator and device management. Build and deploy commands a
 
 As with the Android example, `${1:-}` passes an optional device nickname through (e.g., `devbox run start:app min`). If omitted, the default device is used.
 
-The `ios.sh run` command starts the simulator, builds (via `build:ios`), auto-detects the .app bundle (via xcodebuild settings or recursive search), extracts the bundle ID from `Info.plist`, installs, and launches.
-
 Now you can build and deploy:
 
 ```sh
@@ -236,6 +240,23 @@ devbox run build:ios
 
 # Start simulator, install, and launch
 devbox run start:app
+```
+
+**How app auto-detection works:** The `ios.sh run` command starts the simulator, runs your `build:ios` script, then auto-detects the `.app` bundle. It uses this precedence chain:
+
+1. Query `xcodebuild -showBuildSettings` for the built products path (works when your project has an `.xcodeproj` or `.xcworkspace` in the project root)
+2. Recursive search of the project directory for `.app` bundles, skipping `Pods/`, `.build/`, `node_modules/`, `.devbox/`, and similar directories
+
+The bundle ID is extracted automatically from the `.app`'s `Info.plist`.
+
+If auto-detection picks the wrong `.app` or your project structure is non-standard, set `IOS_APP_ARTIFACT` in your `devbox.json` env. This accepts a path or glob pattern relative to your project root:
+
+```json
+{
+  "env": {
+    "IOS_APP_ARTIFACT": "DerivedData/Build/Products/Debug-iphonesimulator/MyApp.app"
+  }
+}
 ```
 
 Use `-derivedDataPath DerivedData` in your xcodebuild command to keep build output project-local.
@@ -277,14 +298,11 @@ Replace the contents of your `devbox.json` with:
     "watchman@latest",
     "jdk17@latest",
     "gradle@latest"
-  ],
-  "env": {
-    "ANDROID_APP_APK": "android/app/build/outputs/apk/debug/app-debug.apk"
-  }
+  ]
 }
 ```
 
-The React Native plugin automatically includes both the Android and iOS plugins. The iOS app project, scheme, bundle ID, and artifact path are all auto-detected at runtime.
+The React Native plugin automatically includes both the Android and iOS plugins. APK and `.app` paths are auto-detected at runtime.
 
 > **Note:** Plugins are included via URL in `devbox.json`, not with `devbox add`.
 
@@ -309,9 +327,6 @@ The plugin provides emulator/simulator control, device management, and Metro bun
     "jdk17@latest",
     "gradle@latest"
   ],
-  "env": {
-    "ANDROID_APP_APK": "android/app/build/outputs/apk/debug/app-debug.apk"
-  },
   "shell": {
     "scripts": {
       "build:android": [
