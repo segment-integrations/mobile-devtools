@@ -71,7 +71,7 @@ processes:
       build-app:
         condition: process_completed_successfully
       ios-simulator:
-        condition: process_completed_successfully
+        condition: process_healthy
     availability:
       restart: "no"
 

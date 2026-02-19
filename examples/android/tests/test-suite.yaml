@@ -86,7 +86,7 @@ processes:
       build-app:
         condition: process_completed_successfully
       android-emulator:
-        condition: process_completed_successfully
+        condition: process_healthy
     availability:
       restart: "no"
 

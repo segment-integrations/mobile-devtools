@@ -114,7 +114,7 @@ processes:
       install-pods:
         condition: process_completed_successfully
       ios-simulator:
-        condition: process_completed_successfully
+        condition: process_healthy
       metro-bundler:
         condition: process_healthy
     availability:

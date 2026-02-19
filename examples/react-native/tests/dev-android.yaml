@@ -97,7 +97,7 @@ processes:
       build-android:
         condition: process_completed_successfully
       android-emulator:
-        condition: process_completed_successfully
+        condition: process_healthy
       metro-bundler:
         condition: process_healthy
     availability:
