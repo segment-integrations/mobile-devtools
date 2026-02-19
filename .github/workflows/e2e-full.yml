@@ -61,12 +61,11 @@ jobs:
       - name: Run Android E2E test
         working-directory: examples/android
         env:
-          EMU_HEADLESS: 1
           BOOT_TIMEOUT: 240
           TEST_TIMEOUT: 600
           ANDROID_DEFAULT_DEVICE: ${{ matrix.device }}
           TEST_TUI: false
-        run: devbox run --pure -e EMU_HEADLESS="${EMU_HEADLESS}" test:e2e
+        run: devbox run --pure -e EMU_HEADLESS=1 test:e2e
 
       - name: Upload reports and logs
         if: always()
@@ -122,12 +121,11 @@ jobs:
       - name: Run iOS E2E test
         working-directory: examples/ios
         env:
-          SIM_HEADLESS: 1
           BOOT_TIMEOUT: 180
           TEST_TIMEOUT: 600
           IOS_DEFAULT_DEVICE: ${{ matrix.device }}
           TEST_TUI: false
-        run: devbox run --pure -e SIM_HEADLESS="${SIM_HEADLESS}" test:e2e
+        run: devbox run --pure -e SIM_HEADLESS=1 test:e2e
 
       - name: Upload reports and logs
         if: always()
