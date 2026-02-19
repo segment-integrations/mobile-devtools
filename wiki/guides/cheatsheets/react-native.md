@@ -90,11 +90,12 @@ devbox run test:metro           # Test Metro bundler setup
 
 # User-defined scripts (add to your devbox.json shell.scripts):
 # "test": ["npm test"]
-# "test:e2e:android": ["bash tests/run-android-tests.sh"]
-# "test:e2e:ios": ["bash tests/run-ios-tests.sh"]
+# "test:e2e:android": ["process-compose -f tests/test-suite-android-e2e.yaml --no-server --tui=${TEST_TUI:-false}"]
+# "test:e2e:ios": ["process-compose -f tests/test-suite-ios-e2e.yaml --no-server --tui=${TEST_TUI:-false}"]
 
-# With TUI (terminal UI)
-TEST_TUI=true devbox run test:e2e:android
+# Skip unused platform for faster startup
+devbox run --pure -e IOS_SKIP_SETUP=1 test:e2e:android
+devbox run --pure -e ANDROID_SKIP_SETUP=1 test:e2e:ios
 ```
 
 ## Configuration

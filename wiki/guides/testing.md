@@ -270,24 +270,17 @@ devbox run test:e2e:all        # Both platforms in parallel
 
 ### Platform-Specific Optimization
 
-Wrapper scripts skip the unused platform for faster startup:
+Skip the unused platform with `-e` flags for faster startup:
 
 ```bash
 # iOS tests only (skips Android SDK evaluation)
-./tests/run-ios-tests.sh
-
-# Android tests only (skips iOS setup)
-./tests/run-android-tests.sh
-```
-
-These scripts use the correct `-e` flag syntax to pass environment variables in pure mode:
-
-```bash
-# iOS wrapper skips Android
 devbox run --pure -e ANDROID_SKIP_SETUP=1 test:e2e:ios
 
-# Android wrapper skips iOS
+# Android tests only (skips iOS setup)
 devbox run --pure -e IOS_SKIP_SETUP=1 test:e2e:android
+
+# Web tests (skips both mobile platforms)
+devbox run --pure -e ANDROID_SKIP_SETUP=1 -e IOS_SKIP_SETUP=1 test:e2e:web
 ```
 
 ### React Native E2E Test Flow

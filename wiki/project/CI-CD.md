@@ -177,9 +177,9 @@ TEST_TUI: false
 3. Setup platform-specific caches (Gradle/CocoaPods/Xcode)
 4. Install Devbox with package caching
 5. Run platform-specific test:
-   - Android: `bash tests/run-android-tests.sh` (wrapper for optimization)
-   - iOS: `bash tests/run-ios-tests.sh` (wrapper for optimization)
-   - Web: `devbox run test:e2e:web`
+   - Android: `devbox run --pure -e IOS_SKIP_SETUP=1 -e EMU_HEADLESS=1 test:e2e:android`
+   - iOS: `devbox run --pure -e ANDROID_SKIP_SETUP=1 -e SIM_HEADLESS=1 test:e2e:ios`
+   - Web: `devbox run --pure -e ANDROID_SKIP_SETUP=1 -e IOS_SKIP_SETUP=1 test:e2e:web`
 6. Upload artifacts on success or failure
 
 **Artifacts uploaded:**
@@ -762,21 +762,13 @@ devbox run test:e2e
 cd examples/react-native
 
 # Android
-EMU_HEADLESS=1 \
-BOOT_TIMEOUT=240 \
-TEST_TIMEOUT=600 \
-ANDROID_DEFAULT_DEVICE=min \
-bash tests/run-android-tests.sh
+devbox run --pure -e IOS_SKIP_SETUP=1 -e EMU_HEADLESS=1 test:e2e:android
 
 # iOS
-SIM_HEADLESS=1 \
-BOOT_TIMEOUT=240 \
-TEST_TIMEOUT=600 \
-IOS_DEFAULT_DEVICE=min \
-bash tests/run-ios-tests.sh
+devbox run --pure -e ANDROID_SKIP_SETUP=1 -e SIM_HEADLESS=1 test:e2e:ios
 
 # Web
-devbox run test:e2e:web
+devbox run --pure -e ANDROID_SKIP_SETUP=1 -e IOS_SKIP_SETUP=1 test:e2e:web
 ```
 
 ### Examining Logs

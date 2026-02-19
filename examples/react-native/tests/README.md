@@ -172,30 +172,26 @@ This ensures each test gets its own Metro instance on a unique port with isolate
 
 ## Platform-Specific Optimization
 
-The wrapper scripts optimize startup time by skipping the unused platform:
+Skip unused platform setup with `-e` flags to speed up test startup:
 
 ```bash
-# iOS tests only (fast - skips Android SDK)
-./tests/run-ios-tests.sh
+# iOS tests only (fast - skips Android SDK evaluation)
+devbox run --pure -e ANDROID_SKIP_SETUP=1 test:e2e:ios
 
 # Android tests only (fast - skips iOS setup)
-./tests/run-android-tests.sh
+devbox run --pure -e IOS_SKIP_SETUP=1 test:e2e:android
+
+# Web tests (skip both mobile platforms)
+devbox run --pure -e ANDROID_SKIP_SETUP=1 -e IOS_SKIP_SETUP=1 test:e2e:web
 ```
 
 **Environment variables:**
 - `ANDROID_SKIP_SETUP=1` - Skip Android SDK Nix flake evaluation
 - `IOS_SKIP_SETUP=1` - Skip iOS environment setup
+- `EMU_HEADLESS=1` - Run Android emulator without display (CI)
+- `SIM_HEADLESS=1` - Run iOS simulator without display (CI)
 
-**Important:** When using `--pure` mode, environment variables must be passed with the `-e` flag:
-```bash
-# Correct way to skip Android SDK in pure mode
-devbox run --pure -e ANDROID_SKIP_SETUP=1 test:e2e:ios
-
-# Incorrect - env var gets reset to default
-ANDROID_SKIP_SETUP=1 devbox run --pure test:e2e:ios
-```
-
-The wrapper scripts (`run-ios-tests.sh` and `run-android-tests.sh`) use the correct `-e` flag syntax automatically. This is particularly useful in CI/CD pipelines where you split platform tests into separate jobs.
+**Important:** When using `--pure` mode, environment variables must be passed with the `-e` flag. Variables set in the parent shell are stripped by `--pure`.
 
 ## Build Configuration
 
