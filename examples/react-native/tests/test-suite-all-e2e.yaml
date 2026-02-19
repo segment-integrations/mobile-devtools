@@ -11,7 +11,6 @@ environment:
 log_location: "reports/react-native-all-e2e-logs"
 log_level: info
 is_strict: true
-exit_on_end: true
 
 processes:
   # Phase 0: Allocate Metro port (runs first, no dependencies)

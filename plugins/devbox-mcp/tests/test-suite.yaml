@@ -3,7 +3,6 @@ version: "0.5"
 log_location: "reports/devbox-mcp-logs"
 log_level: info
 is_strict: true
-exit_on_end: true
 
 processes:
   # Test server structure and configuration

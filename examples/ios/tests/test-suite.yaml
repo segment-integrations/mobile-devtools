@@ -8,7 +8,6 @@ environment:
 log_location: "reports/ios-e2e-logs"
 log_level: info
 is_strict: true
-exit_on_end: true
 
 processes:
   # Phase 1: Build app - runs first
