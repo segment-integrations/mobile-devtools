@@ -2,6 +2,7 @@ version: "0.5"
 
 log_location: "test-results/devbox-mcp-logs"
 log_level: info
+is_strict: true
 
 processes:
   # Test server structure and configuration
@@ -28,7 +29,7 @@ processes:
     availability:
       restart: "no"
 
-  # Summary process - displays test results
+  # Summary process - only runs when all tests pass
   summary:
     command: |
       echo ""
@@ -39,7 +40,7 @@ processes:
       echo "Test Logs:"
       echo "  test-results/devbox-mcp-logs"
       echo ""
-      echo "All tests completed!"
+      echo "All tests passed!"
       echo "===================================="
 
       # In TUI mode, delay 30 seconds so user can view summary before exit
@@ -49,14 +50,9 @@ processes:
         sleep 30
         echo "Exiting..."
       fi
-      exit 0
     depends_on:
-      test-server:
-        condition: process_completed
-      test-tools:
-        condition: process_completed
       test-mcp-tools:
-        condition: process_completed
+        condition: process_completed_successfully
     availability:
       restart: "no"
     shutdown:

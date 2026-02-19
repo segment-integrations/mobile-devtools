@@ -2,6 +2,7 @@ version: "0.5"
 
 log_location: "${REPORTS_DIR:-reports}/devbox-unit-tests-logs"
 log_level: info
+is_strict: true
 
 processes:
   # Android plugin unit tests
@@ -54,7 +55,7 @@ processes:
     availability:
       restart: "no"
 
-  # Summary - runs after all tests complete
+  # Summary - only runs when all tests pass
   summary:
     command: |
       echo ""
@@ -78,7 +79,7 @@ processes:
       echo "  - lib.sh"
       echo ""
       echo "========================================"
-      echo "     ALL UNIT TESTS COMPLETE"
+      echo "     ALL UNIT TESTS PASSED"
       echo "========================================"
       echo ""
 
@@ -89,25 +90,24 @@ processes:
         sleep 30
         echo "Exiting..."
       fi
-      exit 0
     depends_on:
       test-android-lib:
-        condition: process_completed
+        condition: process_completed_successfully
       test-android-devices:
-        condition: process_completed
+        condition: process_completed_successfully
       test-android-device-mgmt:
-        condition: process_completed
+        condition: process_completed_successfully
       test-android-validation:
-        condition: process_completed
+        condition: process_completed_successfully
       test-ios-lib:
-        condition: process_completed
+        condition: process_completed_successfully
       test-ios-devices:
-        condition: process_completed
+        condition: process_completed_successfully
       test-ios-device-mgmt:
-        condition: process_completed
+        condition: process_completed_successfully
       test-ios-cache:
-        condition: process_completed
+        condition: process_completed_successfully
       test-rn-lib:
-        condition: process_completed
+        condition: process_completed_successfully
     availability:
       restart: "no"

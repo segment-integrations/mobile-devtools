@@ -9,7 +9,7 @@ environment:
 
 log_location: "reports/react-native-all-e2e-logs"
 log_level: info
-is_strict: false
+is_strict: true
 
 processes:
   # Phase 0: Allocate Metro port (runs first, no dependencies)
@@ -33,7 +33,7 @@ processes:
     depends_on:
       allocate-metro-port:
         condition: process_completed_successfully
-    command: "devbox run --pure build:node"
+    command: "npm install"
     availability:
       restart: "no"
 
@@ -75,7 +75,7 @@ processes:
 
   # Phase 3b: Sync iOS simulators (parallel with Android)
   sync-simulators:
-    command: "devbox run ios.sh devices sync"
+    command: "ios.sh devices sync"
     availability:
       restart: "no"
 
@@ -370,10 +370,14 @@ processes:
     availability:
       restart: "no"
 
-  # Summary - displays results and optionally stays open
+  # Summary - only runs when all test phases succeed
   summary:
     command: "bash tests/test-summary.sh 'React Native All Platforms E2E Test Suite' 'reports/react-native-all-e2e-logs'"
     depends_on:
+      verify-android-running:
+        condition: process_completed_successfully
+      verify-ios-running:
+        condition: process_completed_successfully
       cleanup:
         condition: process_completed
     availability:

@@ -2,6 +2,7 @@ version: "0.5"
 
 log_location: "${REPORTS_DIR:-reports}/e2e-logs"
 log_level: info
+is_strict: true
 
 environment:
   - "TEST_PURE=1"
@@ -33,16 +34,13 @@ processes:
     availability:
       restart: "no"
 
-  # Summary
+  # Summary - only runs when all E2E tests succeed
   summary:
     command: |
       echo ""
       echo "========================================"
-      echo "      E2E TESTS COMPLETE"
+      echo "      E2E TESTS PASSED"
       echo "========================================"
-      echo ""
-      echo "Results:"
-      echo "  Check logs above for individual test results"
       echo ""
       echo "Logs: ${REPORTS_DIR:-reports}/e2e-logs"
       echo ""
@@ -54,13 +52,12 @@ processes:
         sleep 30
         echo "Exiting..."
       fi
-      exit 0
     depends_on:
       e2e-android:
-        condition: process_completed
+        condition: process_completed_successfully
       e2e-ios:
-        condition: process_completed
+        condition: process_completed_successfully
       e2e-react-native:
-        condition: process_completed
+        condition: process_completed_successfully
     availability:
       restart: "no"

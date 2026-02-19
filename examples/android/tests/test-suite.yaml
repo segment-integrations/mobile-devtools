@@ -8,6 +8,7 @@ environment:
 
 log_location: "reports/android-e2e-logs"
 log_level: info
+is_strict: true
 
 processes:
   # Phase 1: Build - runs first (no dependency)
@@ -182,12 +183,12 @@ processes:
     availability:
       restart: "no"
 
-  # Summary - displays results and optionally stays open
+  # Summary - only runs when all test phases succeed
   summary:
-    command: |
-      bash tests/test-summary.sh 'Android E2E Test Suite' 'reports/android-e2e-logs'
-      exit 0
+    command: "bash tests/test-summary.sh 'Android E2E Test Suite' 'reports/android-e2e-logs'"
     depends_on:
+      run-app:
+        condition: process_completed_successfully
       cleanup-app:
         condition: process_completed
     availability:

@@ -35,7 +35,7 @@ processes:
     depends_on:
       allocate-metro-port:
         condition: process_completed_successfully
-    command: "devbox run --pure build:node"
+    command: "npm install"
     availability:
       restart: "no"
 
@@ -54,7 +54,7 @@ processes:
 
   # Phase 3: Sync simulators
   sync-simulators:
-    command: "devbox run ios.sh devices sync"
+    command: "ios.sh devices sync"
     availability:
       restart: "no"
 

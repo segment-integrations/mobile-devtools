@@ -27,7 +27,7 @@ processes:
     depends_on:
       allocate-metro-port:
         condition: process_completed_successfully
-    command: "devbox run --pure build:node"
+    command: "npm install"
     availability:
       restart: "no"
 

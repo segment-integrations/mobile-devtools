@@ -8,7 +8,7 @@ environment:
 
 log_location: "reports/react-native-android-e2e-logs"
 log_level: info
-is_strict: false
+is_strict: true
 
 processes:
   # Phase 0: Allocate Metro port (runs first, no dependencies)
@@ -32,7 +32,7 @@ processes:
     depends_on:
       allocate-metro-port:
         condition: process_completed_successfully
-    command: "devbox run --pure build:node"
+    command: "npm install"
     availability:
       restart: "no"
 
@@ -231,10 +231,12 @@ processes:
     availability:
       restart: "no"
 
-  # Summary - displays results and optionally stays open
+  # Summary - only runs when all test phases succeed
   summary:
     command: "bash tests/test-summary.sh 'React Native Android E2E Test Suite' 'reports/react-native-android-e2e-logs'"
     depends_on:
+      verify-app-running:
+        condition: process_completed_successfully
       cleanup:
         condition: process_completed
     availability:

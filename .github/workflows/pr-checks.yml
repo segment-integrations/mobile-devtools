@@ -228,7 +228,7 @@ jobs:
           elif [ "${{ matrix.platform }}" = "ios" ]; then
             bash tests/run-ios-tests.sh
           elif [ "${{ matrix.platform }}" = "web" ]; then
-            devbox run test:e2e:web
+            bash tests/run-web-tests.sh
           fi
 
       - name: Upload reports and logs

@@ -7,17 +7,18 @@ environment:
 
 log_location: "reports/ios-e2e-logs"
 log_level: info
+is_strict: true
 
 processes:
   # Phase 1: Build app - runs first
   build-app:
-    command: "devbox run --pure build"
+    command: "ios.sh build"
     availability:
       restart: "no"
 
   # Phase 2: Sync simulators - ensure all simulators match device definitions
   sync-simulators:
-    command: "devbox run ios.sh devices sync"
+    command: "ios.sh devices sync"
     availability:
       restart: "no"
 
@@ -196,12 +197,12 @@ processes:
     availability:
       restart: "no"
 
-  # Summary - displays results and optionally stays open
+  # Summary - only runs when all test phases succeed
   summary:
-    command: |
-      bash tests/test-summary.sh 'iOS E2E Test Suite' 'reports/ios-e2e-logs'
-      exit 0
+    command: "bash tests/test-summary.sh 'iOS E2E Test Suite' 'reports/ios-e2e-logs'"
     depends_on:
+      verify-app-running:
+        condition: process_completed_successfully
       cleanup:
         condition: process_completed
     availability:

@@ -15,7 +15,7 @@ echo ""
 echo "Test Logs:"
 echo "  ${LOG_PATH}"
 echo ""
-echo "All tests completed!"
+echo "All tests passed!"
 echo "===================================="
 
 # If TUI is enabled, sleep to keep results visible
@@ -25,5 +25,3 @@ if [ "${TEST_TUI:-false}" = "true" ] || [ "${TEST_TUI:-false}" = "1" ]; then
   sleep 30
   echo "Exiting..."
 fi
-
-exit 0
