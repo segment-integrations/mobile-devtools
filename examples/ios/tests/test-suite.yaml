@@ -24,6 +24,7 @@ processes:
   # Phase 3: Start simulator - depends on sync completing
   ios-simulator:
     command: |
+      set -e
       if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
         ios.sh simulator start --pure ${IOS_DEVICE}
       else
@@ -48,6 +49,7 @@ processes:
   # Phase 4: Deploy app - depends on both build and simulator
   deploy-app:
     command: |
+      set -e
       ios.sh deploy
 
       echo ""

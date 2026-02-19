@@ -18,6 +18,7 @@ processes:
   # Phase 2: Build Android app
   build-android:
     command: |
+      set -e
       BUILD_CONFIG="${ANDROID_BUILD_CONFIG:-Debug}"
       echo "Building Android app (${BUILD_CONFIG})..."
       android.sh build --config "$BUILD_CONFIG"
@@ -42,6 +43,7 @@ processes:
     environment:
       - "ANDROID_EMULATOR_FOREGROUND=1"
     command: |
+      set -e
       echo "[ANDROID-EMULATOR] Starting emulator..."
       device="${ANDROID_DEFAULT_DEVICE:-max}"
 
@@ -90,6 +92,7 @@ processes:
   # Phase 6: Deploy app
   deploy-android:
     command: |
+      set -e
       # Source Metro environment so React Native uses correct port
       . ${REACT_NATIVE_VIRTENV}/metro/env-android.sh
       echo "Metro port: $METRO_PORT"

@@ -8,6 +8,7 @@ processes:
     environment:
       - "ANDROID_EMULATOR_FOREGROUND=1"
     command: |
+      set -e
       echo "[EMULATOR-ONLY] Starting emulator..."
       . ${ANDROID_RUNTIME_DIR}/scripts/init/setup.sh
 

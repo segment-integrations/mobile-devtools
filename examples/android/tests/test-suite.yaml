@@ -30,6 +30,7 @@ processes:
     environment:
       - "ANDROID_EMULATOR_FOREGROUND=1"
     command: |
+      set -e
       echo "[ANDROID-EMULATOR] Starting emulator..."
       device="${ANDROID_DEFAULT_DEVICE:-max}"
 
@@ -57,6 +58,7 @@ processes:
   # Phase 3: Deploy app - depends on both build and emulator being ready
   deploy-app:
     command: |
+      set -e
       android.sh deploy
 
       echo ""

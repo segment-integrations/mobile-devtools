@@ -28,6 +28,7 @@ processes:
   # Phase 2: Install CocoaPods dependencies
   install-pods:
     command: |
+      set -e
       cd ios
       echo "Installing CocoaPods dependencies..."
       pod install --repo-update
@@ -47,6 +48,7 @@ processes:
   # Phase 4: Start simulator (reuses if already running)
   ios-simulator:
     command: |
+      set -e
       echo "Starting iOS simulator (${IOS_DEVICE})..."
       ios.sh simulator start ${IOS_DEVICE}
       echo "Simulator ready for development"

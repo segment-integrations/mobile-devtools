@@ -23,6 +23,7 @@ processes:
   # Phase 2: Install CocoaPods dependencies
   install-pods:
     command: |
+      set -e
       cd ios
       echo "Installing CocoaPods dependencies..."
       pod install --repo-update
@@ -42,6 +43,7 @@ processes:
   # Phase 4: Start simulator
   ios-simulator:
     command: |
+      set -e
       if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
         ios.sh simulator start --pure ${IOS_DEVICE}
       else

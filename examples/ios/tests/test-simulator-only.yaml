@@ -6,6 +6,7 @@ log_level: info
 processes:
   ios-simulator:
     command: |
+      set -e
       echo "[SIMULATOR-ONLY] Starting simulator..."
 
       # Ensure reports/logs directory exists

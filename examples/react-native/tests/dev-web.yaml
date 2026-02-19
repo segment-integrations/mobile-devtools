@@ -14,6 +14,7 @@ processes:
   # Phase 0: Allocate Metro port
   allocate-metro-port:
     command: |
+      set -e
       . ${REACT_NATIVE_VIRTENV}/scripts/lib/lib.sh
       metro_port=$(rn_allocate_metro_port "web")
       echo "📡 Allocated Metro port: $metro_port"

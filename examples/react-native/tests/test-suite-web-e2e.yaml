@@ -12,6 +12,7 @@ processes:
   # Phase 0: Allocate Metro port
   allocate-metro-port:
     command: |
+      set -e
       # Source React Native lib
       . ${REACT_NATIVE_VIRTENV}/scripts/lib/lib.sh
 
