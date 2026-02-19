@@ -1102,8 +1102,8 @@ devbox run --pure test:e2e:android
 devbox run --pure test:e2e:ios
 
 # Pure mode for manual testing
-devbox run --pure start-emu
-devbox run --pure start-sim
+devbox run --pure start:emu
+devbox run --pure start:sim
 ```
 
 Pure mode:

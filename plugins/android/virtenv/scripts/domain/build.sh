@@ -99,9 +99,8 @@ android_build() {
   _config="${ANDROID_BUILD_CONFIG:-Debug}"
   _task="${ANDROID_BUILD_TASK:-}"
   _quiet=0
-  _extra_args=""
 
-  # Parse arguments
+  # Parse arguments - everything after -- stays in "$@" for passthrough
   while [ $# -gt 0 ]; do
     case "$1" in
       --config)
@@ -118,7 +117,6 @@ android_build() {
         ;;
       --)
         shift
-        _extra_args="$*"
         break
         ;;
       *)
@@ -127,6 +125,7 @@ android_build() {
         ;;
     esac
   done
+  # After the loop, "$@" contains any extra args passed after --
 
   # Detect project
   _gradle_dir="$(android_detect_project || true)"
@@ -154,16 +153,17 @@ android_build() {
     return 1
   fi
 
-  # Build command
-  _cmd="cd \"$_gradle_dir\" && \"$_gradle_cmd\" $_task"
-
+  # Build the full argument list: task [--quiet] [extra_args...]
+  # Prepend task and --quiet to the remaining "$@" (extra args)
   if [ "$_quiet" = "1" ]; then
-    _cmd="$_cmd --quiet"
+    set -- "$_task" --quiet "$@"
+  else
+    set -- "$_task" "$@"
   fi
 
-  if [ -n "$_extra_args" ]; then
-    _cmd="$_cmd $_extra_args"
-  fi
-
-  eval "$_cmd"
+  # Run in subshell to cd without affecting caller
+  (
+    cd "$_gradle_dir"
+    "$_gradle_cmd" "$@"
+  )
 }

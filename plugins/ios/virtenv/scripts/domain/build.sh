@@ -138,9 +138,8 @@ ios_build() {
   _derived_data="${IOS_DERIVED_DATA_PATH:-}"
   _quiet=0
   _action="build"
-  _extra_args=""
 
-  # Parse arguments
+  # Parse arguments - everything after -- stays in "$@" for passthrough
   while [ $# -gt 0 ]; do
     case "$1" in
       --config)
@@ -173,7 +172,6 @@ ios_build() {
         ;;
       --)
         shift
-        _extra_args="$*"
         break
         ;;
       *)
@@ -182,6 +180,7 @@ ios_build() {
         ;;
     esac
   done
+  # After the loop, "$@" contains any extra args passed after --
 
   # Resolve project if not explicitly provided
   if [ -z "$_workspace" ] && [ -z "$_project_path" ]; then
@@ -237,17 +236,21 @@ ios_build() {
   # Build xcodebuild command
   ios_log_info "build.sh" "Building: $_xc_path (scheme=$_scheme, config=$_config, action=$_action)"
 
-  _cmd="xcodebuild $_xc_flag \"$_xc_path\" -scheme \"$_scheme\" -configuration \"$_config\" -destination 'generic/platform=iOS Simulator' -derivedDataPath \"$_derived_data\""
+  # Build the full argument list preserving quoting for all values
+  # Prepend xcodebuild flags to the remaining "$@" (extra args after --)
+  set -- "$_xc_flag" "$_xc_path" \
+    -scheme "$_scheme" \
+    -configuration "$_config" \
+    -destination "generic/platform=iOS Simulator" \
+    -derivedDataPath "$_derived_data" \
+    "$@"
 
   if [ "$_quiet" = "1" ]; then
-    _cmd="$_cmd -quiet"
+    set -- "$@" -quiet
   fi
 
-  _cmd="$_cmd $_action"
+  # Append the action (build, test, etc.)
+  set -- "$@" "$_action"
 
-  if [ -n "$_extra_args" ]; then
-    _cmd="$_cmd $_extra_args"
-  fi
-
-  eval "$_cmd"
+  xcodebuild "$@"
 }

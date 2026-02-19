@@ -34,6 +34,8 @@ Configure the plugin by setting environment variables in `plugin.json`. These ar
 - `ANDROID_INCLUDE_CMAKE` — Include CMake in SDK (true/false, default: false)
 - `ANDROID_CMAKE_VERSION` — CMake version when enabled (e.g., "3.22.1")
 - `ANDROID_CMDLINE_TOOLS_VERSION` — Command-line tools version (e.g., "19.0")
+- `ANDROID_BUILD_CONFIG` — Build configuration: Debug or Release (default: "Debug")
+- `ANDROID_BUILD_TASK` — Gradle task override (empty = auto-derive from config, e.g., assembleDebug)
 
 ### Performance Settings
 - `ANDROID_SKIP_SETUP` — Skip Android SDK downloads/evaluation during shell initialization (1=skip, 0=evaluate; default: 0)
@@ -42,6 +44,39 @@ Configure the plugin by setting environment variables in `plugin.json`. These ar
   - Android commands will fail if SDK is actually needed, but iOS workflows run without delay
 
 ## Commands
+
+### Build
+
+```bash
+android.sh build [--config Debug|Release] [--task gradle_task] [--quiet]
+                  [-- extra_gradle_args...]
+```
+- Auto-detects Gradle project by looking for `build.gradle`, `build.gradle.kts`, or `settings.gradle`
+- Default: runs `gradle assembleDebug` (or `assembleRelease` if `--config Release`)
+- Uses `gradlew` if present in the project, otherwise falls back to system `gradle`
+
+**Project detection order:**
+1. Current working directory
+2. `$DEVBOX_PROJECT_ROOT` (if different)
+3. `$PWD/android/` (React Native convention)
+4. `$DEVBOX_PROJECT_ROOT/android/` (if different)
+
+### Run app
+
+```bash
+android.sh run [apk_path] [device]
+```
+- Builds, installs, and launches the app on the emulator
+- If `apk_path` is provided, skips build step and installs provided APK
+- If no arguments, builds project and auto-detects APK
+
+**APK resolution precedence (when no explicit path):**
+
+1. `ANDROID_APP_APK` env var — glob resolved relative to project root
+2. Recursive search of project root for `*.apk` files (excludes .gradle/, build/intermediates/, node_modules/, .devbox/)
+3. Recursive search of `$PWD` if different from project root (same exclusions)
+
+**Build script detection:** Tries `build:android` first, then falls back to `build`. If neither script exists, it runs `android.sh build` to auto-detect and build the Gradle project.
 
 ### Emulator
 
@@ -58,13 +93,6 @@ Configure the plugin by setting environment variables in `plugin.json`. These ar
 **Behavior:**
 - Without `--pure`: Checks if an emulator with the same AVD is already running and reuses it
 - With `--pure`: Always starts a new emulator instance with `-wipe-data` flag (fresh Android OS)
-
-### Run app
-
-- `devbox run --pure android.sh run [apk_path] [device]`
-  - Builds, installs, and launches the app on the emulator
-  - If `apk_path` is provided, skips build step and installs provided APK
-  - If no arguments, builds project and installs APK matched by `ANDROID_APP_APK`
 
 ### Device management
 
@@ -111,4 +139,6 @@ Configuration is managed via environment variables in `devbox.json`, not via CLI
   - Cannot be set within script definitions (too late, init hook already ran)
 
 ### App configuration
-- `ANDROID_APP_APK` - Path or glob pattern for APK (relative to project root)
+- `ANDROID_APP_APK` - Path or glob pattern for APK (relative to project root; empty = auto-detect)
+- `ANDROID_BUILD_CONFIG` - Build configuration: Debug or Release (default: Debug)
+- `ANDROID_BUILD_TASK` - Gradle task override (empty = auto-derive from config)

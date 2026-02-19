@@ -101,7 +101,7 @@ devbox run ios.sh info           # Show Xcode and SDK info
 - `IOS_BUILD_CONFIG` — build configuration: Debug or Release (default: Debug)
 - `IOS_DERIVED_DATA_PATH` — DerivedData directory (default: .devbox/virtenv/ios/DerivedData)
 - `IOS_DEVELOPER_DIR` — path to Xcode developer directory (auto-detected if not set)
-- `IOS_DOWNLOAD_RUNTIME` — auto-download missing iOS runtimes (0/1, default: 0)
+- `IOS_DOWNLOAD_RUNTIME` — auto-download missing iOS runtimes (0/1, default: 1)
 
 ## Pure Mode Testing
 

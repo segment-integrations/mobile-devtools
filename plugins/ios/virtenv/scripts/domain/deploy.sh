@@ -100,6 +100,10 @@ ios_resolve_app_via_xcodebuild() {
   _xc_proj=""
   for _f in "$_xc_root"/*.xcworkspace; do
     if [ -d "$_f" ]; then
+      # Skip Pods workspace
+      case "$(basename "$_f")" in
+        Pods.xcworkspace) continue ;;
+      esac
       _xc_proj="$_f"
       break
     fi

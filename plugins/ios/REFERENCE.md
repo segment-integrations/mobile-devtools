@@ -60,7 +60,7 @@ Configure the plugin by setting environment variables in `devbox.json` or `plugi
 
 Start simulator:
 ```bash
-devbox run --pure start-sim [device]
+devbox run --pure start:sim [device]
 ```
 - If `device` is specified, uses that device name
 - Otherwise uses `IOS_DEFAULT_DEVICE`
@@ -68,7 +68,7 @@ devbox run --pure start-sim [device]
 
 Stop simulator:
 ```bash
-devbox run --pure stop-sim
+devbox run --pure stop:sim
 ```
 - Shuts down all running simulators
 
@@ -520,7 +520,7 @@ ios.sh devices list
 ios.sh devices eval
 
 # Start simulator
-devbox run start-sim
+devbox run start:sim
 
 # Build and run app
 ios.sh run

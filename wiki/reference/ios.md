@@ -43,7 +43,11 @@ Configure the plugin by setting environment variables in `devbox.json` or `plugi
 - `IOS_DOWNLOAD_RUNTIME` — Auto-download missing runtimes (1=yes, 0=no; default: 1)
 
 ### App Settings
-- `IOS_APP_ARTIFACT` — Path or glob pattern for .app bundle (relative to project root; empty = auto-detect via xcodebuild + search)
+- `IOS_APP_ARTIFACT` — Path or glob pattern for .app bundle (relative to project root; empty = auto-detect)
+- `IOS_APP_SCHEME` — Xcode scheme override (empty = auto-detect from project filename)
+- `IOS_APP_PROJECT` — Explicit .xcworkspace or .xcodeproj path (empty = auto-detect)
+- `IOS_BUILD_CONFIG` — Build configuration: Debug or Release (default: "Debug")
+- `IOS_DERIVED_DATA_PATH` — DerivedData directory path (default: `.devbox/virtenv/ios/DerivedData`)
 
 ### Performance Settings
 - `IOS_SKIP_SETUP` — Skip iOS environment setup during shell initialization (1=skip, 0=setup; default: 0)
@@ -301,7 +305,6 @@ Set during simulator/app operations:
 
 - `IOS_SIM_UDID` — UUID of running simulator
 - `IOS_SIM_NAME` — Name of running simulator
-- `IOS_APP_BUNDLE_PATH` — Resolved app bundle path after build
 
 ## Troubleshooting
 

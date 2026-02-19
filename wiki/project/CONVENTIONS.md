@@ -315,8 +315,8 @@ DEBUG=1 devbox shell
 
 - name: Test Android Plugin
   run: |
-    EMU_HEADLESS=1 devbox run --pure start-emu max
-    devbox run --pure stop-emu
+    EMU_HEADLESS=1 devbox run --pure start:emu max
+    devbox run --pure stop:emu
 ```
 
 ### Performance Tips

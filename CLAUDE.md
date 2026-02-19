@@ -829,7 +829,7 @@ Configuration for both Android and iOS plugins is now managed via environment va
 - `IOS_DEFAULT_DEVICE` - Default simulator
 - `IOS_DEVICES` - Devices to evaluate (comma-separated, empty = all)
 - `IOS_APP_ARTIFACT` - Path or glob for .app bundle (empty = auto-detect via xcodebuild + search)
-- `IOS_DOWNLOAD_RUNTIME` - Auto-download runtimes (0/1)
+- `IOS_DOWNLOAD_RUNTIME` - Auto-download runtimes (0/1, default: 1)
 
 ## Important Implementation Notes
 
@@ -840,8 +840,7 @@ Configuration for both Android and iOS plugins is now managed via environment va
 - Lock file limits which API versions are evaluated (optimization for CI)
 
 ### iOS Xcode Discovery
-- Multiple strategies: `IOS_DEVELOPER_DIR` env var → `xcode-select -p` → `/Applications/Xcode*.app`
-- Selects latest Xcode by version number
+- Multiple strategies: `IOS_DEVELOPER_DIR` env var → `/Applications/Xcode*.app` (latest by version) → `xcode-select -p` → `/Applications/Xcode.app` fallback
 - Path cached in `.xcode_dev_dir.cache` (1-hour TTL)
 
 ### Validation Philosophy
