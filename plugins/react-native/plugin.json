@@ -40,7 +40,7 @@
   },
   "shell": {
     "init_hook": [
-      "source {{ .Virtenv }}/scripts/init/init-hook.sh",
+      ". {{ .Virtenv }}/scripts/init/init-hook.sh",
       "export NODE_BINARY=\"$(command -v node)\""
     ],
     "scripts": {
