@@ -17,6 +17,8 @@
 #     exec treefmt --fail-on-change
 
 [global]
+# Use git to walk files, which respects .gitignore
+walk = "git"
 excludes = [
   "*.md",
   "*.lock",

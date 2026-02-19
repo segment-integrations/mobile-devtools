@@ -24,10 +24,19 @@ Model Context Protocol server for [Jetify's devbox](https://www.jetify.com/devbo
 
 The `.devbox/virtenv/` directory is automatically regenerated on `devbox shell` or `devbox run`. Any manual changes will be lost.
 
+## Environment Variables
+
+The devbox-mcp server supports the following optional environment variables:
+
+- **`GITHUB_TOKEN`** or **`GITHUB_PAT`**: Required for `devbox_docs_search` tool. GitHub Personal Access Token with `public_repo` read access. Without this, the docs search tool will fail with authentication errors.
+
+See the Installation section below for how to configure environment variables.
+
 ## Installation
 
 ### For Claude Code
 
+Basic installation (without GitHub token):
 ```bash
 # Install via npx (recommended)
 claude mcp add devbox -- npx -y devbox-mcp-server
@@ -37,16 +46,39 @@ npm install -g devbox-mcp-server
 claude mcp add devbox -- devbox-mcp-server
 ```
 
+With GitHub token for `devbox_docs_search` (recommended):
+```bash
+# User-wide configuration
+claude mcp add devbox-mcp -s user -e GITHUB_TOKEN="your_token_here" -- npx -y devbox-mcp-server
+
+# Or for local development
+claude mcp add devbox-mcp -s user -e GITHUB_TOKEN="your_token_here" -- node /path/to/devbox-mcp/src/index.js
+```
+
 ### For Claude Desktop
 
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
-
+Without GitHub token:
 ```json
 {
   "mcpServers": {
     "devbox": {
       "command": "npx",
       "args": ["-y", "devbox-mcp-server"]
+    }
+  }
+}
+```
+
+With GitHub token (recommended):
+```json
+{
+  "mcpServers": {
+    "devbox": {
+      "command": "npx",
+      "args": ["-y", "devbox-mcp-server"],
+      "env": {
+        "GITHUB_TOKEN": "your_token_here"
+      }
     }
   }
 }
@@ -125,16 +157,40 @@ Initialize a new devbox.json file in the specified directory.
 ### `devbox_docs_search`
 Search the devbox documentation for relevant information.
 
-**Requires GitHub Authentication:** This tool uses GitHub's code search API which requires a Personal Access Token (PAT). Set one of these environment variables:
-- `GITHUB_TOKEN=your_token_here`
-- `GITHUB_PAT=your_token_here`
+**Requires GitHub Authentication:** This tool uses GitHub's code search API which requires authentication.
 
-To create a token:
-1. Visit https://github.com/settings/tokens
-2. Create a fine-grained token with `public_repo` read access
-3. Set it in your environment
+**Setup Instructions:**
 
-If authentication isn't available, use `devbox_docs_list` to browse files, then `devbox_docs_read` to read specific docs.
+1. Create a GitHub Personal Access Token (PAT):
+   - Visit https://github.com/settings/tokens
+   - Click "Generate new token" (fine-grained or classic)
+   - Grant `public_repo` or `repo` read access
+   - Copy the token
+
+2. Configure the MCP server with your token:
+
+   For Claude Code (user-wide):
+   ```bash
+   claude mcp remove devbox-mcp -s user  # Remove existing config
+   claude mcp add devbox-mcp -s user -e GITHUB_TOKEN="your_token_here" -- node /path/to/devbox-mcp/src/index.js
+   ```
+
+   For Claude Desktop, add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
+   ```json
+   {
+     "mcpServers": {
+       "devbox": {
+         "command": "node",
+         "args": ["/path/to/devbox-mcp/src/index.js"],
+         "env": {
+           "GITHUB_TOKEN": "your_token_here"
+         }
+       }
+     }
+   }
+   ```
+
+**Alternative (no auth required):** Use `devbox_docs_list` to browse files, then `devbox_docs_read` to read specific docs.
 
 ```typescript
 devbox_docs_search({
@@ -166,7 +222,10 @@ devbox_docs_read({
 
 - Node.js 18+ (for native fetch support)
 - devbox CLI installed and in PATH (for devbox commands)
-- GitHub Personal Access Token (optional, required for `devbox_docs_search`)
+- GitHub Personal Access Token (optional, but required for `devbox_docs_search` tool)
+  - Create at: https://github.com/settings/tokens
+  - Requires: `public_repo` or `repo` read access
+  - Configure via `GITHUB_TOKEN` environment variable in MCP config
 
 ## License
 
