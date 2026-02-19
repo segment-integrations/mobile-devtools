@@ -131,9 +131,20 @@ ios_resolve_app_via_xcodebuild() {
   # Derive scheme from project name
   _xc_scheme="$(basename "$_xc_proj" | sed 's/\.\(xcworkspace\|xcodeproj\)$//')"
 
-  # Query build settings
+  # Resolve DerivedData path (must match ios_build defaults)
+  _xc_derived_data="${IOS_DERIVED_DATA_PATH:-}"
+  if [ -z "$_xc_derived_data" ]; then
+    if [ -n "${DEVBOX_PROJECT_ROOT:-}" ]; then
+      _xc_derived_data="${DEVBOX_PROJECT_ROOT}/.devbox/virtenv/ios/DerivedData"
+    else
+      _xc_derived_data="$PWD/.devbox/virtenv/ios/DerivedData"
+    fi
+  fi
+
+  # Query build settings with matching DerivedData path
   _settings="$(ios_xcodebuild "$_xc_flag" "$_xc_proj" -scheme "$_xc_scheme" \
     -configuration Debug -destination 'generic/platform=iOS Simulator' \
+    -derivedDataPath "$_xc_derived_data" \
     -showBuildSettings 2>/dev/null || true)"
 
   if [ -z "$_settings" ]; then
@@ -168,9 +179,10 @@ ios_resolve_app_via_xcodebuild() {
 # Precedence:
 #   1. IOS_APP_ARTIFACT env var (glob resolved relative to project_root)
 #   2. xcodebuild -showBuildSettings query
-#   3. Recursive search of project_root for *.app directories
-#   4. Recursive search of $PWD (skipped if PWD == project_root)
-#   5. Error with guidance
+#   3. DerivedData search (matches ios_build default output location)
+#   4. Recursive search of project_root for *.app directories
+#   5. Recursive search of $PWD (skipped if PWD == project_root)
+#   6. Error with guidance
 ios_find_app() {
   _find_root="$1"
 
@@ -194,7 +206,27 @@ ios_find_app() {
     fi
   fi
 
-  # 3. Recursive search of project_root
+  # 3. DerivedData search (matches ios_build default output location)
+  _dd_path="${IOS_DERIVED_DATA_PATH:-}"
+  if [ -z "$_dd_path" ]; then
+    if [ -n "${DEVBOX_PROJECT_ROOT:-}" ]; then
+      _dd_path="${DEVBOX_PROJECT_ROOT}/.devbox/virtenv/ios/DerivedData"
+    else
+      _dd_path="${_find_root}/.devbox/virtenv/ios/DerivedData"
+    fi
+  fi
+  if [ -d "$_dd_path" ]; then
+    _app="$(find "$_dd_path" -name '*.app' -type d \
+      -not -path '*/ModuleCache/*' \
+      2>/dev/null | head -n1)"
+    if [ -n "$_app" ] && [ -d "$_app" ]; then
+      ios_log_info "deploy.sh" "App resolved via DerivedData: $_app"
+      printf '%s\n' "$_app"
+      return 0
+    fi
+  fi
+
+  # 4. Recursive search of project_root
   _app="$(find "$_find_root" -name '*.app' -type d \
     -not -path '*/Pods/*' \
     -not -path '*/.build/*' \
@@ -209,7 +241,7 @@ ios_find_app() {
     return 0
   fi
 
-  # 4. Recursive search of $PWD (skip if same as project_root)
+  # 5. Recursive search of $PWD (skip if same as project_root)
   _cwd="$(cd "$PWD" && pwd -P)"
   _root_real="$(cd "$_find_root" && pwd -P)"
   if [ "$_cwd" != "$_root_real" ]; then
@@ -228,7 +260,7 @@ ios_find_app() {
     fi
   fi
 
-  # 5. Error
+  # 6. Error
   ios_log_error "deploy.sh" "No .app bundle found. Searched: IOS_APP_ARTIFACT env var, xcodebuild settings, project root, current directory."
   ios_log_error "deploy.sh" "Set IOS_APP_ARTIFACT in devbox.json env, or pass a path: ios.sh run /path/to/MyApp.app"
   ios_log_error "deploy.sh" "See: plugins/ios/REFERENCE.md for app resolution details."

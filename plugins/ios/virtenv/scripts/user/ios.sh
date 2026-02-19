@@ -7,11 +7,15 @@ Usage: ios.sh <command> [args]
 
 Commands:
   build [flags]              Auto-detect and build Xcode project
+  deploy [app_path]          Install and launch app on running simulator
   devices <command> [args]
   simulator start [device] [--pure]
   simulator stop
+  simulator ready
   simulator reset
-  run [app_path] [device]
+  app status                 Check if deployed app is running
+  app stop                   Stop the deployed app
+  run [app_path] [device]    Build, start sim, install, and launch
   xcodebuild [args...]
   config show
   info
@@ -30,12 +34,17 @@ Examples:
   ios.sh build
   ios.sh build --config Release
   ios.sh build --action test
+  ios.sh deploy
+  ios.sh deploy /path/to/MyApp.app
   ios.sh devices list
   ios.sh devices create iphone15 --runtime 17.5
   ios.sh simulator start max
   ios.sh simulator start max --pure
   ios.sh simulator stop
+  ios.sh simulator ready
   ios.sh simulator reset
+  ios.sh app status
+  ios.sh app stop
   ios.sh run
   ios.sh run max
   ios.sh run /path/to/MyApp.app
@@ -55,6 +64,21 @@ script_dir="$(cd "$(dirname "$0")" && pwd)"
 if [ -n "${IOS_SCRIPTS_DIR:-}" ] && [ -d "${IOS_SCRIPTS_DIR}" ]; then
   script_dir="${IOS_SCRIPTS_DIR}"
 fi
+
+# Derive suite-namespaced state directory
+ios_state_dir() {
+  _suite="${SUITE_NAME:-default}"
+  _runtime_dir="${IOS_RUNTIME_DIR:-}"
+  if [ -z "$_runtime_dir" ]; then
+    # Fallback for environments where plugin.json hasn't set it
+    if [ -n "${DEVBOX_PROJECT_ROOT:-}" ]; then
+      _runtime_dir="${DEVBOX_PROJECT_ROOT}/.devbox/virtenv/ios/runtime"
+    else
+      _runtime_dir="${PWD}/.devbox/virtenv/ios/runtime"
+    fi
+  fi
+  printf '%s/%s' "$_runtime_dir" "$_suite"
+}
 
 case "$command_name" in
   build)
@@ -93,6 +117,15 @@ case "$command_name" in
           esac
         done
 
+        # Auto-detect pure mode from devbox environment
+        if [ "${IN_NIX_SHELL:-}" = "pure" ] || [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
+          pure_mode=1
+        fi
+
+        # Prepare state directory
+        state_dir="$(ios_state_dir)"
+        mkdir -p "$state_dir"
+
         # If --pure mode, create a separate test-specific simulator
         if [ "$pure_mode" = "1" ]; then
           export IOS_SIMULATOR_PURE=1
@@ -127,8 +160,9 @@ case "$command_name" in
           runtime_id="$(printf '%s' "$choice" | cut -d'|' -f1)"
           runtime_name="$(printf '%s' "$choice" | cut -d'|' -f2)"
 
-          # Create test-specific simulator name
-          test_sim_name="${device_base} (${runtime_name}) Test"
+          # Create test-specific simulator name (includes suite name for isolation)
+          suite_label="${SUITE_NAME:-default}"
+          test_sim_name="${device_base} (${runtime_name}) Test-${suite_label}"
 
           # Delete test simulator if it already exists
           existing_test_udid="$(xcrun simctl list devices -j | jq -r --arg name "$test_sim_name" '.devices[]?[]? | select(.name == $name) | .udid' | head -n1)"
@@ -170,6 +204,10 @@ case "$command_name" in
           IOS_TEST_SIMULATOR="$test_udid"
           export IOS_SIM_UDID IOS_SIM_NAME IOS_TEST_SIMULATOR
 
+          # Save state to runtime dir
+          echo "$test_udid" > "$state_dir/simulator-udid.txt"
+          echo "$test_udid" > "$state_dir/test-simulator-udid.txt"
+
           # Open Simulator app if not headless
           headless="${SIM_HEADLESS:-}"
           if [ -z "$headless" ]; then
@@ -184,23 +222,63 @@ case "$command_name" in
             export IOS_DEFAULT_DEVICE="$device_name"
           fi
           ios_start
+
+          # Save UDID to state dir
+          if [ -n "${IOS_SIM_UDID:-}" ]; then
+            echo "$IOS_SIM_UDID" > "$state_dir/simulator-udid.txt"
+          fi
         fi
         ;;
       stop)
-        # shellcheck disable=SC1090
-        . "${script_dir}/domain/simulator.sh"
+        state_dir="$(ios_state_dir)"
 
-        # If this was a test simulator, delete it after stopping
-        if [ -n "${IOS_TEST_SIMULATOR:-}" ]; then
+        # Check for test simulator in state dir
+        test_udid=""
+        if [ -f "$state_dir/test-simulator-udid.txt" ]; then
+          test_udid="$(cat "$state_dir/test-simulator-udid.txt")"
+        fi
+
+        if [ -n "$test_udid" ]; then
           echo "Stopping and deleting test simulator..."
-          xcrun simctl shutdown "$IOS_TEST_SIMULATOR" >/dev/null 2>&1 || true
-          xcrun simctl delete "$IOS_TEST_SIMULATOR" >/dev/null 2>&1 || true
-          echo "Test simulator deleted: $IOS_TEST_SIMULATOR"
-          unset IOS_TEST_SIMULATOR
+          xcrun simctl shutdown "$test_udid" >/dev/null 2>&1 || true
+          xcrun simctl delete "$test_udid" >/dev/null 2>&1 || true
+          echo "Test simulator deleted: $test_udid"
+
+          # Clean up all state files
+          rm -f "$state_dir/simulator-udid.txt"
+          rm -f "$state_dir/test-simulator-udid.txt"
+          rm -f "$state_dir/bundle-id.txt"
         else
           # Normal mode - just stop the simulator
           ios_stop
+          rm -f "$state_dir/simulator-udid.txt" 2>/dev/null || true
         fi
+        ;;
+      ready)
+        # Silent readiness probe: exit 0 if booted, 1 if not
+        state_dir="$(ios_state_dir)"
+        udid=""
+
+        # Try state file first
+        if [ -f "$state_dir/simulator-udid.txt" ]; then
+          udid="$(cat "$state_dir/simulator-udid.txt")"
+        fi
+
+        # Fallback: find any booted simulator
+        if [ -z "$udid" ]; then
+          udid="$(xcrun simctl list devices -j | jq -r '.devices[]?[]? | select(.state == "Booted") | .udid' | head -n1 || true)"
+        fi
+
+        if [ -z "$udid" ]; then
+          exit 1
+        fi
+
+        # Check if booted
+        sim_state="$(xcrun simctl list devices -j | jq -r --arg udid "$udid" '.devices[]?[]? | select(.udid == $udid) | .state' | head -n1 || true)"
+        if [ "$sim_state" = "Booted" ]; then
+          exit 0
+        fi
+        exit 1
         ;;
       reset)
         # Stop all simulators and delete those matching device definitions
@@ -212,7 +290,7 @@ case "$command_name" in
         # Stop all running simulators
         echo "Stopping all running simulators..."
         xcrun simctl shutdown all >/dev/null 2>&1 || true
-        echo "  ✓ All simulators stopped"
+        echo "  All simulators stopped"
         echo ""
 
         # Get device definitions
@@ -251,7 +329,7 @@ case "$command_name" in
 
         echo ""
         echo "================================================"
-        echo "✓ Reset complete!"
+        echo "Reset complete!"
         echo "================================================"
         echo ""
         echo "Deleted $deleted_count simulator(s) matching device definitions."
@@ -262,6 +340,134 @@ case "$command_name" in
       *)
         echo "Error: Unknown simulator command: $sub" >&2
         usage
+        ;;
+    esac
+    ;;
+  deploy)
+    # Install and launch app on already-running simulator (no build, no sim start)
+    # shellcheck disable=SC1090
+    . "${script_dir}/domain/deploy.sh"
+
+    app_arg="${1:-}"
+
+    state_dir="$(ios_state_dir)"
+
+    # Resolve UDID from state file or find booted simulator
+    udid=""
+    if [ -f "$state_dir/simulator-udid.txt" ]; then
+      udid="$(cat "$state_dir/simulator-udid.txt")"
+    fi
+    if [ -z "$udid" ]; then
+      udid="$(xcrun simctl list devices -j | jq -r '.devices[]?[]? | select(.state == "Booted") | .udid' | head -n1 || true)"
+    fi
+    if [ -z "$udid" ]; then
+      echo "ERROR: No booted simulator found. Run 'ios.sh simulator start' first." >&2
+      exit 1
+    fi
+
+    # Resolve app path
+    if [ -n "$app_arg" ]; then
+      app_path="$app_arg"
+      if [ "${app_path#/}" = "$app_path" ]; then
+        app_path="$PWD/$app_path"
+      fi
+      if [ ! -d "$app_path" ]; then
+        echo "ERROR: App bundle not found: $app_path" >&2
+        exit 1
+      fi
+    else
+      project_root="$(ios_resolve_project_root)"
+      app_path="$(ios_find_app "$project_root" || true)"
+      if [ -z "$app_path" ] || [ ! -d "$app_path" ]; then
+        echo "ERROR: No .app bundle found. Build first with 'ios.sh build'." >&2
+        exit 1
+      fi
+    fi
+
+    echo "App: $(basename "$app_path")"
+
+    # Extract bundle ID
+    bundle_id="${IOS_XCODEBUILD_BUNDLE_ID:-}"
+    if [ -z "$bundle_id" ]; then
+      bundle_id="$(ios_extract_bundle_id "$app_path")"
+    fi
+    if [ -z "$bundle_id" ]; then
+      echo "ERROR: Unable to resolve bundle identifier" >&2
+      exit 1
+    fi
+
+    # Install and launch
+    echo "Installing on simulator: $udid"
+    xcrun simctl install "$udid" "$app_path"
+
+    echo "Launching: $bundle_id"
+    xcrun simctl launch "$udid" "$bundle_id"
+
+    # Save state
+    mkdir -p "$state_dir"
+    echo "$bundle_id" > "$state_dir/bundle-id.txt"
+
+    echo "Deploy complete"
+    ;;
+  app)
+    sub="${1-}"
+    shift || true
+
+    state_dir="$(ios_state_dir)"
+
+    case "$sub" in
+      status)
+        # Check if deployed app is running (exit 0 if running, 1 if not)
+        bundle_id=""
+        if [ -f "$state_dir/bundle-id.txt" ]; then
+          bundle_id="$(cat "$state_dir/bundle-id.txt")"
+        fi
+        if [ -z "$bundle_id" ]; then
+          exit 1
+        fi
+
+        udid=""
+        if [ -f "$state_dir/simulator-udid.txt" ]; then
+          udid="$(cat "$state_dir/simulator-udid.txt")"
+        fi
+        if [ -z "$udid" ]; then
+          udid="$(xcrun simctl list devices -j | jq -r '.devices[]?[]? | select(.state == "Booted") | .udid' | head -n1 || true)"
+        fi
+        if [ -z "$udid" ]; then
+          exit 1
+        fi
+
+        if xcrun simctl spawn "$udid" launchctl list 2>/dev/null | grep -q "$bundle_id"; then
+          exit 0
+        fi
+        exit 1
+        ;;
+      stop)
+        # Stop the deployed app
+        bundle_id=""
+        if [ -f "$state_dir/bundle-id.txt" ]; then
+          bundle_id="$(cat "$state_dir/bundle-id.txt")"
+        fi
+
+        udid=""
+        if [ -f "$state_dir/simulator-udid.txt" ]; then
+          udid="$(cat "$state_dir/simulator-udid.txt")"
+        fi
+        if [ -z "$udid" ]; then
+          udid="$(xcrun simctl list devices -j | jq -r '.devices[]?[]? | select(.state == "Booted") | .udid' | head -n1 || true)"
+        fi
+
+        if [ -n "$udid" ] && [ -n "$bundle_id" ]; then
+          xcrun simctl terminate "$udid" "$bundle_id" 2>/dev/null || true
+          echo "App stopped: $bundle_id"
+        else
+          echo "No app to stop"
+        fi
+        ;;
+      *)
+        echo "ERROR: Unknown app subcommand: $sub" >&2
+        echo "Usage: ios.sh app <status|stop>" >&2
+        exit 1
         ;;
     esac
     ;;

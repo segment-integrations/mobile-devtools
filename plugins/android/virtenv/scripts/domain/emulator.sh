@@ -233,6 +233,13 @@ android_start_emulator() {
   EMU_PORT="$available_port"
   export ANDROID_EMULATOR_SERIAL EMU_PORT
 
+  # Persist serial so readiness probes can find it (survives foreground blocking)
+  _emu_runtime_dir="${ANDROID_RUNTIME_DIR:-${ANDROID_USER_HOME:-}}"
+  if [ -n "$_emu_runtime_dir" ]; then
+    mkdir -p "$_emu_runtime_dir"
+    echo "$emulator_serial" > "$_emu_runtime_dir/emulator-serial.txt"
+  fi
+
   # ---- Start Emulator ----
 
   echo ""

@@ -8,6 +8,7 @@ version: "0.5"
 
 environment:
   - "IOS_DEVICE=${IOS_DEFAULT_DEVICE:-max}"
+  - "SUITE_NAME=rn-ios-dev"
   - "BOOT_TIMEOUT=120"
   - "ANDROID_SKIP_SETUP=1"
   - "LANG=en_US.UTF-8"
@@ -19,22 +20,8 @@ log_level: info
 is_strict: false  # Allow graceful exit
 
 processes:
-  # Phase 0: Allocate Metro port
-  allocate-metro-port:
-    command: |
-      . ${REACT_NATIVE_VIRTENV}/scripts/lib/lib.sh
-      metro_port=$(rn_allocate_metro_port "ios")
-      echo "📡 Allocated Metro port: $metro_port"
-      env_file=$(rn_save_metro_env "ios" "$metro_port")
-      echo "✓ Metro environment saved to: $env_file"
-    availability:
-      restart: "no"
-
   # Phase 1: Build Node dependencies
   build-node:
-    depends_on:
-      allocate-metro-port:
-        condition: process_completed_successfully
     command: "npm install"
     availability:
       restart: "no"
@@ -45,7 +32,7 @@ processes:
       cd ios
       echo "Installing CocoaPods dependencies..."
       pod install --repo-update
-      echo '✓ Pod install complete'
+      echo 'Pod install complete'
     depends_on:
       build-node:
         condition: process_completed_successfully
@@ -61,20 +48,10 @@ processes:
   # Phase 4: Start simulator (reuses if already running)
   ios-simulator:
     command: |
-      echo "🚀 Starting iOS simulator (${IOS_DEVICE})..."
+      echo "Starting iOS simulator (${IOS_DEVICE})..."
       ios.sh simulator start ${IOS_DEVICE}
-
-      echo "Waiting for simulator to boot..."
-      DEVICE_UDID=$(xcrun simctl list devices | grep "Booted" | grep -oE '[0-9A-F-]{36}' | head -1 || echo "")
-      if [ -z "$DEVICE_UDID" ]; then
-        echo "ERROR: No booted simulator found"
-        exit 1
-      fi
-      xcrun simctl bootstatus "$DEVICE_UDID" >/dev/null 2>&1 || true
-
-      echo "✓ Simulator ready for development"
-      echo "✓ Simulator will remain running for hot reload"
-      exit 0
+      echo "Simulator ready for development"
+      echo "Simulator will remain running for hot reload"
     depends_on:
       sync-simulators:
         condition: process_completed_successfully
@@ -82,9 +59,7 @@ processes:
       restart: "no"
     readiness_probe:
       exec:
-        command: |
-          DEVICE_UDID=$(xcrun simctl list devices | grep "Booted" | grep -oE '[0-9A-F-]{36}' | head -1 || echo "")
-          [ -n "$DEVICE_UDID" ] && xcrun simctl bootstatus "$DEVICE_UDID" >/dev/null 2>&1
+        command: "ios.sh simulator ready"
       initial_delay_seconds: 10
       period_seconds: 5
       timeout_seconds: 120
@@ -95,8 +70,6 @@ processes:
   metro-bundler:
     command: "metro.sh start ios"
     depends_on:
-      allocate-metro-port:
-        condition: process_completed_successfully
       build-node:
         condition: process_completed_successfully
     availability:
@@ -120,53 +93,20 @@ processes:
       set -e
 
       BUILD_CONFIG="${IOS_BUILD_CONFIG:-Debug}"
-      echo "📲 Building React Native app (${BUILD_CONFIG})"
+      echo "Building React Native app (${BUILD_CONFIG})"
 
       . ${REACT_NATIVE_VIRTENV}/metro/env-ios.sh
       echo "Metro port: $METRO_PORT"
-
-      # Get simulator UDID
-      max_attempts=15
-      attempt=0
-      DEVICE_UDID=""
-      while [ $attempt -lt $max_attempts ] && [ -z "$DEVICE_UDID" ]; do
-        DEVICE_UDID=$(xcrun simctl list devices | grep "Booted" | grep -oE '[0-9A-F-]{36}' | head -1 || echo "")
-        if [ -z "$DEVICE_UDID" ]; then
-          attempt=$((attempt + 1))
-          echo "Waiting for simulator... (attempt $attempt/$max_attempts)"
-          sleep 2
-        fi
-      done
-
-      if [ -z "$DEVICE_UDID" ]; then
-        echo "ERROR: No booted simulator found"
-        exit 1
-      fi
-
-      echo "Building for simulator: $DEVICE_UDID"
 
       # Build with ios.sh build
       NODE_BINARY="$NODE_BINARY" RCT_METRO_PORT="$METRO_PORT" \
         ios.sh build --config "$BUILD_CONFIG" --quiet
 
-      # Install the built app
-      echo "Installing app to simulator..."
-      APP_PATH="${IOS_DERIVED_DATA_PATH:-${DEVBOX_PROJECT_ROOT}/.devbox/virtenv/ios/DerivedData}/Build/Products/${BUILD_CONFIG}-iphonesimulator/ReactNativeExample.app"
-
-      if [ ! -d "$APP_PATH" ]; then
-        echo "ERROR: App bundle not found at $APP_PATH"
-        exit 1
-      fi
-
-      xcrun simctl install "$DEVICE_UDID" "$APP_PATH"
-
-      # Launch app with Metro port
-      echo "Launching app with Metro on port $METRO_PORT..."
-      xcrun simctl launch "$DEVICE_UDID" "${IOS_APP_BUNDLE_ID}" \
-        RCT_METRO_PORT="$METRO_PORT"
+      # Deploy to simulator
+      ios.sh deploy
 
       echo ""
-      echo "✓ App deployed and running!"
+      echo "App deployed and running!"
       echo "  Metro: http://localhost:$METRO_PORT"
       echo "  Hot reload enabled - edit code and save to see changes"
     depends_on:

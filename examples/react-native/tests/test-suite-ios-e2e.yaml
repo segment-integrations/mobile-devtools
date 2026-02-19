@@ -2,6 +2,7 @@ version: "0.5"
 
 environment:
   - "IOS_DEVICE=${IOS_DEFAULT_DEVICE:-max}"
+  - "SUITE_NAME=rn-ios-e2e"
   - "TEST_TIMEOUT=300"
   - "BOOT_TIMEOUT=120"
   - "ANDROID_SKIP_SETUP=1"
@@ -15,27 +16,8 @@ log_level: info
 is_strict: true
 
 processes:
-  # Phase 0: Allocate Metro port (runs first, no dependencies)
-  allocate-metro-port:
-    command: |
-      # Source React Native lib
-      . ${REACT_NATIVE_VIRTENV}/scripts/lib/lib.sh
-
-      # Allocate port for ios test suite
-      metro_port=$(rn_allocate_metro_port "ios")
-      echo "📡 Allocated Metro port: $metro_port"
-
-      # Save environment file for other processes
-      env_file=$(rn_save_metro_env "ios" "$metro_port")
-      echo "✓ Metro environment saved to: $env_file"
-    availability:
-      restart: "no"
-
   # Phase 1: Build Node dependencies
   build-node:
-    depends_on:
-      allocate-metro-port:
-        condition: process_completed_successfully
     command: "npm install"
     availability:
       restart: "no"
@@ -52,7 +34,7 @@ processes:
       unset AR NM RANLIB STRIP SDKROOT
       export CC=/usr/bin/clang CXX=/usr/bin/clang++
       pod install --repo-update
-      echo '✓ Pod install complete'
+      echo 'Pod install complete'
     depends_on:
       build-node:
         condition: process_completed_successfully
@@ -68,36 +50,11 @@ processes:
   # Phase 4: Start simulator
   ios-simulator:
     command: |
-      mkdir -p .devbox/virtenv/ios/runtime
+      ios.sh simulator start ${IOS_DEVICE}
 
-      if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
-        echo "🚀 Starting fresh iOS simulator with clean state (${IOS_DEVICE})..."
-        output=$(ios.sh simulator start --pure ${IOS_DEVICE} 2>&1)
-        echo "$output"
-
-        test_udid=$(echo "$output" | grep -oE '[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}' | tail -1)
-        if [ -n "$test_udid" ]; then
-          echo "$test_udid" > .devbox/virtenv/ios/runtime/simulator-udid.txt
-          echo "✓ Test simulator UDID saved: $test_udid"
-        fi
-
-        echo "✓ Test simulator ready for testing"
-        exit 0
-      else
-        echo "🚀 Starting iOS simulator (${IOS_DEVICE})..."
-        ios.sh simulator start ${IOS_DEVICE}
-
-        echo "Waiting for simulator to boot..."
-        DEVICE_UDID=$(xcrun simctl list devices | grep "Booted" | grep -oE '[0-9A-F-]{36}' | head -1 || echo "")
-        if [ -z "$DEVICE_UDID" ]; then
-          echo "ERROR: No booted simulator found"
-          exit 1
-        fi
-        xcrun simctl bootstatus "$DEVICE_UDID" >/dev/null 2>&1 || true
-
-        echo "✓ Simulator ready for testing"
-        echo "✓ Simulator will remain running after tests complete"
-        exit 0
+      # In pure mode, keep process alive so cleanup can shut down test simulator
+      if [ "${IN_NIX_SHELL:-}" = "pure" ] || [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
+        tail -f /dev/null
       fi
     depends_on:
       sync-simulators:
@@ -106,13 +63,7 @@ processes:
       restart: "no"
     readiness_probe:
       exec:
-        command: |
-          if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
-            DEVICE_UDID=$(xcrun simctl list devices | grep "Test" | grep "Booted" | grep -oE '[0-9A-F-]{36}' | head -1 || echo "")
-          else
-            DEVICE_UDID=$(xcrun simctl list devices | grep "Booted" | grep -oE '[0-9A-F-]{36}' | head -1 || echo "")
-          fi
-          [ -n "$DEVICE_UDID" ] && xcrun simctl bootstatus "$DEVICE_UDID" >/dev/null 2>&1
+        command: "ios.sh simulator ready"
       initial_delay_seconds: 10
       period_seconds: 5
       timeout_seconds: 120
@@ -123,8 +74,6 @@ processes:
   metro-bundler:
     command: "metro.sh start ios"
     depends_on:
-      allocate-metro-port:
-        condition: process_completed_successfully
       build-node:
         condition: process_completed_successfully
     availability:
@@ -147,84 +96,39 @@ processes:
       set -e
 
       BUILD_CONFIG="${IOS_BUILD_CONFIG:-Release}"
-      echo "📲 Building React Native app (${BUILD_CONFIG})"
+      echo "Building React Native app (${BUILD_CONFIG})"
 
       # Source Metro environment so React Native uses correct port
       . ${REACT_NATIVE_VIRTENV}/metro/env-ios.sh
       echo "Metro port: $METRO_PORT"
 
-      # Get simulator UDID (retry for up to 30 seconds)
-      max_attempts=15
-      attempt=0
-      DEVICE_UDID=""
-
-      while [ $attempt -lt $max_attempts ] && [ -z "$DEVICE_UDID" ]; do
-        if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
-          DEVICE_UDID=$(xcrun simctl list devices | grep "Test" | grep "Booted" | grep -oE '[0-9A-F-]{36}' | head -1 || echo "")
-        else
-          DEVICE_UDID=$(xcrun simctl list devices | grep "Booted" | grep -oE '[0-9A-F-]{36}' | head -1 || echo "")
-        fi
-
-        if [ -z "$DEVICE_UDID" ]; then
-          attempt=$((attempt + 1))
-          echo "Waiting for simulator to boot... (attempt $attempt/$max_attempts)"
-          sleep 2
-        fi
-      done
-
-      if [ -z "$DEVICE_UDID" ]; then
-        echo "ERROR: No booted simulator found after $max_attempts attempts" >&2
-        xcrun simctl list devices >&2
-        exit 1
-      fi
-
-      echo "Building for simulator: $DEVICE_UDID"
-
       # Build with ios.sh build
       NODE_BINARY="$NODE_BINARY" RCT_METRO_PORT="$METRO_PORT" \
         ios.sh build --config "$BUILD_CONFIG" --quiet
 
-      # Install the built app
-      echo "Installing app to simulator..."
-      APP_PATH="${IOS_DERIVED_DATA_PATH:-${DEVBOX_PROJECT_ROOT}/.devbox/virtenv/ios/DerivedData}/Build/Products/${BUILD_CONFIG}-iphonesimulator/ReactNativeExample.app"
+      # Deploy to simulator
+      ios.sh deploy
 
-      if [ ! -d "$APP_PATH" ]; then
-        echo "ERROR: App bundle not found at $APP_PATH" >&2
-        ls -la "${IOS_DERIVED_DATA_PATH:-${DEVBOX_PROJECT_ROOT}/.devbox/virtenv/ios/DerivedData}/Build/Products/" >&2 || true
-        exit 1
-      fi
-
-      xcrun simctl install "$DEVICE_UDID" "$APP_PATH"
-
-      # Launch app with Metro port
-      echo "Launching app with Metro on port $METRO_PORT..."
-      xcrun simctl launch "$DEVICE_UDID" "${IOS_APP_BUNDLE_ID}" \
-        RCT_METRO_PORT="$METRO_PORT"
-
-      echo "✓ App deployed and launched successfully"
+      echo "App deployed and launched successfully"
     depends_on:
       install-pods:
         condition: process_completed_successfully
       ios-simulator:
         condition: process_completed_successfully
+      metro-bundler:
+        condition: process_healthy
     availability:
       restart: "no"
 
   # Phase 7: Verify app is running
   verify-app-running:
     command: |
-      if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
-        DEVICE_UDID=$(xcrun simctl list devices | grep "Test" | grep "Booted" | grep -oE '[0-9A-F-]{36}' | head -1)
-      else
-        DEVICE_UDID=$(xcrun simctl list devices | grep "Booted" | grep -oE '[0-9A-F-]{36}' | head -1)
-      fi
-
       echo "Waiting for app to start..."
       max_attempts=10
       attempt=0
       while [ $attempt -lt $max_attempts ]; do
-        if xcrun simctl spawn "$DEVICE_UDID" launchctl list | grep -q "${IOS_APP_BUNDLE_ID}"; then
-          echo "✓ App is running: ${IOS_APP_BUNDLE_ID}"
+        if ios.sh app status; then
+          echo "App is running"
           mkdir -p reports
           touch reports/.e2e-passed
           exit 0
@@ -245,30 +149,16 @@ processes:
   # Cleanup - runs after verify completes
   cleanup:
     command: |
-      # Stop Metro bundler explicitly
       echo "Stopping Metro bundler..."
       metro.sh stop ios || true
 
-      if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
-        echo "🧹 Cleaning up (pure mode)..."
-
-        test_sim_udid=$(cat .devbox/virtenv/ios/runtime/simulator-udid.txt 2>/dev/null || echo "")
-
-        if [ -z "$test_sim_udid" ]; then
-          test_sim_udid=$(xcrun simctl list devices | grep "Test" | grep -oE '[0-9A-F-]{36}' | head -1 || echo "")
-        fi
-
-        if [ -n "$test_sim_udid" ]; then
-          xcrun simctl terminate "$test_sim_udid" "${IOS_APP_BUNDLE_ID}" 2>/dev/null || true
-          xcrun simctl shutdown "$test_sim_udid" 2>/dev/null || true
-          xcrun simctl delete "$test_sim_udid" 2>/dev/null || true
-          rm -f .devbox/virtenv/ios/runtime/simulator-udid.txt 2>/dev/null || true
-          echo "✓ App stopped, test simulator deleted"
-        else
-          echo "✓ No test simulator to clean up"
-        fi
+      if [ "${IN_NIX_SHELL:-}" = "pure" ] || [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
+        echo "Cleaning up (pure mode)..."
+        ios.sh app stop || true
+        ios.sh simulator stop
+        echo "App stopped, test simulator deleted"
       else
-        echo "✓ Test complete - app and simulator still running"
+        echo "Test complete - app and simulator still running"
       fi
     depends_on:
       verify-app-running:

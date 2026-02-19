@@ -2,8 +2,8 @@ version: "0.5"
 
 environment:
   - "EMU_HEADLESS=${EMU_HEADLESS:-}"
+  - "SUITE_NAME=rn-android-e2e"
   - "TEST_TUI=${TEST_TUI:-false}"
-  - "ANDROID_SERIAL=emulator-5554"
   - "TEST_TIMEOUT=300"
   - "BOOT_TIMEOUT=180"
 
@@ -12,27 +12,8 @@ log_level: info
 is_strict: true
 
 processes:
-  # Phase 0: Allocate Metro port (runs first, no dependencies)
-  allocate-metro-port:
-    command: |
-      # Source React Native lib
-      . ${REACT_NATIVE_VIRTENV}/scripts/lib/lib.sh
-
-      # Allocate port for android test suite
-      metro_port=$(rn_allocate_metro_port "android")
-      echo "📡 Allocated Metro port: $metro_port"
-
-      # Save environment file for other processes
-      env_file=$(rn_save_metro_env "android" "$metro_port")
-      echo "✓ Metro environment saved to: $env_file"
-    availability:
-      restart: "no"
-
   # Phase 1: Build Node dependencies
   build-node:
-    depends_on:
-      allocate-metro-port:
-        condition: process_completed_successfully
     command: "npm install"
     availability:
       restart: "no"
@@ -41,9 +22,9 @@ processes:
   build-android:
     command: |
       BUILD_CONFIG="${ANDROID_BUILD_CONFIG:-Debug}"
-      echo "📦 Building Android app (${BUILD_CONFIG})..."
+      echo "Building Android app (${BUILD_CONFIG})..."
       android.sh build --config "$BUILD_CONFIG"
-      echo '✓ Build complete'
+      echo 'Build complete'
     depends_on:
       build-node:
         condition: process_completed_successfully
@@ -52,11 +33,7 @@ processes:
 
   # Phase 3: Sync AVDs
   sync-avds:
-    command: |
-      . ${ANDROID_RUNTIME_DIR}/scripts/init/setup.sh
-      echo '🔄 Syncing AVDs with device definitions...'
-      android.sh devices sync
-      echo '✓ Sync complete'
+    command: "android.sh devices sync"
     availability:
       restart: "no"
 
@@ -69,58 +46,24 @@ processes:
       - "ANDROID_EMULATOR_FOREGROUND=1"
     command: |
       echo "[ANDROID-EMULATOR] Starting emulator..."
-      # Source Android environment
-      . ${ANDROID_RUNTIME_DIR}/scripts/init/setup.sh
-
       device="${ANDROID_DEFAULT_DEVICE:-max}"
 
-      if [ "${IN_NIX_SHELL:-}" = "pure" ]; then
-        echo "🚀 Starting fresh Android emulator (pure mode): $device"
-        export ANDROID_EMULATOR_PURE=1
-        echo "emulator-5554" > ${ANDROID_RUNTIME_DIR}/emulator-serial.txt
+      if [ "${IN_NIX_SHELL:-}" = "pure" ] || [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
+        echo "Starting fresh Android emulator (pure mode): $device"
         android.sh emulator start "$device"
       else
-        echo "🚀 Verifying Android emulator is running: $device"
-        serial="emulator-5554"
-        echo "$serial" > ${ANDROID_RUNTIME_DIR}/emulator-serial.txt
+        echo "Starting Android emulator: $device"
+        unset ANDROID_EMULATOR_FOREGROUND
+        android.sh emulator start "$device"
 
-        if adb devices | grep -q "$serial"; then
-          echo "✓ Emulator already running: $serial"
-        else
-          echo "Starting emulator in background: $device"
-          unset ANDROID_EMULATOR_FOREGROUND
-          android.sh emulator start "$device" &
-          echo "✓ Emulator starting (PID: $!)"
-        fi
-
-        echo "Waiting for emulator to boot..."
-        max_attempts=60
-        attempt=0
-        while [ $attempt -lt $max_attempts ]; do
-          if adb -s $serial shell getprop sys.boot_completed 2>/dev/null | grep -q "1"; then
-            echo "✓ Emulator ready for testing"
-            break
-          fi
-          attempt=$((attempt + 1))
-          sleep 2
-        done
-
-        if [ $attempt -ge $max_attempts ]; then
-          echo "ERROR: Emulator did not boot within timeout"
-          exit 1
-        fi
-
-        echo "✓ Emulator will remain running after tests complete"
+        echo "Emulator will remain running after tests complete"
         exit 0
       fi
     availability:
       restart: "no"
     readiness_probe:
       exec:
-        command: |
-          . ${ANDROID_RUNTIME_DIR}/scripts/init/setup.sh
-          serial=$(cat ${ANDROID_RUNTIME_DIR}/emulator-serial.txt 2>/dev/null || echo "")
-          [ -n "$serial" ] && adb -s $serial shell getprop sys.boot_completed 2>/dev/null | grep -q "1"
+        command: "android.sh emulator ready"
       initial_delay_seconds: 10
       period_seconds: 10
       timeout_seconds: 180
@@ -131,8 +74,6 @@ processes:
   metro-bundler:
     command: "metro.sh start android"
     depends_on:
-      allocate-metro-port:
-        condition: process_completed_successfully
       build-node:
         condition: process_completed_successfully
     availability:
@@ -155,7 +96,7 @@ processes:
       # Source Metro environment so React Native uses correct port
       . ${REACT_NATIVE_VIRTENV}/metro/env-android.sh
 
-      echo "📲 Deploying React Native app (Metro port: $METRO_PORT)..."
+      echo "Deploying React Native app (Metro port: $METRO_PORT)..."
       npx react-native run-android --no-packager
     depends_on:
       build-android:
@@ -170,22 +111,12 @@ processes:
   # Phase 7: Verify app is running
   verify-app-running:
     command: |
-      . ${ANDROID_RUNTIME_DIR}/scripts/init/setup.sh
-      serial=$(cat ${ANDROID_RUNTIME_DIR}/emulator-serial.txt 2>/dev/null || echo emulator-5554)
-
-      # Resolve app ID: env var > auto-detected from APK > fail
-      app_id="${ANDROID_APP_ID:-$(cat ${ANDROID_RUNTIME_DIR}/app-id.txt 2>/dev/null || true)}"
-      if [ -z "$app_id" ]; then
-        echo "ERROR: Cannot determine app ID. Set ANDROID_APP_ID or run deploy first." >&2
-        exit 1
-      fi
-
-      echo "Waiting for app to start ($app_id)..."
+      echo "Waiting for app to start..."
       max_attempts=10
       attempt=0
       while [ $attempt -lt $max_attempts ]; do
-        if adb -s $serial shell pidof "$app_id" >/dev/null 2>&1; then
-          echo "✓ App process running (PID: $(adb -s $serial shell pidof "$app_id"))"
+        if android.sh app status; then
+          echo "App is running"
           mkdir -p reports
           touch reports/.e2e-passed
           exit 0
@@ -206,22 +137,16 @@ processes:
   # Cleanup
   cleanup:
     command: |
-      . ${ANDROID_RUNTIME_DIR}/scripts/init/setup.sh
-
-      serial=$(cat ${ANDROID_RUNTIME_DIR}/emulator-serial.txt 2>/dev/null || echo emulator-5554)
-
-      # Stop Metro bundler explicitly
       echo "Stopping Metro bundler..."
       metro.sh stop android || true
 
-      if [ "${IN_NIX_SHELL:-}" = "pure" ]; then
-        echo "🧹 Cleaning up (pure mode)..."
-        app_id="${ANDROID_APP_ID:-$(cat ${ANDROID_RUNTIME_DIR}/app-id.txt 2>/dev/null || true)}"
-        [ -n "$app_id" ] && adb -s $serial shell am force-stop "$app_id" 2>/dev/null || true
+      if [ "${IN_NIX_SHELL:-}" = "pure" ] || [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
+        echo "Cleaning up (pure mode)..."
+        android.sh app stop || true
         android.sh emulator stop || true
-        echo "✓ App stopped, emulator stopped"
+        echo "App stopped, emulator stopped"
       else
-        echo "✓ Test complete - app and emulator still running"
+        echo "Test complete - app and emulator still running"
       fi
     depends_on:
       verify-app-running:
