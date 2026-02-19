@@ -1,7 +1,6 @@
 version: "0.5"
 
 environment:
-  - "EMU_HEADLESS=${EMU_HEADLESS:-}"
   - "SUITE_NAME=rn-android-e2e"
   - "TEST_TUI=${TEST_TUI:-false}"
   - "TEST_TIMEOUT=300"

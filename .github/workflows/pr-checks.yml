@@ -74,7 +74,7 @@ jobs:
           TEST_TIMEOUT: 300
           ANDROID_DEFAULT_DEVICE: max
           TEST_TUI: false
-        run: devbox run --pure test:e2e
+        run: devbox run --pure -e EMU_HEADLESS test:e2e
 
       - name: Upload reports and logs
         if: always()
@@ -127,7 +127,7 @@ jobs:
           TEST_TIMEOUT: 300
           IOS_DEFAULT_DEVICE: max
           TEST_TUI: false
-        run: devbox run --pure test:e2e
+        run: devbox run --pure -e SIM_HEADLESS test:e2e
 
       - name: Upload reports and logs
         if: always()

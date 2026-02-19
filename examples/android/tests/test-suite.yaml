@@ -1,7 +1,6 @@
 version: "0.5"
 
 environment:
-  - "EMU_HEADLESS=${EMU_HEADLESS:-}"
   - "SUITE_NAME=android-e2e"
   - "TEST_TIMEOUT=300"
   - "BOOT_TIMEOUT=90"
