@@ -60,28 +60,73 @@ Configure the plugin by setting environment variables in `devbox.json` or `plugi
 
 Start simulator:
 ```bash
-devbox run --pure start:sim [device]
+ios.sh simulator start [--pure] [device]
 ```
 - If `device` is specified, uses that device name
 - Otherwise uses `IOS_DEFAULT_DEVICE`
 - Boots simulator if not already running
+- `--pure`: Creates a fresh, isolated test simulator with clean state (for deterministic tests)
+- Auto-detects pure mode when `IN_NIX_SHELL=pure` or `DEVBOX_PURE_SHELL=1`
+- Saves simulator UDID to `$IOS_RUNTIME_DIR/${SUITE_NAME:-default}/simulator-udid.txt`
+
+**Convenience aliases:**
+- `devbox run --pure start:sim [device]` (equivalent to `ios.sh simulator start` without `--pure`)
+- `devbox run --pure stop:sim` (equivalent to `ios.sh simulator stop`)
 
 Stop simulator:
 ```bash
-devbox run --pure stop:sim
+ios.sh simulator stop
 ```
-- Shuts down all running simulators
+- In pure mode (test simulator exists): shuts down and deletes the test simulator, cleans up state files
+- In normal mode: shuts down the simulator via `ios_stop()`
 
-Run app (starts simulator, builds, installs, launches):
+Check simulator readiness:
+```bash
+ios.sh simulator ready
+```
+- Silent readiness probe: exit 0 if simulator is booted, exit 1 if not
+- Reads UDID from suite-namespaced state file, falls back to finding any booted simulator
+
+Reset simulators:
+```bash
+ios.sh simulator reset
+```
+- Stops all running simulators
+- Deletes simulators matching device definitions
+
+### Deploy
+
+```bash
+ios.sh deploy [app_path]
+```
+- Installs and launches an app on an already-running simulator (no build, no simulator start)
+- If `app_path` is provided, installs the specified .app bundle
+- If no arguments, auto-detects .app using `ios_find_app()` (same resolution as `run`)
+- Saves bundle ID to `$IOS_RUNTIME_DIR/${SUITE_NAME:-default}/bundle-id.txt`
+
+### App Lifecycle
+
+```bash
+ios.sh app status
+```
+- Checks if the deployed app is running on the simulator
+- Exit 0 if running, exit 1 if not
+
+```bash
+ios.sh app stop
+```
+- Terminates the deployed app via `xcrun simctl terminate`
+
+### Run App
+
 ```bash
 ios.sh run [app_path] [device]
 ```
+- Starts simulator, builds, installs, and launches the app
 - If `app_path` is provided, skips build and installs the provided .app bundle directly
 - If no arguments, builds project (via `build:ios` or `build` scripts) and auto-detects the .app bundle
 - Auto-detection precedence: `IOS_APP_ARTIFACT` env var → xcodebuild settings → recursive search
 - Bundle ID is auto-extracted from `Info.plist`
-
-Note: Build scripts (e.g., `build:ios`) are user-defined in your project's `devbox.json`. The plugin provides `start:sim`, `stop:sim`, and `ios.sh run` for simulator lifecycle and app deployment. See the example projects for typical build script definitions.
 
 ### Device Management
 
@@ -298,6 +343,14 @@ These are set automatically by the plugin:
 - `CXX` — C++ compiler path (`/usr/bin/clang++`)
 - `PATH` — Updated with Xcode tools and plugin scripts
 - `IOS_NODE_BINARY` — Node.js binary path (if available, for React Native)
+
+### Runtime State
+
+- `IOS_RUNTIME_DIR` — Directory for runtime state files (default: `.devbox/virtenv/ios/runtime`)
+- `SUITE_NAME` — Test suite name for state isolation (default: "default")
+  - Each suite gets its own subdirectory under `$IOS_RUNTIME_DIR/$SUITE_NAME/`
+  - State files: `simulator-udid.txt`, `test-simulator-udid.txt` (pure mode only), `bundle-id.txt`
+  - Set in process-compose environment blocks for parallel test execution
 
 ### Runtime Variables
 

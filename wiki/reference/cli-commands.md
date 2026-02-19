@@ -68,6 +68,14 @@ devbox run --pure android.sh emulator stop
 ```
 - Stops all running emulators
 
+**Check emulator readiness:**
+```bash
+devbox run --pure android.sh emulator ready
+```
+- Silent readiness probe: exit 0 if emulator is booted, exit 1 if not
+- Reads emulator serial from suite-namespaced state file
+- Checks `sys.boot_completed` property via adb
+
 **Reset emulator:**
 ```bash
 devbox run --pure android.sh emulator reset [device]
@@ -209,24 +217,52 @@ devbox run --pure android.sh config reset
 
 #### Application Deployment
 
-**Run app (plugin-provided):**
+**Deploy app (install + launch on running emulator):**
+```bash
+android.sh deploy [apk_path]
+```
+- Installs and launches app on an already-running emulator (no build, no emulator start)
+- If `apk_path` is provided, installs the specified APK
+- If no arguments, auto-detects APK using the same resolution as `run`
+- Saves app ID and activity to suite-namespaced state files
+
+**Check app status:**
+```bash
+android.sh app status
+```
+- Exit 0 if the deployed app is running, exit 1 if not
+- Reads app ID and emulator serial from state files
+
+**Stop app:**
+```bash
+android.sh app stop
+```
+- Stops the deployed app via `adb shell am force-stop`
+
+**Run app (full orchestration):**
 ```bash
 devbox run --pure android.sh run [apk_path] [device]
 ```
-- Installs and launches app on emulator
+- Builds, installs, and launches app on emulator (starts emulator if needed)
 - `apk_path`: Path to APK (optional, uses `ANDROID_APP_APK` glob if not provided)
 - `device`: Device name (optional, defaults to `ANDROID_DEFAULT_DEVICE`)
 
 **Examples:**
 ```bash
-# Install and run APK matched by ANDROID_APP_APK on default device
+# Full orchestration: build, start emulator, install, launch
 devbox run --pure android.sh run
 
 # Install specific APK on default device
 devbox run --pure android.sh run app/build/outputs/apk/debug/app-debug.apk
 
-# Install APK on specific device
-devbox run --pure android.sh run app/build/outputs/apk/debug/app-debug.apk pixel_api30
+# Deploy to already-running emulator
+android.sh deploy
+
+# Check if app is running
+android.sh app status
+
+# Stop app
+android.sh app stop
 ```
 
 **Note:** `start:app` is not a plugin command. If your project defines a `start:app` script in `devbox.json`, it is a user-defined convenience script that may wrap `android.sh run` with additional build steps.
@@ -287,17 +323,51 @@ ios.sh build --workspace ios/MyApp.xcworkspace --scheme MyApp --quiet
 
 **Start simulator:**
 ```bash
-devbox run --pure start:sim [device]
+ios.sh simulator start [--pure] [device]
 ```
 - `device`: Device name (optional, defaults to `IOS_DEFAULT_DEVICE`)
 - Boots simulator if not already running
-- Example: `devbox run --pure start:sim iphone15`
+- `--pure`: Creates a fresh, isolated test simulator with clean state
+- Auto-detects pure mode when `IN_NIX_SHELL=pure` or `DEVBOX_PURE_SHELL=1`
+- Saves UDID to `$IOS_RUNTIME_DIR/${SUITE_NAME:-default}/simulator-udid.txt`
+
+**Examples:**
+```bash
+# Start default device, reuse if running
+ios.sh simulator start
+
+# Start specific device with fresh state
+ios.sh simulator start --pure iphone15
+
+# Start max device
+ios.sh simulator start max
+```
 
 **Stop simulator:**
 ```bash
-devbox run --pure stop:sim
+ios.sh simulator stop
 ```
-- Shuts down all running simulators
+- In pure mode: shuts down and deletes the test simulator, cleans up state files
+- In normal mode: shuts down the simulator
+
+**Check simulator readiness:**
+```bash
+ios.sh simulator ready
+```
+- Silent readiness probe: exit 0 if booted, exit 1 if not
+- Designed for use as a process-compose readiness probe
+
+**Reset simulators:**
+```bash
+ios.sh simulator reset
+```
+- Stops all running simulators and deletes those matching device definitions
+
+**Convenience aliases:**
+```bash
+devbox run --pure start:sim [device]   # ios.sh simulator start (without --pure)
+devbox run --pure stop:sim             # ios.sh simulator stop
+```
 
 #### Device Management
 
@@ -375,10 +445,48 @@ devbox run --pure ios.sh devices sync
 
 #### Application Deployment
 
-**Plugin-provided:**
+**Deploy app (install + launch on running simulator):**
 ```bash
-ios.sh build [flags]                   # Auto-detect and build Xcode project
-ios.sh run [app_path] [device]         # Build, install, and launch app on simulator
+ios.sh deploy [app_path]
+```
+- Installs and launches app on an already-running simulator (no build, no simulator start)
+- If `app_path` is provided, installs the specified .app bundle
+- If no arguments, auto-detects .app bundle
+- Saves bundle ID to suite-namespaced state file
+
+**Check app status:**
+```bash
+ios.sh app status
+```
+- Exit 0 if the deployed app is running, exit 1 if not
+
+**Stop app:**
+```bash
+ios.sh app stop
+```
+- Terminates the deployed app via `xcrun simctl terminate`
+
+**Run app (full orchestration):**
+```bash
+ios.sh run [app_path] [device]
+```
+- Starts simulator, builds, installs, and launches the app
+- Auto-detects .app bundle via `IOS_APP_ARTIFACT` env var, xcodebuild settings, or recursive search
+- Extracts bundle ID from `Info.plist`
+
+**Examples:**
+```bash
+# Full orchestration
+ios.sh run
+
+# Deploy to already-running simulator
+ios.sh deploy
+
+# Check if app is running
+ios.sh app status
+
+# Stop app
+ios.sh app stop
 ```
 
 **Example devbox.json scripts:**
@@ -394,8 +502,6 @@ ios.sh run [app_path] [device]         # Build, install, and launch app on simul
   }
 }
 ```
-
-The `ios.sh run` command auto-detects the .app bundle (via `IOS_APP_ARTIFACT` env var, xcodebuild settings, or recursive search) and extracts the bundle ID from `Info.plist`.
 
 #### Configuration Management
 
@@ -651,13 +757,18 @@ The following are NOT provided by the plugins. Define them in your project's `de
 **Android:**
 - `android.sh emulator start [--pure] [device]`
 - `android.sh emulator stop`
+- `android.sh emulator ready`
 - `android.sh emulator reset [device]`
 - `start:emu [device]` - Convenience alias for `android.sh emulator start`
 - `stop:emu` - Convenience alias for `android.sh emulator stop`
 
 **iOS:**
-- `start:sim [device]`
-- `stop:sim`
+- `ios.sh simulator start [--pure] [device]`
+- `ios.sh simulator stop`
+- `ios.sh simulator ready`
+- `ios.sh simulator reset`
+- `start:sim [device]` - Convenience alias for `ios.sh simulator start`
+- `stop:sim` - Convenience alias for `ios.sh simulator stop`
 
 ### Device Definition Management (Plugin-Provided)
 
@@ -684,9 +795,15 @@ The following are NOT provided by the plugins. Define them in your project's `de
 
 **Plugin-provided:**
 - `android.sh build [flags]` - Auto-detect and build Gradle project
-- `android.sh run [apk_path] [device]` - Install and launch Android app
+- `android.sh deploy [apk_path]` - Install and launch on running emulator
+- `android.sh app status` - Check if deployed app is running
+- `android.sh app stop` - Stop the deployed app
+- `android.sh run [apk_path] [device]` - Build, start emulator, install and launch
 - `ios.sh build [flags]` - Auto-detect and build Xcode project
-- `ios.sh run [app_path] [device]` - Build, install, and launch iOS app
+- `ios.sh deploy [app_path]` - Install and launch on running simulator
+- `ios.sh app status` - Check if deployed app is running
+- `ios.sh app stop` - Stop the deployed app
+- `ios.sh run [app_path] [device]` - Start simulator, build, install and launch
 
 **User-defined (define in your devbox.json):**
 - `start-android` / `start:android` - Build and run Android app

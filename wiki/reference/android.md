@@ -83,7 +83,11 @@ android.sh run [apk_path] [device]
 - `devbox run --pure android.sh emulator start [--pure] [device]`
   - `--pure`: Start fresh emulator with wiped data (clean Android OS state for deterministic tests)
   - Without `--pure`: Reuses existing emulator if running (faster for development, preserves data)
+  - Auto-detects pure mode when `IN_NIX_SHELL=pure` or `DEVBOX_PURE_SHELL=1`
 - `devbox run --pure android.sh emulator stop`
+- `devbox run --pure android.sh emulator ready`
+  - Silent readiness probe: exit 0 if emulator is booted, exit 1 if not
+  - Reads emulator serial from suite-namespaced state file
 - `devbox run --pure android.sh emulator reset [device]`
 
 **Convenience aliases:**
@@ -93,6 +97,30 @@ android.sh run [apk_path] [device]
 **Behavior:**
 - Without `--pure`: Checks if an emulator with the same AVD is already running and reuses it
 - With `--pure`: Always starts a new emulator instance with `-wipe-data` flag (fresh Android OS)
+- Emulator serial is saved to `$ANDROID_RUNTIME_DIR/${SUITE_NAME:-default}/emulator-serial.txt`
+
+### Deploy
+
+```bash
+android.sh deploy [apk_path]
+```
+- Installs and launches an app on an already-running emulator (no build, no emulator start)
+- If `apk_path` is provided, installs the specified APK
+- If no arguments, auto-detects APK using the same resolution as `run`
+- Saves app ID and activity to state files for use by `app status` and `app stop`
+
+### App Lifecycle
+
+```bash
+android.sh app status
+```
+- Checks if the deployed app is running on the emulator
+- Exit 0 if running, exit 1 if not
+
+```bash
+android.sh app stop
+```
+- Stops the deployed app via `adb shell am force-stop`
 
 ### Device management
 
@@ -137,6 +165,13 @@ Configuration is managed via environment variables in `devbox.json`, not via CLI
   - With --pure flag: `devbox run --pure -e ANDROID_SKIP_SETUP=1 build:ios`
   - Or set in test suite environment sections (process-compose spawns new shells)
   - Cannot be set within script definitions (too late, init hook already ran)
+
+### Runtime state
+- `ANDROID_RUNTIME_DIR` - Directory for runtime state files (default: `.devbox/virtenv/android`)
+- `SUITE_NAME` - Test suite name for state isolation (default: "default")
+  - Each suite gets its own subdirectory under `$ANDROID_RUNTIME_DIR/$SUITE_NAME/`
+  - State files: `emulator-serial.txt`, `app-id.txt`, `app-activity.txt`
+  - Set in process-compose environment blocks for parallel test execution
 
 ### App configuration
 - `ANDROID_APP_APK` - Path or glob pattern for APK (relative to project root; empty = auto-detect)
