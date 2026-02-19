@@ -94,20 +94,14 @@
       "test": [
         "npm test"
       ],
-      "test:e2e": [
-        "bash tests/run-android-tests.sh && bash tests/run-ios-tests.sh"
-      ],
       "test:e2e:android": [
-        "bash tests/run-android-tests.sh"
+        "process-compose -f tests/test-suite-android-e2e.yaml --no-server --tui=${TEST_TUI:-false}"
       ],
       "test:e2e:ios": [
-        "bash tests/run-ios-tests.sh"
-      ],
-      "test:e2e:all": [
-        "bash tests/run-android-tests.sh && bash tests/run-ios-tests.sh"
+        "process-compose -f tests/test-suite-ios-e2e.yaml --no-server --tui=${TEST_TUI:-false}"
       ],
       "test:e2e:web": [
-        "bash tests/run-web-tests.sh"
+        "process-compose -f tests/test-suite-web-e2e.yaml --no-server --tui=${TEST_TUI:-false}"
       ]
     }
   }
