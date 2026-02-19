@@ -787,13 +787,13 @@ Examples:
 ## CI/CD
 
 ### Fast PR Checks (`pr-checks.yml`)
-- Runs automatically on every PR
-- Plugin validation and quick smoke tests
-- Tests default devices only
+- Runs automatically on every PR and push to main
+- Fast tests (lint + unit + integration) plus E2E tests with max devices only
+- Tests: Android max, iOS max, React Native (android-max, ios-max, web)
 
 ### Full E2E Tests (`e2e-full.yml`)
-- Manual trigger or weekly schedule
-- Tests min/max platform versions:
+- Weekly schedule (Monday 00:00 UTC) or manual trigger
+- Tests both min and max platform versions:
   - Android: API 21 (min) to API 36 (max)
   - iOS: iOS 15.4 (min) to iOS 26.2 (max)
 - Matrix execution for parallel testing

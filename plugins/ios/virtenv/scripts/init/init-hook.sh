@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# iOS plugin initialization script
+# iOS Plugin - Initialization Hook
 # Generates devices.lock from IOS_DEVICES environment variable
-# This runs before env.sh is sourced
+# This runs before setup.sh is sourced
 
 set -e
 

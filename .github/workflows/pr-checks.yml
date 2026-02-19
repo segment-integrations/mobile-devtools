@@ -36,16 +36,12 @@ jobs:
             reports/
           retention-days: 7
 
-  # Android example E2E tests (min/max devices)
+  # Android example E2E test (max device only on PRs)
   android-e2e:
-    name: Android E2E - ${{ matrix.device }}
+    name: Android E2E - max
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs: fast-tests
-    strategy:
-      fail-fast: false
-      matrix:
-        device: [min, max]
     steps:
       - uses: actions/checkout@v4
 
@@ -76,7 +72,7 @@ jobs:
           EMU_HEADLESS: 1
           BOOT_TIMEOUT: 180
           TEST_TIMEOUT: 300
-          ANDROID_DEFAULT_DEVICE: ${{ matrix.device }}
+          ANDROID_DEFAULT_DEVICE: max
           TEST_TUI: false
         run: devbox run --pure test:e2e
 
@@ -84,26 +80,18 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: android-${{ matrix.device }}-reports
+          name: android-max-reports
           path: |
             examples/android/reports/
             examples/android/app/build/outputs/
           retention-days: 7
 
-  # iOS example E2E tests (min/max devices)
+  # iOS example E2E test (max device only on PRs)
   ios-e2e:
-    name: iOS E2E - ${{ matrix.device }}
-    runs-on: ${{ matrix.os }}
+    name: iOS E2E - max
+    runs-on: macos-15
     timeout-minutes: 25
     needs: fast-tests
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - device: min
-            os: macos-14
-          - device: max
-            os: macos-15
     steps:
       - uses: actions/checkout@v4
 
@@ -137,7 +125,7 @@ jobs:
           SIM_HEADLESS: 1
           BOOT_TIMEOUT: 120
           TEST_TIMEOUT: 300
-          IOS_DEFAULT_DEVICE: ${{ matrix.device }}
+          IOS_DEFAULT_DEVICE: max
           TEST_TUI: false
         run: devbox run --pure test:e2e
 
@@ -145,13 +133,13 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ios-${{ matrix.device }}-reports
+          name: ios-max-reports
           path: |
             examples/ios/reports/
             ~/Library/Logs/CoreSimulator/
           retention-days: 7
 
-  # React Native E2E tests (Android min/max, iOS min/max, Web)
+  # React Native E2E tests (max device only on PRs, plus web)
   react-native-e2e:
     name: React Native E2E - ${{ matrix.platform }}-${{ matrix.device }}
     runs-on: ${{ matrix.os }}
@@ -161,21 +149,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Android tests
-          - platform: android
-            device: min
-            os: ubuntu-24.04
           - platform: android
             device: max
             os: ubuntu-24.04
-          # iOS tests
-          - platform: ios
-            device: min
-            os: macos-14
           - platform: ios
             device: max
             os: macos-15
-          # Web test (fast, no device needed)
           - platform: web
             device: none
             os: ubuntu-24.04
@@ -245,10 +224,8 @@ jobs:
           TEST_TUI: false
         run: |
           if [ "${{ matrix.platform }}" = "android" ]; then
-            # Use wrapper script for platform-specific optimization
             bash tests/run-android-tests.sh
           elif [ "${{ matrix.platform }}" = "ios" ]; then
-            # Use wrapper script for platform-specific optimization
             bash tests/run-ios-tests.sh
           elif [ "${{ matrix.platform }}" = "web" ]; then
             devbox run test:e2e:web
@@ -275,7 +252,7 @@ jobs:
     steps:
       - name: Check job results
         run: |
-          echo "📊 PR Check Results:"
+          echo "PR Check Results:"
           echo "  Fast Tests: ${{ needs.fast-tests.result }}"
           echo "  Android E2E: ${{ needs.android-e2e.result }}"
           echo "  iOS E2E: ${{ needs.ios-e2e.result }}"
@@ -289,4 +266,4 @@ jobs:
             echo "::error::One or more PR checks failed"
             exit 1
           fi
-          echo "::notice::✅ All PR checks passed!"
+          echo "::notice::All PR checks passed!"
