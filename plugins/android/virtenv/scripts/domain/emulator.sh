@@ -238,6 +238,11 @@ android_start_emulator() {
   if [ -n "$_emu_runtime_dir" ]; then
     mkdir -p "$_emu_runtime_dir"
     echo "$emulator_serial" > "$_emu_runtime_dir/emulator-serial.txt"
+    # Also write to suite-namespaced path if SUITE_NAME is set
+    if [ -n "${SUITE_NAME:-}" ]; then
+      mkdir -p "$_emu_runtime_dir/$SUITE_NAME"
+      echo "$emulator_serial" > "$_emu_runtime_dir/$SUITE_NAME/emulator-serial.txt"
+    fi
   fi
 
   # ---- Start Emulator ----

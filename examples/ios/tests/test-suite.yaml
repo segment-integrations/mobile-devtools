@@ -3,8 +3,6 @@ version: "0.5"
 environment:
   - "IOS_DEVICE=${IOS_DEFAULT_DEVICE:-max}"
   - "SUITE_NAME=ios-e2e"
-  - "TEST_TIMEOUT=300"
-  - "BOOT_TIMEOUT=120"
 
 log_location: "reports/ios-e2e-logs"
 log_level: info
@@ -41,11 +39,11 @@ processes:
     readiness_probe:
       exec:
         command: "ios.sh simulator ready"
-      initial_delay_seconds: 10
+      initial_delay_seconds: 5
       period_seconds: 5
-      timeout_seconds: 120
+      timeout_seconds: 10
       success_threshold: 1
-      failure_threshold: 3
+      failure_threshold: 12
 
   # Phase 4: Deploy app - depends on both build and simulator
   deploy-app:

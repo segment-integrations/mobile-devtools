@@ -8,7 +8,6 @@ version: "0.5"
 
 environment:
   - "SUITE_NAME=rn-android-dev"
-  - "BOOT_TIMEOUT=180"
 
 log_location: "reports/react-native-android-dev-logs"
 log_level: info
@@ -57,10 +56,10 @@ processes:
       exec:
         command: "android.sh emulator ready"
       initial_delay_seconds: 10
-      period_seconds: 10
-      timeout_seconds: 180
+      period_seconds: 5
+      timeout_seconds: 10
       success_threshold: 1
-      failure_threshold: 12
+      failure_threshold: 24
 
   # Phase 5: Start Metro bundler with hot reload
   metro-bundler:
@@ -80,8 +79,9 @@ processes:
         command: "metro.sh health android android"
       initial_delay_seconds: 5
       period_seconds: 5
-      timeout_seconds: 60
+      timeout_seconds: 5
       success_threshold: 1
+      failure_threshold: 12
 
   # Phase 6: Deploy app (Debug build for fast iteration)
   deploy-android:

@@ -3,7 +3,6 @@ version: "0.5"
 environment:
   - "TEST_TUI=${TEST_TUI:-false}"
   - "WEB_PORT=8081"
-  - "TEST_TIMEOUT=60"
 
 log_location: "reports/react-native-web-e2e-logs"
 log_level: info
@@ -66,8 +65,9 @@ processes:
         command: "metro.sh health web ios"
       initial_delay_seconds: 5
       period_seconds: 5
-      timeout_seconds: 60
+      timeout_seconds: 5
       success_threshold: 1
+      failure_threshold: 12
 
   # Phase 4: Verify web app is being served
   verify-web-serving:

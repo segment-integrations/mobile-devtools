@@ -2,8 +2,6 @@ version: "0.5"
 
 environment:
   - "SUITE_NAME=android-e2e"
-  - "TEST_TIMEOUT=300"
-  - "BOOT_TIMEOUT=90"
   - "TEST_TUI=${TEST_TUI:-false}"
   - "ANDROID_DEBUG_SETUP=${ANDROID_DEBUG_SETUP:-}"
 
@@ -51,10 +49,10 @@ processes:
       exec:
         command: "android.sh emulator ready"
       initial_delay_seconds: 10
-      period_seconds: 10
-      timeout_seconds: 180
+      period_seconds: 5
+      timeout_seconds: 10
       success_threshold: 1
-      failure_threshold: 12
+      failure_threshold: 24
 
   # Phase 3: Deploy app - depends on both build and emulator being ready
   deploy-app:

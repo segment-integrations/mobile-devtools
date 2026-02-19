@@ -3,8 +3,6 @@ version: "0.5"
 environment:
   - "SUITE_NAME=rn-all-e2e"
   - "IOS_DEVICE=${IOS_DEFAULT_DEVICE:-max}"
-  - "TEST_TIMEOUT=300"
-  - "BOOT_TIMEOUT=180"
   - "TEST_TUI=${TEST_TUI:-false}"
 
 log_location: "reports/react-native-all-e2e-logs"
@@ -83,10 +81,10 @@ processes:
       exec:
         command: "android.sh emulator ready"
       initial_delay_seconds: 10
-      period_seconds: 10
-      timeout_seconds: 180
+      period_seconds: 5
+      timeout_seconds: 10
       success_threshold: 1
-      failure_threshold: 12
+      failure_threshold: 24
 
   # Phase 4b: Start iOS simulator (parallel with Android)
   ios-simulator:
@@ -106,11 +104,11 @@ processes:
     readiness_probe:
       exec:
         command: "ios.sh simulator ready"
-      initial_delay_seconds: 10
+      initial_delay_seconds: 5
       period_seconds: 5
-      timeout_seconds: 120
+      timeout_seconds: 10
       success_threshold: 1
-      failure_threshold: 3
+      failure_threshold: 12
 
   # Phase 5: Start Metro bundler (shared by both platforms)
   metro-bundler:
@@ -129,8 +127,9 @@ processes:
         command: "metro.sh health all ios"
       initial_delay_seconds: 5
       period_seconds: 5
-      timeout_seconds: 60
+      timeout_seconds: 5
       success_threshold: 1
+      failure_threshold: 12
 
   # Phase 6a: Deploy Android app
   deploy-android:
