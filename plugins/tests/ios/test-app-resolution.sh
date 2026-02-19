@@ -158,14 +158,15 @@ assert_equal "$test_root/DerivedData/Build/Products/Real.app" "$result" \
 start_test "ios_find_app - fails when no .app found"
 test_root="$TMPDIR_BASE/test5"
 mkdir -p "$test_root"
-IOS_APP_ARTIFACT="" \
-  assert_failure "ios_find_app '$test_root'" "Should fail when no .app exists"
+# Run from a clean dir so $PWD fallback search doesn't find fixture .app bundles
+(cd "$test_root" && IOS_APP_ARTIFACT="" \
+  assert_failure "ios_find_app '$test_root'" "Should fail when no .app exists")
 
 start_test "ios_find_app - error message includes guidance"
 test_root="$TMPDIR_BASE/test5b"
 mkdir -p "$test_root"
-IOS_APP_ARTIFACT="" \
-  error_output=$(ios_find_app "$test_root" 2>&1 || true)
+# Run from a clean dir so $PWD fallback search doesn't find fixture .app bundles
+error_output=$(cd "$test_root" && IOS_APP_ARTIFACT="" ios_find_app "$test_root" 2>&1 || true)
 assert_contains "$error_output" "No .app bundle found" "Error should mention no .app found"
 assert_contains "$error_output" "IOS_APP_ARTIFACT" "Error should mention env var"
 

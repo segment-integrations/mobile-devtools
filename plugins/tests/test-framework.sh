@@ -235,7 +235,7 @@ test_summary() {
   echo "Failed: $test_failed"
   echo ""
 
-  # Write results file for summary aggregation
+  # Write per-suite results JSON
   local results_dir="${TEST_RESULTS_DIR:-$REPO_ROOT/reports/results}"
   if [[ ! "$results_dir" = /* ]]; then
     results_dir="$REPO_ROOT/$results_dir"
@@ -247,9 +247,13 @@ test_summary() {
   "suite": "${suite_name}",
   "passed": ${test_passed},
   "failed": ${test_failed},
-  "total": ${total}
+  "total": ${total},
+  "timestamp": "$(date '+%Y-%m-%d %H:%M:%S')"
 }
 EOF
+
+  # Regenerate combined summary from all suite JSONs
+  _regenerate_summary "$results_dir"
 
   if [ "$test_failed" -gt 0 ]; then
     echo "RESULT: ✗ FAILED"
@@ -258,4 +262,87 @@ EOF
     echo "RESULT: ✓ ALL PASSED"
     exit 0
   fi
+}
+
+# Regenerate reports/summary.md from all per-suite JSON files.
+# Called automatically by test_summary(); can also be called standalone.
+_regenerate_summary() {
+  local results_dir="${1:-${TEST_RESULTS_DIR:-$REPO_ROOT/reports/results}}"
+  local reports_dir="${REPORTS_DIR:-$REPO_ROOT/reports}"
+  local logs_dir="${TEST_LOGS_DIR:-$reports_dir/logs}"
+
+  # Resolve relative paths against REPO_ROOT
+  [[ "$results_dir" = /* ]] || results_dir="$REPO_ROOT/$results_dir"
+  [[ "$reports_dir" = /* ]] || reports_dir="$REPO_ROOT/$reports_dir"
+  [[ "$logs_dir" = /* ]] || logs_dir="$REPO_ROOT/$logs_dir"
+
+  local summary_file="$reports_dir/summary.md"
+
+  # Bail if no result files exist yet
+  local json_files
+  json_files=$(ls "$results_dir"/*.json 2>/dev/null | sort) || return 0
+  [ -n "$json_files" ] || return 0
+
+  # Aggregate
+  local _tp=0 _tf=0 _sc=0 _af=0
+  local _names=() _passed=() _failed=() _totals=() _times=()
+
+  for rf in $json_files; do
+    [ -f "$rf" ] || continue
+    local n p f t ts
+    n=$(jq -r '.suite // "unknown"' "$rf" 2>/dev/null)
+    p=$(jq -r '.passed // 0' "$rf" 2>/dev/null)
+    f=$(jq -r '.failed // 0' "$rf" 2>/dev/null)
+    t=$(jq -r '.total // 0' "$rf" 2>/dev/null)
+    ts=$(jq -r '.timestamp // ""' "$rf" 2>/dev/null)
+
+    _names+=("$n"); _passed+=("$p"); _failed+=("$f"); _totals+=("$t"); _times+=("$ts")
+    _tp=$((_tp + p)); _tf=$((_tf + f)); _sc=$((_sc + 1))
+    [ "$f" -gt 0 ] && _af=1
+  done
+
+  local _gt=$((_tp + _tf))
+
+  mkdir -p "$reports_dir" 2>/dev/null || true
+  {
+    echo "# Test Suite Summary"
+    echo ""
+    echo "**Updated:** $(date '+%Y-%m-%d %H:%M:%S')"
+    echo ""
+
+    if [ "$_af" -gt 0 ]; then
+      echo "> **SOME TESTS FAILED**"
+    else
+      echo "> **ALL ${_sc} SUITES PASSED** (${_gt} tests)"
+    fi
+    echo ""
+
+    echo "| Suite | Passed | Failed | Total | Result | Ran At |"
+    echo "|-------|-------:|-------:|------:|--------|--------|"
+
+    for i in $(seq 0 $((_sc - 1))); do
+      local badge="PASS"
+      [ "${_failed[$i]}" -gt 0 ] && badge="FAIL"
+      echo "| ${_names[$i]} | ${_passed[$i]} | ${_failed[$i]} | ${_totals[$i]} | ${badge} | ${_times[$i]} |"
+    done
+
+    local total_badge="PASS"
+    [ "$_af" -gt 0 ] && total_badge="FAIL"
+    echo "| **TOTAL** | **${_tp}** | **${_tf}** | **${_gt}** | **${total_badge}** | |"
+    echo ""
+
+    # Log files
+    if ls "$logs_dir"/*.txt >/dev/null 2>&1; then
+      echo "## Log Files"
+      echo ""
+      for log in "$logs_dir"/*.txt; do
+        echo "- \`$log\`"
+      done
+      echo ""
+    fi
+
+    echo "---"
+    echo ""
+    echo "_Run \`devbox run test:fast\` to regenerate this summary_"
+  } > "$summary_file"
 }
