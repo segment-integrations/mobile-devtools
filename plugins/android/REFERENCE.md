@@ -93,7 +93,8 @@ Use in `devbox.json`:
 - `devbox run --pure android.sh emulator start [--pure] [device]`
   - `--pure`: Start fresh emulator with wiped data (clean Android OS state for deterministic tests)
   - Without `--pure`: Reuses existing emulator if running (faster for development, preserves data)
-  - Auto-detects pure mode when `IN_NIX_SHELL=pure` or `DEVBOX_PURE_SHELL=1`
+  - Auto-detects pure mode when `DEVBOX_PURE_SHELL=1` (set by `devbox run --pure`)
+  - `REUSE_EMU=1`: Override pure mode to reuse existing emulator (e.g., `devbox run --pure -e REUSE_EMU=1`)
 - `devbox run --pure android.sh emulator stop`
 - `devbox run --pure android.sh emulator ready`
   - Silent readiness probe: exit 0 if emulator is booted, exit 1 if not

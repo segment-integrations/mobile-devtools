@@ -49,6 +49,7 @@ devbox run --pure android.sh emulator start [--pure] [device]
 - `device`: Device name (optional, defaults to `ANDROID_DEFAULT_DEVICE`)
 - Without `--pure`: Reuses existing emulator if running (faster, preserves data)
 - With `--pure`: Always starts new instance with `-wipe-data` flag
+- `REUSE_EMU=1`: Override pure mode to reuse existing emulator
 
 **Examples:**
 ```bash
@@ -328,7 +329,8 @@ ios.sh simulator start [--pure] [device]
 - `device`: Device name (optional, defaults to `IOS_DEFAULT_DEVICE`)
 - Boots simulator if not already running
 - `--pure`: Creates a fresh, isolated test simulator with clean state
-- Auto-detects pure mode when `IN_NIX_SHELL=pure` or `DEVBOX_PURE_SHELL=1`
+- Auto-detects pure mode when `DEVBOX_PURE_SHELL=1` (set by `devbox run --pure`)
+- `REUSE_SIM=1`: Override pure mode to reuse existing simulator
 - Saves UDID to `$IOS_RUNTIME_DIR/${SUITE_NAME:-default}/simulator-udid.txt`
 
 **Examples:**

@@ -352,14 +352,9 @@ devbox run test:e2e
 
 ```bash
 devbox run --pure test:e2e
-
-# Or in CI:
-IN_NIX_SHELL=pure devbox run test:e2e
 ```
 
-The `IN_NIX_SHELL` environment variable is automatically set by devbox:
-- `IN_NIX_SHELL=impure` - Normal mode
-- `IN_NIX_SHELL=pure` - Pure mode (set by `--pure` flag)
+The `DEVBOX_PURE_SHELL` environment variable is automatically set by devbox when using the `--pure` flag. Scripts auto-detect this to determine whether to create fresh, isolated emulators/simulators.
 
 ### Interactive Monitoring
 

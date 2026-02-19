@@ -345,8 +345,14 @@ case "$command_name" in
         done
 
         # Auto-detect pure mode from devbox environment
-        if [ "${IN_NIX_SHELL:-}" = "pure" ] || [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
+        if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
           pure_mode=1
+        fi
+
+        # Allow overriding pure mode to reuse existing emulator
+        # Usage: devbox run --pure -e REUSE_EMU=1 android.sh emulator start
+        if [ "${REUSE_EMU:-}" = "1" ]; then
+          pure_mode=0
         fi
 
         # Layer 3 orchestration: setup AVDs first, then start emulator

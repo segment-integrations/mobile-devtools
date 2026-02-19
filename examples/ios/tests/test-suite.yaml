@@ -26,7 +26,7 @@ processes:
   # Phase 3: Start simulator - depends on sync completing
   ios-simulator:
     command: |
-      if [ "${IN_NIX_SHELL:-}" = "pure" ] || [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
+      if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
         ios.sh simulator start --pure ${IOS_DEVICE}
       else
         ios.sh simulator start ${IOS_DEVICE}
@@ -97,7 +97,7 @@ processes:
   # Cleanup - stop everything in pure mode, keep running in dev mode
   cleanup:
     command: |
-      if [ "${IN_NIX_SHELL:-}" = "pure" ] || [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
+      if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
         echo "Cleaning up (pure mode)..."
         ios.sh app stop || true
         ios.sh simulator stop

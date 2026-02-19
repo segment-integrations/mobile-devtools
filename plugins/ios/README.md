@@ -121,9 +121,7 @@ When running with `--pure`, the plugin:
 - Cleans up test simulators after completion
 - Ensures reproducible CI environment
 
-The `IN_NIX_SHELL` environment variable is automatically set by devbox:
-- `IN_NIX_SHELL=impure` - Normal mode
-- `IN_NIX_SHELL=pure` - Pure mode (set by `--pure` flag)
+The `DEVBOX_PURE_SHELL` environment variable is automatically set by devbox when using the `--pure` flag. Scripts auto-detect this to determine whether to create fresh, isolated simulators.
 
 ## Xcode Discovery
 

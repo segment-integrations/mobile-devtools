@@ -67,7 +67,7 @@ processes:
       echo "[ANDROID-EMULATOR] Starting emulator..."
       device="${ANDROID_DEFAULT_DEVICE:-max}"
 
-      if [ "${IN_NIX_SHELL:-}" = "pure" ] || [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
+      if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
         echo "Starting fresh Android emulator (pure mode): $device"
         android.sh emulator start --pure "$device"
       else
@@ -91,7 +91,7 @@ processes:
   # Phase 4b: Start iOS simulator (parallel with Android)
   ios-simulator:
     command: |
-      if [ "${IN_NIX_SHELL:-}" = "pure" ] || [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
+      if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
         ios.sh simulator start --pure ${IOS_DEVICE}
       else
         ios.sh simulator start ${IOS_DEVICE}
@@ -253,7 +253,7 @@ processes:
       echo "Stopping Metro bundler..."
       metro.sh stop all || true
 
-      if [ "${IN_NIX_SHELL:-}" = "pure" ] || [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
+      if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
         echo "Cleaning up (pure mode)..."
 
         # Cleanup Android

@@ -44,7 +44,7 @@ processes:
   # Phase 4: Start simulator
   ios-simulator:
     command: |
-      if [ "${IN_NIX_SHELL:-}" = "pure" ] || [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
+      if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
         ios.sh simulator start --pure ${IOS_DEVICE}
       else
         ios.sh simulator start ${IOS_DEVICE}
@@ -147,7 +147,7 @@ processes:
       echo "Stopping Metro bundler..."
       metro.sh stop ios || true
 
-      if [ "${IN_NIX_SHELL:-}" = "pure" ] || [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
+      if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
         echo "Cleaning up (pure mode)..."
         ios.sh app stop || true
         ios.sh simulator stop

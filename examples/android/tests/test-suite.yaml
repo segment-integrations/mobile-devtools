@@ -35,7 +35,7 @@ processes:
       echo "[ANDROID-EMULATOR] Starting emulator..."
       device="${ANDROID_DEFAULT_DEVICE:-max}"
 
-      if [ "${IN_NIX_SHELL:-}" = "pure" ] || [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
+      if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
         echo "Starting fresh Android emulator (pure mode): $device"
         android.sh emulator start --pure "$device"
       else
@@ -90,7 +90,7 @@ processes:
   # Cleanup - stop everything in pure mode, keep running in dev mode
   cleanup-app:
     command: |
-      if [ "${IN_NIX_SHELL:-}" = "pure" ] || [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
+      if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
         echo "Cleaning up (pure mode)..."
         android.sh app stop || true
         android.sh emulator stop || true
