@@ -21,8 +21,9 @@ processes:
   # Phase 2a: Android build
   build-android:
     command: |
-      echo 'Building Android app...'
-      cd android && gradle assembleDebug
+      BUILD_CONFIG="${ANDROID_BUILD_CONFIG:-Debug}"
+      echo "Building Android app (${BUILD_CONFIG})..."
+      android.sh build --config "$BUILD_CONFIG"
       echo 'Build complete'
     depends_on:
       build-node:
@@ -136,9 +137,10 @@ processes:
     command: |
       # Source Metro environment so React Native uses correct port
       . ${REACT_NATIVE_VIRTENV}/metro/env-all.sh
+      echo "Metro port: $METRO_PORT"
 
-      echo "Deploying React Native app to Android (Metro port: $METRO_PORT)..."
-      npx react-native run-android --no-packager
+      # Deploy using android.sh (APK already built by build-android)
+      android.sh deploy
     depends_on:
       build-android:
         condition: process_completed_successfully
@@ -154,15 +156,21 @@ processes:
     command: |
       set -e
 
+      BUILD_CONFIG="${IOS_BUILD_CONFIG:-Release}"
+      echo "Building React Native app (${BUILD_CONFIG})"
+
       # Source Metro environment so React Native uses correct port
       . ${REACT_NATIVE_VIRTENV}/metro/env-all.sh
+      echo "Metro port: $METRO_PORT"
 
-      echo "Deploying React Native app to iOS (Metro port: $METRO_PORT)..."
-      echo "Build configuration: Release"
-      npx react-native run-ios --no-packager --configuration Release
+      # Build with ios.sh build
+      NODE_BINARY="$NODE_BINARY" RCT_METRO_PORT="$METRO_PORT" \
+        ios.sh build --config "$BUILD_CONFIG" --quiet
 
-      # Deploy to save state for app status/stop
-      ios.sh deploy || true
+      # Deploy to simulator
+      ios.sh deploy
+
+      echo "App deployed and launched successfully"
     depends_on:
       install-pods:
         condition: process_completed_successfully

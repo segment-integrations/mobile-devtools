@@ -88,7 +88,10 @@ processes:
     command: |
       . ${REACT_NATIVE_VIRTENV}/metro/env-android.sh
       echo "Deploying React Native app (Debug, Metro port: $METRO_PORT)..."
-      npx react-native run-android --no-packager
+
+      # Deploy using android.sh (APK already built by build-android)
+      android.sh deploy
+
       echo ""
       echo "App deployed!"
       echo "  Metro: http://localhost:$METRO_PORT"

@@ -93,9 +93,10 @@ processes:
     command: |
       # Source Metro environment so React Native uses correct port
       . ${REACT_NATIVE_VIRTENV}/metro/env-android.sh
+      echo "Metro port: $METRO_PORT"
 
-      echo "Deploying React Native app (Metro port: $METRO_PORT)..."
-      npx react-native run-android --no-packager
+      # Deploy using android.sh (APK already built by build-android)
+      android.sh deploy
     depends_on:
       build-android:
         condition: process_completed_successfully
