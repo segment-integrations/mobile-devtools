@@ -88,7 +88,7 @@ jobs:
   # iOS example E2E test (max device only on PRs)
   ios-e2e:
     name: iOS E2E - max
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 25
     needs: fast-tests
     steps:
@@ -152,7 +152,7 @@ jobs:
             os: ubuntu-24.04
           - platform: ios
             device: max
-            os: macos-15
+            os: macos-26
           - platform: web
             device: none
             os: ubuntu-24.04
@@ -212,21 +212,13 @@ jobs:
 
       - name: Run React Native E2E test
         working-directory: examples/react-native
-        env:
-          EMU_HEADLESS: ${{ matrix.platform == 'android' && '1' || '0' }}
-          SIM_HEADLESS: ${{ matrix.platform == 'ios' && '1' || '0' }}
-          BOOT_TIMEOUT: 240
-          TEST_TIMEOUT: 600
-          ANDROID_DEFAULT_DEVICE: ${{ matrix.device }}
-          IOS_DEFAULT_DEVICE: ${{ matrix.device }}
-          TEST_TUI: false
         run: |
           if [ "${{ matrix.platform }}" = "android" ]; then
-            bash tests/run-android-tests.sh
+            devbox run --pure -e IOS_SKIP_SETUP=1 -e EMU_HEADLESS=1 test:e2e:android
           elif [ "${{ matrix.platform }}" = "ios" ]; then
-            bash tests/run-ios-tests.sh
+            devbox run --pure -e ANDROID_SKIP_SETUP=1 -e SIM_HEADLESS=1 test:e2e:ios
           elif [ "${{ matrix.platform }}" = "web" ]; then
-            bash tests/run-web-tests.sh
+            devbox run --pure -e ANDROID_SKIP_SETUP=1 -e IOS_SKIP_SETUP=1 test:e2e:web
           fi
 
       - name: Upload reports and logs

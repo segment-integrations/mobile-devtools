@@ -90,7 +90,7 @@ jobs:
           - device: min
             os: macos-14
           - device: max
-            os: macos-15
+            os: macos-26
     steps:
       - uses: actions/checkout@v4
 
@@ -160,7 +160,7 @@ jobs:
             os: macos-14
           - platform: ios
             device: max
-            os: macos-15
+            os: macos-26
           # Web test (fast, no device needed)
           - platform: web
             device: none
@@ -221,23 +221,13 @@ jobs:
 
       - name: Run React Native E2E test
         working-directory: examples/react-native
-        env:
-          EMU_HEADLESS: ${{ matrix.platform == 'android' && '1' || '0' }}
-          SIM_HEADLESS: ${{ matrix.platform == 'ios' && '1' || '0' }}
-          BOOT_TIMEOUT: 300
-          TEST_TIMEOUT: 900
-          ANDROID_DEFAULT_DEVICE: ${{ matrix.device }}
-          IOS_DEFAULT_DEVICE: ${{ matrix.device }}
-          TEST_TUI: false
         run: |
           if [ "${{ matrix.platform }}" = "android" ]; then
-            # Use wrapper script for platform-specific optimization
-            bash tests/run-android-tests.sh
+            devbox run --pure -e IOS_SKIP_SETUP=1 -e EMU_HEADLESS=1 test:e2e:android
           elif [ "${{ matrix.platform }}" = "ios" ]; then
-            # Use wrapper script for platform-specific optimization
-            bash tests/run-ios-tests.sh
+            devbox run --pure -e ANDROID_SKIP_SETUP=1 -e SIM_HEADLESS=1 test:e2e:ios
           elif [ "${{ matrix.platform }}" = "web" ]; then
-            bash tests/run-web-tests.sh
+            devbox run --pure -e ANDROID_SKIP_SETUP=1 -e IOS_SKIP_SETUP=1 test:e2e:web
           fi
 
       - name: Upload reports and logs
