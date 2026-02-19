@@ -6,6 +6,7 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { execFile } from "child_process";
+import { writeFile } from "fs/promises";
 import { promisify } from "util";
 
 const execFileAsync = promisify(execFile);
@@ -217,7 +218,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           "- devbox.d/: Per-project configuration directory\n" +
           "- .devbox/virtenv/: Temporary runtime directory (auto-regenerated, never edit directly)\n\n" +
           "The .devbox/virtenv/ directory is automatically regenerated on 'devbox shell' or 'devbox run'. " +
-          "Any manual changes to files in .devbox/virtenv/ will be lost.",
+          "Any manual changes to files in .devbox/virtenv/ will be lost.\n\n" +
+          "OUTPUT MANAGEMENT: For commands that produce large output (builds, test suites, logs), " +
+          "use the 'logFile' parameter to write output to a file instead of returning it inline. " +
+          "This keeps context tokens low. The response will include the file path, exit status, " +
+          "and a short summary. You can then read the log file selectively if needed.",
         inputSchema: {
           type: "object",
           properties: {
@@ -249,6 +254,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
               type: "number",
               description: "Timeout in milliseconds (default: 120000)",
               default: 120000,
+            },
+            logFile: {
+              type: "string",
+              description:
+                "Absolute path to write stdout+stderr to instead of returning inline. " +
+                "Use for commands with large output (builds, test suites) to avoid filling context. " +
+                "When set, the response returns a short summary with the log file path.",
             },
           },
           required: ["command"],
@@ -424,7 +436,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
   switch (name) {
     case "devbox_run": {
-      const { command, args: cmdArgs = [], pure = false, env = {}, cwd, timeout } = args;
+      const { command, args: cmdArgs = [], pure = false, env = {}, cwd, timeout, logFile } = args;
 
       const devboxArgs = ["run"];
       if (pure) devboxArgs.push("--pure");
@@ -440,6 +452,44 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       const result = await runDevbox(devboxArgs, { cwd, timeout });
+
+      // If logFile is specified, write output to file and return summary
+      if (logFile) {
+        const fullOutput = [
+          result.stdout || "",
+          result.stderr ? `\n--- stderr ---\n${result.stderr}` : "",
+        ].join("");
+
+        try {
+          await writeFile(logFile, fullOutput, "utf-8");
+        } catch (writeErr) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `✗ Failed to write log file: ${writeErr.message}\n\nCommand ${result.success ? "succeeded" : `failed (exit ${result.exitCode})`}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+
+        const lines = fullOutput.split("\n");
+        const lineCount = lines.length;
+        const tail = lines.slice(-5).join("\n");
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: result.success
+                ? `✓ Command succeeded (${lineCount} lines written to ${logFile})\n\nLast 5 lines:\n${tail}`
+                : `✗ Command failed (exit ${result.exitCode}, ${lineCount} lines written to ${logFile})\n\nLast 5 lines:\n${tail}`,
+            },
+          ],
+          isError: !result.success,
+        };
+      }
 
       return {
         content: [

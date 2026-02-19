@@ -20,12 +20,12 @@ REPO_ROOT="$SCRIPT_DIR/../../.."
 . "$REPO_ROOT/plugins/tests/test-framework.sh"
 
 # Setup test environment
-TEST_ROOT="/tmp/android-validation-test-$$"
+TEST_ROOT="$(make_temp_dir "android-validation")"
 mkdir -p "$TEST_ROOT/devbox.d/android/devices"
 mkdir -p "$TEST_ROOT/devbox.d/android/scripts"
 
-# Copy fixtures
-cp "$SCRIPT_DIR/../../fixtures/android/devices/"*.json "$TEST_ROOT/devbox.d/android/devices/"
+# Copy device fixtures from example project
+cp "$REPO_ROOT/examples/android/devbox.d/android/devices/"*.json "$TEST_ROOT/devbox.d/android/devices/"
 
 # Copy plugin scripts
 cp -r "$REPO_ROOT/plugins/android/virtenv/scripts/"* "$TEST_ROOT/devbox.d/android/scripts/"
@@ -37,7 +37,7 @@ export ANDROID_DEVICES_DIR="$TEST_ROOT/devbox.d/android/devices"
 export ANDROID_SCRIPTS_DIR="$TEST_ROOT/devbox.d/android/scripts"
 export ANDROID_DEVICES=""
 export ANDROID_SDK_ROOT="/tmp/fake-sdk"
-export ANDROID_DEFAULT_DEVICE="test_pixel_api36"
+export ANDROID_DEFAULT_DEVICE="medium_phone_api36"
 
 cd "$TEST_ROOT"
 
@@ -45,14 +45,14 @@ cd "$TEST_ROOT"
 echo "Test: Lock file generation..."
 if sh "$ANDROID_SCRIPTS_DIR/user/devices.sh" eval >/dev/null 2>&1; then
   if [ -f "$ANDROID_DEVICES_DIR/devices.lock" ]; then
-    TEST_PASS=$((TEST_PASS + 1))
+    test_passed=$((test_passed + 1))
     echo "✓ Lock file generated successfully"
   else
-    TEST_FAIL=$((TEST_FAIL + 1))
+    test_failed=$((test_failed + 1))
     echo "✗ Lock file not created"
   fi
 else
-  TEST_FAIL=$((TEST_FAIL + 1))
+  test_failed=$((test_failed + 1))
   echo "✗ Device eval command failed"
 fi
 
@@ -60,14 +60,14 @@ fi
 echo "Test: Lock file content validation..."
 if [ -f "$ANDROID_DEVICES_DIR/devices.lock" ]; then
   if [ -s "$ANDROID_DEVICES_DIR/devices.lock" ]; then
-    TEST_PASS=$((TEST_PASS + 1))
+    test_passed=$((test_passed + 1))
     echo "✓ Lock file has valid content"
   else
-    TEST_FAIL=$((TEST_FAIL + 1))
+    test_failed=$((test_failed + 1))
     echo "✗ Lock file is empty"
   fi
 else
-  TEST_FAIL=$((TEST_FAIL + 1))
+  test_failed=$((test_failed + 1))
   echo "✗ Lock file not found"
 fi
 
@@ -77,29 +77,29 @@ if [ -f "$ANDROID_DEVICES_DIR/devices.lock" ]; then
   if jq -e '.checksum' "$ANDROID_DEVICES_DIR/devices.lock" >/dev/null 2>&1; then
     checksum=$(jq -r '.checksum' "$ANDROID_DEVICES_DIR/devices.lock")
     if [ -n "$checksum" ] && [ "$checksum" != "null" ]; then
-      TEST_PASS=$((TEST_PASS + 1))
+      test_passed=$((test_passed + 1))
       echo "✓ Lock file has valid checksum"
     else
-      TEST_FAIL=$((TEST_FAIL + 1))
+      test_failed=$((test_failed + 1))
       echo "✗ Lock file checksum is invalid"
     fi
   else
-    TEST_FAIL=$((TEST_FAIL + 1))
+    test_failed=$((test_failed + 1))
     echo "✗ Lock file missing checksum field"
   fi
 else
-  TEST_FAIL=$((TEST_FAIL + 1))
+  test_failed=$((test_failed + 1))
   echo "✗ Lock file not found"
 fi
 
 # Test 4: Device list shows fixtures
 echo "Test: Device list validation..."
 device_list=$(sh "$ANDROID_SCRIPTS_DIR/user/devices.sh" list 2>/dev/null || echo "")
-if echo "$device_list" | grep -q "test_pixel"; then
-  TEST_PASS=$((TEST_PASS + 1))
+if echo "$device_list" | grep -q "pixel_api21"; then
+  test_passed=$((test_passed + 1))
   echo "✓ Device list shows test devices"
 else
-  TEST_FAIL=$((TEST_FAIL + 1))
+  test_failed=$((test_failed + 1))
   echo "✗ Device list doesn't show expected devices"
 fi
 
