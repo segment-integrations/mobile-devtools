@@ -1,6 +1,7 @@
 version: "0.5"
 
 environment:
+  - "EMU_HEADLESS=${EMU_HEADLESS:-}"
   - "ANDROID_SERIAL=emulator-5554"
   - "IOS_DEVICE=${IOS_DEFAULT_DEVICE:-max}"
   - "TEST_TIMEOUT=300"
@@ -10,6 +11,7 @@ environment:
 log_location: "reports/react-native-all-e2e-logs"
 log_level: info
 is_strict: true
+exit_on_end: true
 
 processes:
   # Phase 0: Allocate Metro port (runs first, no dependencies)
@@ -55,6 +57,12 @@ processes:
     command: |
       cd ios
       echo "Installing CocoaPods dependencies..."
+      # Strip Nix compiler env vars so CocoaPods uses system compilers
+      # (Nix CC can't find iOS SDK for cross-compilation)
+      unset CC CXX LD LDFLAGS NIX_CC NIX_CXX NIX_LDFLAGS NIX_CFLAGS_COMPILE NIX_CFLAGS_LINK
+      unset NIX_ENFORCE_PURITY NIX_HARDENING_ENABLE
+      unset AR NM RANLIB STRIP SDKROOT
+      export CC=/usr/bin/clang CXX=/usr/bin/clang++
       pod install --repo-update
       echo '✓ Pod install complete'
     depends_on:
@@ -389,6 +397,7 @@ processes:
         condition: process_completed
     availability:
       restart: "no"
+      exit_on_end: true
     shutdown:
       signal: 15
       timeout_seconds: 1

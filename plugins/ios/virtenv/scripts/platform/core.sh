@@ -103,14 +103,26 @@ ios_resolve_developer_dir() {
 # Xcode Build Wrapper
 # ============================================================================
 
-# Run xcodebuild with Nix-incompatible environment variables removed.
-# Nix sets LD, LDFLAGS, NIX_LDFLAGS, NIX_CFLAGS_COMPILE, and NIX_CFLAGS_LINK
-# which conflict with Apple's toolchain. This wrapper strips them in a subshell
-# so the caller's environment is not affected.
+# Safety-net wrapper for xcodebuild that strips residual Nix stdenv variables.
+# devbox_omit_nix_env() handles the main cleanup at shell init via
+# `devbox shellenv --omit-nix-env=true`. This wrapper catches any edge cases
+# where Nix variables leak through (e.g., subshells, process-compose processes
+# that don't go through the full init chain).
 # Args: all arguments are forwarded to xcodebuild
 ios_xcodebuild() {
   (
+    # Remove Nix linker/compiler variables that break Xcode builds
     unset LD LDFLAGS NIX_LDFLAGS NIX_CFLAGS_COMPILE NIX_CFLAGS_LINK
+    unset NIX_CC NIX_CXX NIX_ENFORCE_PURITY NIX_HARDENING_ENABLE
+    unset NIX_CC_WRAPPER_TARGET_HOST_x86_64_apple_darwin
+    unset NIX_CC_WRAPPER_TARGET_HOST_aarch64_apple_darwin
+    unset AR NM RANLIB STRIP STRINGS SIZE
+    unset SDKROOT MACOSX_DEPLOYMENT_TARGET
+    unset configureFlags depsBuildBuild depsBuildHost
+    # Ensure system compiler is used
+    CC=/usr/bin/clang
+    CXX=/usr/bin/clang++
+    export CC CXX
     xcodebuild "$@"
   )
 }
@@ -206,7 +218,6 @@ devbox_omit_nix_env() {
     PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
     export PATH
     unset SDKROOT
-    unset LD LDFLAGS NIX_LDFLAGS NIX_CFLAGS_COMPILE NIX_CFLAGS_LINK 2>/dev/null || true
   fi
 
   if [ -n "$devbox_init_path" ]; then

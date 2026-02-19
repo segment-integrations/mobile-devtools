@@ -1,6 +1,7 @@
 version: "0.5"
 
 environment:
+  - "EMU_HEADLESS=${EMU_HEADLESS:-}"
   - "TEST_TIMEOUT=300"
   - "BOOT_TIMEOUT=90"
   - "TEST_TUI=${TEST_TUI:-false}"
@@ -9,6 +10,7 @@ environment:
 log_location: "reports/android-e2e-logs"
 log_level: info
 is_strict: true
+exit_on_end: true
 
 processes:
   # Phase 1: Build - runs first (no dependency)
@@ -193,6 +195,7 @@ processes:
         condition: process_completed
     availability:
       restart: "no"
+      exit_on_end: true
     shutdown:
       signal: 15
       timeout_seconds: 1

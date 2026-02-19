@@ -3,6 +3,7 @@ version: "0.5"
 log_location: "${REPORTS_DIR:-reports}/e2e-logs"
 log_level: info
 is_strict: true
+exit_on_end: true
 
 environment:
   - "TEST_PURE=1"
@@ -61,3 +62,4 @@ processes:
         condition: process_completed_successfully
     availability:
       restart: "no"
+      exit_on_end: true

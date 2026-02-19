@@ -3,6 +3,7 @@ version: "0.5"
 log_location: "${REPORTS_DIR:-reports}/devbox-unit-tests-logs"
 log_level: info
 is_strict: true
+exit_on_end: true
 
 processes:
   # Android plugin unit tests
@@ -111,3 +112,4 @@ processes:
         condition: process_completed_successfully
     availability:
       restart: "no"
+      exit_on_end: true
