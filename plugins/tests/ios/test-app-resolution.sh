@@ -3,13 +3,19 @@
 #
 # Tests for the ios_find_app() precedence chain in deploy.sh.
 # These tests use temporary directories with fixture .app bundles.
-# Does NOT require Xcode (xcodebuild tests are skipped).
+# Requires macOS (uses PlistBuddy for plist creation/reading).
 
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "$0")" && pwd)"
 . "$script_dir/../test-framework.sh"
 setup_logging
+
+# Only run on macOS
+if [ "$(uname -s)" != "Darwin" ]; then
+  echo "Skipping iOS app resolution tests (not on macOS)"
+  exit 0
+fi
 
 # ============================================================================
 # Setup
@@ -38,16 +44,7 @@ create_fake_app() {
   app_dir="$1"
   bundle_id="${2:-com.test.app}"
   mkdir -p "$app_dir"
-  cat > "$app_dir/Info.plist" <<PLIST
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-  <key>CFBundleIdentifier</key>
-  <string>${bundle_id}</string>
-</dict>
-</plist>
-PLIST
+  /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string $bundle_id" "$app_dir/Info.plist" 2>/dev/null || true
 }
 
 echo "========================================"
@@ -180,24 +177,19 @@ assert_contains "$error_output" "No .app bundle found" "Error should mention no 
 assert_contains "$error_output" "IOS_APP_ARTIFACT" "Error should mention env var"
 
 # ============================================================================
-# Tests: ios_extract_bundle_id (macOS only - uses PlistBuddy)
+# Tests: ios_extract_bundle_id
 # ============================================================================
 
-if [ -x /usr/libexec/PlistBuddy ]; then
-  start_test "ios_extract_bundle_id - extracts from Info.plist"
-  test_root="$TMPDIR_BASE/test_bundle"
-  create_fake_app "$test_root/MyApp.app" "com.example.myapp"
-  result=$(ios_extract_bundle_id "$test_root/MyApp.app" 2>/dev/null)
-  assert_equal "com.example.myapp" "$result" "Should extract correct bundle ID"
+start_test "ios_extract_bundle_id - extracts from Info.plist"
+test_root="$TMPDIR_BASE/test_bundle"
+create_fake_app "$test_root/MyApp.app" "com.example.myapp"
+result=$(ios_extract_bundle_id "$test_root/MyApp.app" 2>/dev/null)
+assert_equal "com.example.myapp" "$result" "Should extract correct bundle ID"
 
-  start_test "ios_extract_bundle_id - fails on missing Info.plist"
-  test_root="$TMPDIR_BASE/test_bundle_missing"
-  mkdir -p "$test_root/NoInfo.app"
-  assert_failure "ios_extract_bundle_id '$test_root/NoInfo.app'" "Should fail without Info.plist"
-else
-  echo ""
-  echo "SKIP: ios_extract_bundle_id tests (PlistBuddy not available on this platform)"
-fi
+start_test "ios_extract_bundle_id - fails on missing Info.plist"
+test_root="$TMPDIR_BASE/test_bundle_missing"
+mkdir -p "$test_root/NoInfo.app"
+assert_failure "ios_extract_bundle_id '$test_root/NoInfo.app'" "Should fail without Info.plist"
 
 # ============================================================================
 # Tests: ios_resolve_app_glob
