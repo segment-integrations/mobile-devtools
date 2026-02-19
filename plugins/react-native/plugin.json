@@ -1,6 +1,6 @@
 {
   "name": "react-native",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Aggregates the Android and iOS Devbox plugins for React Native projects.",
   "include": [
     "github:segment-integrations/devbox-plugins?dir=plugins/android&ref=main",
