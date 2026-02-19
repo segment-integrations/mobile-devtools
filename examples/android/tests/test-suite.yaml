@@ -137,6 +137,8 @@ processes:
       while [ $attempt -lt $max_attempts ]; do
         if adb -s $serial shell pidof "$app_id" >/dev/null 2>&1; then
           echo "✓ App process running (PID: $(adb -s $serial shell pidof "$app_id"))"
+          mkdir -p reports
+          touch reports/.e2e-passed
           exit 0
         fi
         attempt=$((attempt + 1))
@@ -179,16 +181,14 @@ processes:
       fi
     depends_on:
       run-app:
-        condition: process_completed_successfully
+        condition: process_completed
     availability:
       restart: "no"
 
-  # Summary - only runs when all test phases succeed
+  # Summary - always runs, checks marker file for pass/fail
   summary:
-    command: "bash tests/test-summary.sh 'Android E2E Test Suite' 'reports/android-e2e-logs'"
+    command: "bash tests/test-summary.sh 'Android E2E Test Suite' 'reports/android-e2e-logs' 'reports/.e2e-passed'"
     depends_on:
-      run-app:
-        condition: process_completed_successfully
       cleanup-app:
         condition: process_completed
     availability:

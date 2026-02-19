@@ -279,6 +279,8 @@ processes:
       while [ $attempt -lt $max_attempts ]; do
         if adb -s $serial shell pidof "$app_id" >/dev/null 2>&1; then
           echo "✓ App process running (PID: $(adb -s $serial shell pidof "$app_id"))"
+          mkdir -p reports
+          touch reports/.e2e-android-passed
           exit 0
         fi
         attempt=$((attempt + 1))
@@ -309,6 +311,8 @@ processes:
       while [ $attempt -lt $max_attempts ]; do
         if xcrun simctl spawn "$DEVICE_UDID" launchctl list | grep -q "${IOS_APP_BUNDLE_ID}"; then
           echo "✓ App is running: ${IOS_APP_BUNDLE_ID}"
+          mkdir -p reports
+          touch reports/.e2e-ios-passed
           exit 0
         fi
         attempt=$((attempt + 1))
@@ -324,15 +328,26 @@ processes:
     availability:
       restart: "no"
 
+  # Mark passed - only runs when both platforms verified successfully
+  mark-passed:
+    command: |
+      mkdir -p reports
+      touch reports/.e2e-passed
+      echo "✓ All platforms verified successfully"
+    depends_on:
+      verify-android-running:
+        condition: process_completed_successfully
+      verify-ios-running:
+        condition: process_completed_successfully
+    availability:
+      restart: "no"
+
   # Cleanup - runs when both platforms complete
   cleanup:
     command: |
       # Stop Metro bundler explicitly
       echo "Stopping Metro bundler..."
       metro.sh stop all || true
-
-      # Also kill the metro.sh wrapper process
-      pkill -f "metro.sh start all" || true
 
       if [ "${IN_NIX_SHELL:-}" = "pure" ]; then
         echo "🧹 Cleaning up (pure mode)..."
@@ -361,23 +376,15 @@ processes:
         echo "✓ Test complete - apps and emulator/simulator still running"
       fi
     depends_on:
-      verify-android-running:
+      mark-passed:
         condition: process_completed
-      verify-ios-running:
-        condition: process_completed
-      metro-bundler:
-        condition: process_healthy
     availability:
       restart: "no"
 
-  # Summary - only runs when all test phases succeed
+  # Summary - always runs, checks marker file for pass/fail
   summary:
-    command: "bash tests/test-summary.sh 'React Native All Platforms E2E Test Suite' 'reports/react-native-all-e2e-logs'"
+    command: "bash tests/test-summary.sh 'React Native All Platforms E2E Test Suite' 'reports/react-native-all-e2e-logs' 'reports/.e2e-passed'"
     depends_on:
-      verify-android-running:
-        condition: process_completed_successfully
-      verify-ios-running:
-        condition: process_completed_successfully
       cleanup:
         condition: process_completed
     availability:

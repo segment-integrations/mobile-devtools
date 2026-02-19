@@ -146,6 +146,8 @@ processes:
       echo "Verifying app is running on simulator: $DEVICE_UDID"
       if xcrun simctl spawn "$DEVICE_UDID" launchctl list | grep -q "${IOS_APP_BUNDLE_ID}"; then
         echo "✓ App is running: ${IOS_APP_BUNDLE_ID}"
+        mkdir -p reports
+        touch reports/.e2e-passed
         exit 0
       else
         echo "ERROR: App not found in running processes"
@@ -197,12 +199,10 @@ processes:
     availability:
       restart: "no"
 
-  # Summary - only runs when all test phases succeed
+  # Summary - always runs, checks marker file for pass/fail
   summary:
-    command: "bash tests/test-summary.sh 'iOS E2E Test Suite' 'reports/ios-e2e-logs'"
+    command: "bash tests/test-summary.sh 'iOS E2E Test Suite' 'reports/ios-e2e-logs' 'reports/.e2e-passed'"
     depends_on:
-      verify-app-running:
-        condition: process_completed_successfully
       cleanup:
         condition: process_completed
     availability:

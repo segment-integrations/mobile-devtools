@@ -185,6 +185,8 @@ processes:
       while [ $attempt -lt $max_attempts ]; do
         if adb -s $serial shell pidof "$app_id" >/dev/null 2>&1; then
           echo "✓ App process running (PID: $(adb -s $serial shell pidof "$app_id"))"
+          mkdir -p reports
+          touch reports/.e2e-passed
           exit 0
         fi
         attempt=$((attempt + 1))
@@ -211,9 +213,6 @@ processes:
       echo "Stopping Metro bundler..."
       metro.sh stop android || true
 
-      # Also kill the metro.sh wrapper process
-      pkill -f "metro.sh start android" || true
-
       if [ "${IN_NIX_SHELL:-}" = "pure" ]; then
         echo "🧹 Cleaning up (pure mode)..."
         app_id="${ANDROID_APP_ID:-$(cat ${ANDROID_RUNTIME_DIR}/app-id.txt 2>/dev/null || true)}"
@@ -226,17 +225,13 @@ processes:
     depends_on:
       verify-app-running:
         condition: process_completed
-      metro-bundler:
-        condition: process_healthy
     availability:
       restart: "no"
 
-  # Summary - only runs when all test phases succeed
+  # Summary - always runs, checks marker file for pass/fail
   summary:
-    command: "bash tests/test-summary.sh 'React Native Android E2E Test Suite' 'reports/react-native-android-e2e-logs'"
+    command: "bash tests/test-summary.sh 'React Native Android E2E Test Suite' 'reports/react-native-android-e2e-logs' 'reports/.e2e-passed'"
     depends_on:
-      verify-app-running:
-        condition: process_completed_successfully
       cleanup:
         condition: process_completed
     availability:

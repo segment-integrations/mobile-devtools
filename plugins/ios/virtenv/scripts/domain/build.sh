@@ -219,7 +219,12 @@ ios_build() {
 
   # Derive scheme from project name if not set
   if [ -z "$_scheme" ]; then
-    _scheme="$(basename "$_xc_path" | sed 's/\.\(xcworkspace\|xcodeproj\)$//')"
+    _base="$(basename "$_xc_path")"
+    case "$_base" in
+      *.xcworkspace) _scheme="${_base%.xcworkspace}" ;;
+      *.xcodeproj)   _scheme="${_base%.xcodeproj}" ;;
+      *)             _scheme="$_base" ;;
+    esac
   fi
 
   # Default DerivedData path
