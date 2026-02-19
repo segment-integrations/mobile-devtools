@@ -1,6 +1,6 @@
 version: "0.5"
 
-log_location: "test-results/devbox-mcp-logs"
+log_location: "reports/devbox-mcp-logs"
 log_level: info
 is_strict: true
 
@@ -38,7 +38,7 @@ processes:
       echo "===================================="
       echo ""
       echo "Test Logs:"
-      echo "  test-results/devbox-mcp-logs"
+      echo "  reports/devbox-mcp-logs"
       echo ""
       echo "All tests passed!"
       echo "===================================="
