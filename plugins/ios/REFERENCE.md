@@ -44,6 +44,10 @@ Configure the plugin by setting environment variables in `devbox.json` or `plugi
 
 ### App Settings
 - `IOS_APP_ARTIFACT` — Path or glob pattern for .app bundle (relative to project root; empty = auto-detect)
+- `IOS_APP_SCHEME` — Xcode scheme override (empty = auto-detect from project filename)
+- `IOS_APP_PROJECT` — Explicit .xcworkspace or .xcodeproj path (empty = auto-detect)
+- `IOS_BUILD_CONFIG` — Build configuration: Debug or Release (default: "Debug")
+- `IOS_DERIVED_DATA_PATH` — DerivedData directory path (default: `.devbox/virtenv/ios/DerivedData`)
 
 ### Performance Settings
 - `IOS_SKIP_SETUP` — Skip iOS environment setup during shell initialization (1=skip, 0=setup; default: 0)
@@ -68,6 +72,83 @@ devbox run --pure stop-sim
 ```
 - Shuts down all running simulators
 
+### Build
+
+```bash
+ios.sh build [--config Debug|Release] [--scheme name] [--workspace path]
+             [--project path] [--derived-data path] [--quiet] [--action build|test]
+             [-- extra_xcodebuild_args...]
+```
+- Auto-detects Xcode project (.xcworkspace preferred over .xcodeproj)
+- Default action: `build`. Use `--action test` for xcodebuild tests.
+- Calls `xcodebuild` directly (Nix vars are stripped at init time)
+
+**Project detection order:**
+1. Current working directory
+2. `$DEVBOX_PROJECT_ROOT` (if different)
+3. `$PWD/ios/` (React Native convention)
+4. `$DEVBOX_PROJECT_ROOT/ios/` (if different)
+
+Within each directory, prefers `.xcworkspace` over `.xcodeproj`. Scheme is derived from the project filename (e.g., `MyApp.xcodeproj` → `MyApp`), overridable via `--scheme` or `IOS_APP_SCHEME`.
+
+**Examples:**
+```bash
+# Build with defaults (Debug, auto-detect project)
+ios.sh build
+
+# Build Release
+ios.sh build --config Release
+
+# Run xcodebuild tests
+ios.sh build --action test
+
+# Explicit workspace and scheme
+ios.sh build --workspace ios/MyApp.xcworkspace --scheme MyApp
+
+# Pass extra flags to xcodebuild
+ios.sh build --quiet -- -allowProvisioningUpdates
+```
+
+Use in `devbox.json`:
+```json
+{
+  "shell": {
+    "scripts": {
+      "build": ["ios.sh build"],
+      "build:release": ["ios.sh build --config Release"],
+      "test": ["ios.sh build --action test"]
+    }
+  }
+}
+```
+
+### Xcode Build Wrapper
+
+```bash
+ios.sh xcodebuild [args...]
+```
+- Runs `xcodebuild` with Nix-incompatible environment variables removed
+- Unsets `LD`, `LDFLAGS`, `NIX_LDFLAGS`, `NIX_CFLAGS_COMPILE`, and `NIX_CFLAGS_LINK` in a subshell
+- All arguments are forwarded directly to `xcodebuild`
+- The caller's environment is not affected (stripping happens in a subshell)
+
+Use this in `devbox.json` build scripts instead of manually stripping Nix flags:
+```json
+{
+  "shell": {
+    "scripts": {
+      "build:ios": [
+        "ios.sh xcodebuild -project MyApp.xcodeproj -scheme MyApp -configuration Debug -destination 'generic/platform=iOS Simulator' build"
+      ]
+    }
+  }
+}
+```
+
+Also available as the `ios_xcodebuild()` shell function (from `platform/core.sh`) for use within plugin scripts.
+
+> **Note:** Since the iOS init hook now strips Nix compilation variables (`LD`, `LDFLAGS`, `NIX_LDFLAGS`, `NIX_CFLAGS_COMPILE`, `NIX_CFLAGS_LINK`) at shell startup, `xcodebuild` works natively in devbox shell without the wrapper. The `ios.sh xcodebuild` wrapper and `ios_xcodebuild()` function are kept for backward compatibility and use outside devbox shell.
+
 ### Run App
 
 ```bash
@@ -86,7 +167,7 @@ devbox run --pure ios.sh run [app_path] [device]
 
 Bundle ID is auto-extracted from the .app's `Info.plist` via PlistBuddy, or from `xcodebuild -showBuildSettings` if available.
 
-**Build script detection:** The `run` command tries `build:ios` first, then falls back to `build`. If neither script exists, it skips the build step (assumes pre-built).
+**Build script detection:** The `run` command tries `build:ios` first, then falls back to `build`. If neither script exists, it runs `ios.sh build` to auto-detect and build the Xcode project.
 
 ### Device Management
 
@@ -280,6 +361,7 @@ Scripts are organized in 5 layers (see `wiki/project/ARCHITECTURE.md` for detail
 **Layer 3 - domain/**: Domain operations
 - `domain/device_manager.sh` — Runtime resolution, simulator operations
 - `domain/simulator.sh` — Simulator lifecycle management
+- `domain/build.sh` — Build command (auto-detect and build Xcode project)
 - `domain/deploy.sh` — App building and deployment
 - `domain/validate.sh` — Non-blocking validation
 
@@ -385,6 +467,7 @@ devbox run --pure ios.sh devices eval
 - **Xcode** — Install from App Store or use Xcode Command Line Tools
 - **iOS Simulator** — Included with Xcode
 - **Devbox** — Required for plugin system
+- **Non-Darwin:** On non-macOS platforms, the iOS plugin init hooks exit immediately without errors, allowing cross-platform devbox.json files that include both Android and iOS plugins.
 
 ## Best Practices
 

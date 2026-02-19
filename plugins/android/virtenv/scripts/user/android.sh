@@ -24,6 +24,7 @@ usage() {
 Usage: android.sh <command> [args]
 
 Commands:
+  build [flags]                    Auto-detect and build Gradle project
   devices <command> [args]         Manage device definitions
   info                             Display resolved SDK information
   config <command>                 Manage configuration
@@ -32,7 +33,16 @@ Commands:
   emulator reset                   Reset all emulator AVDs
   run [apk_path] [device]          Build, install, and launch app on emulator
 
+Build flags:
+  --config Debug|Release           Build configuration (default: Debug)
+  --task gradle_task               Gradle task override
+  --quiet                          Suppress Gradle output
+  -- extra_args...                 Extra args passed to gradle
+
 Examples:
+  android.sh build
+  android.sh build --config Release
+  android.sh build --task bundleRelease
   android.sh devices list
   android.sh devices create pixel_api28 --api 28 --device pixel
   android.sh info
@@ -84,6 +94,23 @@ ensure_lib_loaded() {
 # ============================================================================
 
 case "$command_name" in
+  # --------------------------------------------------------------------------
+  # build - Auto-detect and build Gradle project
+  # --------------------------------------------------------------------------
+  build)
+    ensure_lib_loaded
+
+    build_script="${scripts_dir%/}/domain/build.sh"
+    if [ ! -f "$build_script" ]; then
+      echo "ERROR: domain/build.sh not found: $build_script" >&2
+      exit 1
+    fi
+
+    # shellcheck source=/dev/null
+    . "$build_script"
+    android_build "$@"
+    ;;
+
   # --------------------------------------------------------------------------
   # devices - Delegate to devices.sh
   # --------------------------------------------------------------------------

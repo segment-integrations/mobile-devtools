@@ -41,9 +41,6 @@ Include the React Native plugin in your `devbox.json`:
   "env": {
     "ANDROID_APP_ID": "com.example.app",
     "ANDROID_APP_APK": "android/app/build/outputs/apk/debug/app-debug.apk",
-    "IOS_APP_PROJECT": "MyApp.xcodeproj",
-    "IOS_APP_SCHEME": "MyApp",
-    "IOS_APP_BUNDLE_ID": "com.example.app",
     "IOS_APP_ARTIFACT": ".devbox/virtenv/ios/DerivedData/Build/Products/Debug-iphonesimulator/MyApp.app"
   }
 }
@@ -78,10 +75,7 @@ The React Native plugin inherits configuration from both Android and iOS plugins
 **iOS configuration** - See [iOS Guide](ios-guide.md) for details:
 - `IOS_DEFAULT_DEVICE` - Default simulator (e.g., "max", "min", "iphone15")
 - `IOS_DEVICES` - Comma-separated devices to evaluate (empty = all)
-- `IOS_APP_PROJECT` - Xcode project path
-- `IOS_APP_SCHEME` - Xcode build scheme
-- `IOS_APP_BUNDLE_ID` - App bundle identifier
-- `IOS_APP_ARTIFACT` - App path/glob after build
+- `IOS_APP_ARTIFACT` - App path/glob after build (empty = auto-detect)
 - `IOS_DOWNLOAD_RUNTIME` - Auto-download missing runtimes (1=yes, 0=no)
 
 ### Installing Dependencies
@@ -521,7 +515,7 @@ devbox run start:sim
 ```bash
 # Clean build
 cd android && gradle clean
-devbox run build:android
+android.sh build
 ```
 
 **iOS Xcode errors:**
@@ -534,7 +528,7 @@ rm -rf .devbox/virtenv/ios/DerivedData
 cd ios && pod install --repo-update
 
 # Rebuild
-devbox run build:ios
+ios.sh build
 ```
 
 ### Platform-Specific Issues
@@ -596,10 +590,7 @@ ls -la reports/react-native-ios-e2e-logs/
 **iOS settings** (see [iOS Reference](../reference/ios.md)):
 - `IOS_DEFAULT_DEVICE` - Default simulator
 - `IOS_DEVICES` - Devices to evaluate (comma-separated, empty = all)
-- `IOS_APP_PROJECT` - Xcode project path
-- `IOS_APP_SCHEME` - Xcode build scheme
-- `IOS_APP_BUNDLE_ID` - App bundle identifier
-- `IOS_APP_ARTIFACT` - App bundle path/glob
+- `IOS_APP_ARTIFACT` - App bundle path/glob (empty = auto-detect)
 - `IOS_DOWNLOAD_RUNTIME` - Auto-download runtimes (1=yes, 0=no)
 - `IOS_SKIP_SETUP` - Skip iOS setup (1=skip, 0=setup)
 

@@ -135,26 +135,13 @@ processes:
       timeout_seconds: 60
       success_threshold: 1
 
-  # Phase 6: Build and deploy app with xcodebuild
+  # Phase 6: Build and deploy app
   deploy-ios:
     command: |
       set -e
 
-      # Set build configuration (default to Release for E2E tests)
-      BUILD_CONFIG="Release"
-      test -n "${IOS_BUILD_CONFIG:-}" && BUILD_CONFIG="$IOS_BUILD_CONFIG"
-
-      # Get absolute project root path
-      PROJECT_ROOT="${DEVBOX_PROJECT_ROOT:-}"
-      test -z "$PROJECT_ROOT" && PROJECT_ROOT="$(pwd)"
-
-      echo "📲 Building React Native app"
-      echo "Build configuration: $BUILD_CONFIG"
-      echo "Project root: $PROJECT_ROOT"
-
-      # Validate critical variables early
-      test -z "$BUILD_CONFIG" && { echo "ERROR: BUILD_CONFIG is empty!" >&2; exit 1; }
-      test -z "$PROJECT_ROOT" && { echo "ERROR: PROJECT_ROOT is empty!" >&2; exit 1; }
+      BUILD_CONFIG="${IOS_BUILD_CONFIG:-Release}"
+      echo "📲 Building React Native app (${BUILD_CONFIG})"
 
       # Source Metro environment so React Native uses correct port
       . ${REACT_NATIVE_VIRTENV}/metro/env-ios.sh
@@ -181,56 +168,29 @@ processes:
 
       if [ -z "$DEVICE_UDID" ]; then
         echo "ERROR: No booted simulator found after $max_attempts attempts" >&2
-        echo "Available devices:" >&2
         xcrun simctl list devices >&2
         exit 1
       fi
 
       echo "Building for simulator: $DEVICE_UDID"
 
-      # Build with xcodebuild
-      # Remove Nix-specific flags that interfere with Apple toolchain
-      # NODE_BINARY is set by React Native plugin init hook
-      # Pass RCT_METRO_PORT so the app connects to the correct Metro instance
-
-      DERIVED_DATA_PATH="$PROJECT_ROOT/.devbox/virtenv/ios/DerivedData"
-      echo "Derived data path: $DERIVED_DATA_PATH"
-
-      # Ensure the derived data directory exists
-      mkdir -p "$DERIVED_DATA_PATH"
-
-      # Build with xcodebuild in a subshell to preserve variables
-      (
-        cd ios
-        env -u LD -u LDFLAGS -u NIX_LDFLAGS -u NIX_CFLAGS_COMPILE -u NIX_CFLAGS_LINK \
-          NODE_BINARY="$NODE_BINARY" \
-          RCT_METRO_PORT="$METRO_PORT" \
-          xcodebuild \
-          -workspace ReactNativeExample.xcworkspace \
-          -scheme ${IOS_APP_SCHEME} \
-          -configuration "$BUILD_CONFIG" \
-          -destination "id=$DEVICE_UDID" \
-          -derivedDataPath "$DERIVED_DATA_PATH" \
-          -quiet \
-          build
-      )
+      # Build with ios.sh build
+      NODE_BINARY="$NODE_BINARY" RCT_METRO_PORT="$METRO_PORT" \
+        ios.sh build --config "$BUILD_CONFIG" --quiet
 
       # Install the built app
       echo "Installing app to simulator..."
-
-      # Use Release build for E2E tests
-      APP_PATH="${DEVBOX_PROJECT_ROOT}/.devbox/virtenv/ios/DerivedData/Build/Products/Release-iphonesimulator/ReactNativeExample.app"
+      APP_PATH="${IOS_DERIVED_DATA_PATH:-${DEVBOX_PROJECT_ROOT}/.devbox/virtenv/ios/DerivedData}/Build/Products/${BUILD_CONFIG}-iphonesimulator/ReactNativeExample.app"
 
       if [ ! -d "$APP_PATH" ]; then
         echo "ERROR: App bundle not found at $APP_PATH" >&2
-        echo "ERROR: Contents of Products directory:" >&2
-        ls -la "${DEVBOX_PROJECT_ROOT}/.devbox/virtenv/ios/DerivedData/Build/Products/" >&2 || true
+        ls -la "${IOS_DERIVED_DATA_PATH:-${DEVBOX_PROJECT_ROOT}/.devbox/virtenv/ios/DerivedData}/Build/Products/" >&2 || true
         exit 1
       fi
 
       xcrun simctl install "$DEVICE_UDID" "$APP_PATH"
 
-      # Launch app with Metro port environment variable
+      # Launch app with Metro port
       echo "Launching app with Metro on port $METRO_PORT..."
       xcrun simctl launch "$DEVICE_UDID" "${IOS_APP_BUNDLE_ID}" \
         RCT_METRO_PORT="$METRO_PORT"

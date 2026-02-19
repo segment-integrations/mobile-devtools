@@ -1,5 +1,5 @@
 {
-  "include": ["github:segment-integrations/devbox-plugins/main?dir=plugins/react-native"],
+  "include": ["path:../../plugins/react-native/plugin.json"],
   "packages": [
     "nodejs@20",
     "watchman@latest",
@@ -7,10 +7,8 @@
     "gradle@latest"
   ],
   "env": {
-    "IOS_APP_PROJECT": "ReactNativeExample.xcodeproj",
     "IOS_APP_SCHEME": "ReactNativeExample",
     "IOS_APP_BUNDLE_ID": "org.reactjs.native.example.ReactNativeExample",
-    "IOS_APP_ARTIFACT": ".devbox/virtenv/ios/DerivedData/Build/Products/Debug-iphonesimulator/ReactNativeExample.app",
     "ANDROID_APP_ID": "com.reactnativeexample",
     "ANDROID_APP_APK": "android/app/build/outputs/apk/debug/app-debug.apk",
     "ANDROID_MAX_API": "35",
@@ -27,12 +25,21 @@
       ],
       "build:android": [
         "devbox run install",
-        "cd android && gradle assembleDebug"
+        "android.sh build"
+      ],
+      "build:android:release": [
+        "devbox run install",
+        "android.sh build --config Release"
       ],
       "build:ios": [
         "devbox run install",
         "cd ios && pod install --repo-update",
-        "cd ios && env -u LD -u LDFLAGS -u NIX_LDFLAGS -u NIX_CFLAGS_COMPILE -u NIX_CFLAGS_LINK xcodebuild -workspace ReactNativeExample.xcworkspace -scheme ${IOS_APP_SCHEME} -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath ${DEVBOX_PROJECT_ROOT}/.devbox/virtenv/ios/DerivedData -quiet build"
+        "ios.sh build --quiet"
+      ],
+      "build:ios:release": [
+        "devbox run install",
+        "cd ios && pod install --repo-update",
+        "ios.sh build --config Release --quiet"
       ],
       "build:web": [
         "devbox run install",
@@ -43,11 +50,25 @@
         "devbox run build:ios",
         "devbox run build:web"
       ],
+      "build:debug": [
+        "devbox run build:android",
+        "devbox run build:ios"
+      ],
+      "build:release": [
+        "devbox run build:android:release",
+        "devbox run build:ios:release"
+      ],
       "start:android": [
         "process-compose -f tests/dev-android.yaml --tui=${DEVBOX_TUI:-false}"
       ],
+      "start:android:release": [
+        "ANDROID_BUILD_CONFIG=Release process-compose -f tests/dev-android.yaml --tui=${DEVBOX_TUI:-false}"
+      ],
       "start:ios": [
         "process-compose -f tests/dev-ios.yaml --tui=${DEVBOX_TUI:-false}"
+      ],
+      "start:ios:release": [
+        "IOS_BUILD_CONFIG=Release process-compose -f tests/dev-ios.yaml --tui=${DEVBOX_TUI:-false}"
       ],
       "start:web": [
         "process-compose -f tests/dev-web.yaml --tui=${DEVBOX_TUI:-false}"

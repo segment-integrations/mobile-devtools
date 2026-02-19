@@ -39,10 +39,9 @@ processes:
   # Phase 2: Build Android app
   build-android:
     command: |
-      # Source Android environment
-      . ${ANDROID_RUNTIME_DIR}/scripts/init/setup.sh
-      echo '📦 Building Android app...'
-      cd android && gradle assembleDebug
+      BUILD_CONFIG="${ANDROID_BUILD_CONFIG:-Debug}"
+      echo "📦 Building Android app (${BUILD_CONFIG})..."
+      android.sh build --config "$BUILD_CONFIG"
       echo '✓ Build complete'
     depends_on:
       build-node:

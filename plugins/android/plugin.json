@@ -22,6 +22,8 @@
     "ANDROID_INCLUDE_CMAKE": "false",
     "ANDROID_CMAKE_VERSION": "3.22.1",
     "ANDROID_CMDLINE_TOOLS_VERSION": "19.0",
+    "ANDROID_BUILD_CONFIG": "Debug",
+    "ANDROID_BUILD_TASK": "",
     "ANDROID_DISABLE_SNAPSHOTS": "0",
     "ANDROID_SKIP_SETUP": "0",
     "REPORTS_DIR": "reports"
@@ -45,6 +47,7 @@
     "{{ .Virtenv }}/scripts/domain/avd.sh": "virtenv/scripts/domain/avd.sh",
     "{{ .Virtenv }}/scripts/domain/avd-reset.sh": "virtenv/scripts/domain/avd-reset.sh",
     "{{ .Virtenv }}/scripts/domain/emulator.sh": "virtenv/scripts/domain/emulator.sh",
+    "{{ .Virtenv }}/scripts/domain/build.sh": "virtenv/scripts/domain/build.sh",
     "{{ .Virtenv }}/scripts/domain/deploy.sh": "virtenv/scripts/domain/deploy.sh",
     "{{ .Virtenv }}/scripts/domain/validate.sh": "virtenv/scripts/domain/validate.sh",
     "{{ .Virtenv }}/scripts/user/android.sh": "virtenv/scripts/user/android.sh",

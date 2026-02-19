@@ -96,8 +96,11 @@ The plugin provides emulator and device management. Build and deploy commands ar
   },
   "shell": {
     "scripts": {
-      "build:android": [
-        "gradle assembleDebug --info"
+      "build": [
+        "android.sh build"
+      ],
+      "build:release": [
+        "android.sh build --config Release"
       ],
       "start:app": [
         "android.sh run ${1:-}"
@@ -112,8 +115,8 @@ The `${1:-}` syntax passes an optional argument through to the command. It means
 Now you can build and deploy:
 
 ```sh
-# Build the APK
-devbox run build:android
+# Build the APK (auto-detects Gradle project)
+devbox run build
 
 # Build, install, and launch on the default device
 devbox run start:app
@@ -144,7 +147,7 @@ devbox run stop:emu
 
 ### Next Steps
 
-- Check out the [Android example project](../../examples/android/) for a complete working setup with build scripts and E2E test suites
+- Check out the [Android example project](../../examples/android/) for a complete working setup with build scripts and E2E test suites. The example uses a local plugin path for development — if you use it as a template, change the `include` to the GitHub URL shown above.
 - [Android Guide](android-guide.md) - Complete Android development workflow
 - [Device Management](device-management.md) - Create custom device configurations
 - [Troubleshooting](troubleshooting.md) - Common issues and solutions
@@ -219,8 +222,14 @@ The plugin provides simulator and device management. Build and deploy commands a
   "include": ["github:segment-integrations/devbox-plugins?dir=plugins/ios"],
   "shell": {
     "scripts": {
-      "build:ios": [
-        "env -u LD -u LDFLAGS -u NIX_LDFLAGS -u NIX_CFLAGS_COMPILE -u NIX_CFLAGS_LINK xcodebuild -project MyApp.xcodeproj -scheme MyApp -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData build"
+      "build": [
+        "ios.sh build"
+      ],
+      "build:release": [
+        "ios.sh build --config Release"
+      ],
+      "test": [
+        "ios.sh build --action test"
       ],
       "start:app": [
         "ios.sh run ${1:-}"
@@ -235,14 +244,14 @@ As with the Android example, `${1:-}` passes an optional device nickname through
 Now you can build and deploy:
 
 ```sh
-# Build the app
-devbox run build:ios
+# Build the app (auto-detects Xcode project)
+devbox run build
 
 # Start simulator, install, and launch
 devbox run start:app
 ```
 
-**How app auto-detection works:** The `ios.sh run` command starts the simulator, runs your `build:ios` script, then auto-detects the `.app` bundle. It uses this precedence chain:
+**How app auto-detection works:** The `ios.sh run` command starts the simulator, builds the app (using `build:ios`, `build`, or `ios.sh build` auto-detection), then locates the `.app` bundle. It uses this precedence chain:
 
 1. Query `xcodebuild -showBuildSettings` for the built products path (works when your project has an `.xcodeproj` or `.xcworkspace` in the project root)
 2. Recursive search of the project directory for `.app` bundles, skipping `Pods/`, `.build/`, `node_modules/`, `.devbox/`, and similar directories
@@ -269,7 +278,7 @@ devbox run stop:sim
 
 ### Next Steps
 
-- Check out the [iOS example project](../../examples/ios/) for a complete working setup with build scripts and E2E test suites
+- Check out the [iOS example project](../../examples/ios/) for a complete working setup with build scripts and E2E test suites. The example uses a local plugin path for development — if you use it as a template, change the `include` to the GitHub URL shown above.
 - [iOS Guide](ios-guide.md) - Complete iOS development workflow
 - [Device Management](device-management.md) - Create custom device configurations
 - [Troubleshooting](troubleshooting.md) - Common issues and solutions
@@ -331,12 +340,12 @@ The plugin provides emulator/simulator control, device management, and Metro bun
     "scripts": {
       "build:android": [
         "npm install",
-        "cd android && gradle assembleDebug"
+        "android.sh build"
       ],
       "build:ios": [
         "npm install",
         "cd ios && pod install --repo-update",
-        "env -u LD -u LDFLAGS -u NIX_LDFLAGS -u NIX_CFLAGS_COMPILE -u NIX_CFLAGS_LINK xcodebuild -workspace ios/MyApp.xcworkspace -scheme MyApp -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData -quiet build"
+        "ios.sh build --quiet"
       ]
     }
   }
@@ -371,7 +380,7 @@ devbox run stop:sim
 
 ### Next Steps
 
-- Check out the [React Native example project](../../examples/react-native/) for a complete working setup with Metro orchestration, process-compose test suites, and multi-platform builds
+- Check out the [React Native example project](../../examples/react-native/) for a complete working setup with Metro orchestration, process-compose test suites, and multi-platform builds. The example uses a local plugin path for development — if you use it as a template, change the `include` to the GitHub URL shown above.
 - [React Native Guide](react-native-guide.md) - Complete React Native workflow
 - [Device Management](device-management.md) - Configure emulators and simulators
 - [Testing Guide](testing.md) - Set up automated testing
@@ -379,6 +388,10 @@ devbox run stop:sim
 ---
 
 ## Common Plugin Commands
+
+The example projects in this repository use local plugin paths (`path:../../plugins/...`) so they always test against the current plugin source. If you copy an example as a starting point for your own project, change the `include` to the GitHub URL format shown in the quickstart guides above.
+
+
 
 These commands are provided by the plugins and available in all projects:
 

@@ -6,15 +6,30 @@ usage() {
 Usage: ios.sh <command> [args]
 
 Commands:
+  build [flags]              Auto-detect and build Xcode project
   devices <command> [args]
   simulator start [device] [--pure]
   simulator stop
   simulator reset
   run [app_path] [device]
+  xcodebuild [args...]
   config show
   info
 
+Build flags:
+  --config Debug|Release     Build configuration (default: Debug)
+  --scheme name              Xcode scheme (default: auto-detect)
+  --workspace path           Path to .xcworkspace
+  --project path             Path to .xcodeproj
+  --derived-data path        DerivedData path
+  --quiet                    Suppress xcodebuild output
+  --action build|test        xcodebuild action (default: build)
+  -- extra_args...           Extra args passed to xcodebuild
+
 Examples:
+  ios.sh build
+  ios.sh build --config Release
+  ios.sh build --action test
   ios.sh devices list
   ios.sh devices create iphone15 --runtime 17.5
   ios.sh simulator start max
@@ -24,6 +39,7 @@ Examples:
   ios.sh run
   ios.sh run max
   ios.sh run /path/to/MyApp.app
+  ios.sh xcodebuild -project MyApp.xcodeproj -scheme MyApp build
   ios.sh config show
 USAGE
   exit 1
@@ -41,6 +57,11 @@ if [ -n "${IOS_SCRIPTS_DIR:-}" ] && [ -d "${IOS_SCRIPTS_DIR}" ]; then
 fi
 
 case "$command_name" in
+  build)
+    # shellcheck disable=SC1090
+    . "${script_dir}/domain/build.sh"
+    ios_build "$@"
+    ;;
   devices)
     exec "${script_dir}/user/devices.sh" "$@"
     ;;
@@ -273,6 +294,11 @@ case "$command_name" in
       echo "Error: init/setup.sh not found" >&2
       exit 1
     fi
+    ;;
+  xcodebuild)
+    # shellcheck disable=SC1090
+    . "${script_dir}/platform/core.sh"
+    ios_xcodebuild "$@"
     ;;
   *)
     usage

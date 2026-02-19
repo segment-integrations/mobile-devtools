@@ -17,6 +17,28 @@ The `--pure` flag runs commands in an isolated environment without environment v
 
 The main Android CLI provides device and emulator management.
 
+#### Build
+
+**Build project:**
+```bash
+android.sh build [--config Debug|Release] [--task gradle_task] [--quiet] [-- extra_args...]
+```
+- Auto-detects Gradle project (`build.gradle`, `build.gradle.kts`, or `settings.gradle`)
+- Default: runs `assembleDebug` (or `assembleRelease` with `--config Release`)
+- Uses `gradlew` if present, otherwise system `gradle`
+
+**Examples:**
+```bash
+# Build with defaults
+android.sh build
+
+# Build Release
+android.sh build --config Release
+
+# Custom task with extra flags
+android.sh build --task bundleRelease -- --info
+```
+
 #### Emulator Management
 
 **Start emulator:**
@@ -234,6 +256,33 @@ devbox run verify:setup
 
 The main iOS CLI provides device and simulator management.
 
+#### Build
+
+**Build project:**
+```bash
+ios.sh build [--config Debug|Release] [--scheme name] [--workspace path]
+             [--project path] [--derived-data path] [--quiet] [--action build|test]
+             [-- extra_xcodebuild_args...]
+```
+- Auto-detects Xcode project (`.xcworkspace` preferred over `.xcodeproj`)
+- Default action: `build`. Use `--action test` for xcodebuild tests.
+- Nix compilation vars are stripped at init time, so `xcodebuild` works natively.
+
+**Examples:**
+```bash
+# Build with defaults (Debug, auto-detect)
+ios.sh build
+
+# Build Release
+ios.sh build --config Release
+
+# Run tests
+ios.sh build --action test
+
+# Quiet mode with explicit workspace
+ios.sh build --workspace ios/MyApp.xcworkspace --scheme MyApp --quiet
+```
+
 #### Simulator Management
 
 **Start simulator:**
@@ -326,17 +375,10 @@ devbox run --pure ios.sh devices sync
 
 #### Application Deployment
 
-The iOS plugin does not provide built-in build or run commands. Instead, you define these as user scripts in your `devbox.json`.
-
 **Plugin-provided:**
 ```bash
+ios.sh build [flags]                   # Auto-detect and build Xcode project
 ios.sh run [app_path] [device]         # Build, install, and launch app on simulator
-```
-
-**User-defined examples:**
-```bash
-# Define build script in your devbox.json
-devbox run --pure build:ios            # Build iOS app only
 ```
 
 **Example devbox.json scripts:**
@@ -344,8 +386,10 @@ devbox run --pure build:ios            # Build iOS app only
 {
   "shell": {
     "scripts": {
-      "build:ios": "env -u LD -u LDFLAGS -u NIX_LDFLAGS xcodebuild -project MyApp.xcodeproj -scheme MyApp -sdk iphonesimulator -configuration Debug",
-      "start:app": "ios.sh run ${1:-}"
+      "build": ["ios.sh build"],
+      "build:release": ["ios.sh build --config Release"],
+      "test": ["ios.sh build --action test"],
+      "start:app": ["ios.sh run ${1:-}"]
     }
   }
 }
@@ -595,8 +639,6 @@ The following are NOT provided by the plugins. Define them in your project's `de
 
 - `start-ios` / `start:ios` - Build and run iOS app
 - `start-android` / `start:android` - Build and run Android app
-- `build-ios` / `build:ios` - Build iOS app only
-- `build-android` / `build:android` - Build Android app only
 
 ### Device Management Scripts
 
@@ -641,12 +683,14 @@ The following are NOT provided by the plugins. Define them in your project's `de
 ### Application Deployment
 
 **Plugin-provided:**
+- `android.sh build [flags]` - Auto-detect and build Gradle project
 - `android.sh run [apk_path] [device]` - Install and launch Android app
+- `ios.sh build [flags]` - Auto-detect and build Xcode project
+- `ios.sh run [app_path] [device]` - Build, install, and launch iOS app
 
 **User-defined (define in your devbox.json):**
-- `build-ios` / `build:ios` - Build iOS app
-- `start-ios` / `start:ios` - Build and run iOS app
 - `start-android` / `start:android` - Build and run Android app
+- `start-ios` / `start:ios` - Build and run iOS app
 - `start-web` - Start web development server
 
 ### Configuration (Plugin-Provided)

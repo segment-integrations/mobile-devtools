@@ -56,6 +56,15 @@ devbox run stop:sim
 ## Build and Deploy
 
 ```bash
+# Build (auto-detects project)
+ios.sh build
+
+# Build Release
+ios.sh build --config Release
+
+# Run xcodebuild tests
+ios.sh build --action test
+
 # Run app (starts simulator, builds, installs, launches)
 ios.sh run
 
@@ -66,11 +75,12 @@ ios.sh run max
 ios.sh run /path/to/MyApp.app
 ```
 
-Build scripts are project-specific. Define `build:ios` in your `devbox.json`:
+Build scripts in `devbox.json`:
 
 ```bash
-# User-defined script (add to your devbox.json shell.scripts):
-# "build:ios": ["env -u LD -u LDFLAGS -u NIX_LDFLAGS xcodebuild -project MyApp.xcodeproj -scheme MyApp ..."]
+# "build": ["ios.sh build"]
+# "build:release": ["ios.sh build --config Release"]
+# "test": ["ios.sh build --action test"]
 # "start:app": ["ios.sh run ${1:-}"]
 ```
 
@@ -104,6 +114,9 @@ IOS_DEVELOPER_DIR=""                  # Xcode path (empty = auto-detect)
 IOS_DOWNLOAD_RUNTIME="1"              # Auto-download runtimes (1=yes, 0=no)
 IOS_SKIP_SETUP="0"                    # Skip setup during init (1=yes, 0=no)
 IOS_APP_ARTIFACT=""                   # .app path/glob (empty = auto-detect)
+IOS_APP_SCHEME=""                     # Xcode scheme (empty = auto-detect)
+IOS_BUILD_CONFIG="Debug"              # Build configuration (Debug/Release)
+IOS_DERIVED_DATA_PATH=""              # DerivedData path (default: .devbox/virtenv/ios/DerivedData)
 ```
 
 ## Device Definition Format
@@ -169,7 +182,10 @@ reports/
 ## Common Xcode Commands
 
 ```bash
-# Build project
+# Build project (preferred)
+ios.sh build
+
+# Build project (direct xcodebuild - works natively, Nix vars stripped at init)
 xcodebuild -project ios.xcodeproj -scheme ios -configuration Debug \
   -destination 'generic/platform=iOS Simulator' build
 

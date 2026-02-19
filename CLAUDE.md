@@ -708,11 +708,13 @@ examples/{platform}/
 │       └── devices/     # User device definitions
 │           ├── *.json
 │           └── devices.lock
-├── devbox.json          # Includes plugin
+├── devbox.json          # Includes plugin via path: (local development)
 └── README.md            # Usage guide
-# Note: <plugin-dir> is "{platform}" for local includes (plugin:../plugins/{platform}),
-# but for GitHub includes it uses the full dotted path
-# (e.g., "segment-integrations.devbox-plugins.android").
+# Note: Examples use local path includes (path:../../plugins/{platform}/plugin.json)
+# so PR checks test against the current plugin source. User-facing docs show the
+# GitHub URL format (github:segment-integrations/devbox-plugins?dir=plugins/{platform}).
+# <plugin-dir> is "{platform}" for local/path includes, but for GitHub includes it
+# uses the full dotted path (e.g., "segment-integrations.devbox-plugins.android").
 ```
 
 **Test Directory Layout:**

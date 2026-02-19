@@ -497,10 +497,11 @@ Use Ctrl/Cmd+F to search for specific error messages or symptoms.
    defaults read "$IOS_APP_ARTIFACT/Info.plist" CFBundleIdentifier
    ```
 
-5. Strip Nix flags (plugin does this automatically):
+5. Use `ios.sh build` which auto-detects your project and handles Nix flags:
    ```bash
-   env -u LD -u LDFLAGS -u NIX_LDFLAGS xcodebuild ...
+   ios.sh build
    ```
+   Alternatively, `xcodebuild` works natively in devbox shell since Nix vars are stripped at init time.
 
 **Prevention**: Use automatic code signing and keep CocoaPods updated.
 
@@ -512,9 +513,9 @@ Use Ctrl/Cmd+F to search for specific error messages or symptoms.
 
 **Solutions**:
 
-1. The iOS plugin automatically strips Nix flags. Verify in build logs:
+1. The iOS init hook strips Nix compilation variables (`LD`, `LDFLAGS`, `NIX_LDFLAGS`, `NIX_CFLAGS_COMPILE`, `NIX_CFLAGS_LINK`) at shell startup. Verify they are unset:
    ```bash
-   cat reports/logs/build-app.log | grep "LD"
+   echo "LD=$LD LDFLAGS=$LDFLAGS"
    ```
 
 2. For Android, ensure Gradle uses project JDK:

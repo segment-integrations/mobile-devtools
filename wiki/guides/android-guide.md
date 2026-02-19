@@ -228,7 +228,10 @@ The plugin provides emulator and device management. Build and deploy commands ar
   "shell": {
     "scripts": {
       "build:android": [
-        "gradle assembleDebug --info"
+        "android.sh build"
+      ],
+      "build:release": [
+        "android.sh build --config Release"
       ],
       "start:app": [
         "android.sh run ${1:-}"
@@ -271,7 +274,7 @@ In most projects, step 2 finds the right APK with no configuration. If auto-dete
 }
 ```
 
-See the [Android example project](../../examples/android/) for a complete working setup.
+See the [Android example project](../../examples/android/) for a complete working setup. The example project uses a local plugin path for development. If you use it as a template, change the `include` to the GitHub URL shown above.
 
 ### Complete Development Workflow Example
 

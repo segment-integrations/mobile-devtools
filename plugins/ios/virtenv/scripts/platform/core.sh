@@ -100,6 +100,22 @@ ios_resolve_developer_dir() {
 }
 
 # ============================================================================
+# Xcode Build Wrapper
+# ============================================================================
+
+# Run xcodebuild with Nix-incompatible environment variables removed.
+# Nix sets LD, LDFLAGS, NIX_LDFLAGS, NIX_CFLAGS_COMPILE, and NIX_CFLAGS_LINK
+# which conflict with Apple's toolchain. This wrapper strips them in a subshell
+# so the caller's environment is not affected.
+# Args: all arguments are forwarded to xcodebuild
+ios_xcodebuild() {
+  (
+    unset LD LDFLAGS NIX_LDFLAGS NIX_CFLAGS_COMPILE NIX_CFLAGS_LINK
+    xcodebuild "$@"
+  )
+}
+
+# ============================================================================
 # Devbox Binary Resolution
 # ============================================================================
 
@@ -190,6 +206,7 @@ devbox_omit_nix_env() {
     PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
     export PATH
     unset SDKROOT
+    unset LD LDFLAGS NIX_LDFLAGS NIX_CFLAGS_COMPILE NIX_CFLAGS_LINK 2>/dev/null || true
   fi
 
   if [ -n "$devbox_init_path" ]; then

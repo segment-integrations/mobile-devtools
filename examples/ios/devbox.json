@@ -1,29 +1,21 @@
 {
-  "include": ["github:segment-integrations/devbox-plugins/main?dir=plugins/ios"],
+  "include": ["path:../../plugins/ios/plugin.json"],
   "packages": {
     "process-compose": "latest"
   },
   "shell": {
     "scripts": {
-      "build:ios": [
-        "echo 'Building iOS app...'",
-        "env -u LD -u LDFLAGS -u NIX_LDFLAGS -u NIX_CFLAGS_COMPILE -u NIX_CFLAGS_LINK xcodebuild -project ios.xcodeproj -scheme ios -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath .devbox/virtenv/ios/DerivedData build"
+      "build": [
+        "ios.sh build"
       ],
-      "start:sim": [
-        "ios.sh simulator start ${1:-${IOS_DEFAULT_DEVICE:-max}}"
-      ],
-      "stop:sim": [
-        "ios.sh simulator stop"
+      "build:release": [
+        "ios.sh build --config Release"
       ],
       "start:app": [
         "ios.sh run ${1:-}"
       ],
-      "deploy": [
-        "devbox run build:ios",
-        "devbox run start:app"
-      ],
       "test": [
-        "env -u LD -u LDFLAGS -u NIX_LDFLAGS -u NIX_CFLAGS_COMPILE -u NIX_CFLAGS_LINK xcodebuild -project ios.xcodeproj -scheme ios -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath .devbox/virtenv/ios/DerivedData test"
+        "ios.sh build --action test"
       ],
       "test:e2e": [
         "process-compose -f tests/test-suite.yaml --no-server --tui=${TEST_TUI:-false}"

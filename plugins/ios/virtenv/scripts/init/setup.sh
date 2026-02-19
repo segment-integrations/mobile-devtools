@@ -9,6 +9,10 @@ if [ "${IOS_SKIP_SETUP:-0}" = "1" ]; then
   return 0 2>/dev/null || exit 0
 fi
 
+if [ "$(uname -s)" != "Darwin" ]; then
+  return 0 2>/dev/null || exit 0
+fi
+
 if ! (return 0 2>/dev/null); then
   echo "templates/devbox/plugins/ios/scripts/env.sh must be sourced." >&2
   exit 1

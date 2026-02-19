@@ -72,6 +72,8 @@ The React Native plugin automatically includes both Android and iOS plugins:
 
 - `ANDROID_APP_APK` - Path or glob pattern for APK (relative to project root)
 - `ANDROID_APP_ID` - Android application ID (e.g., `com.example.app`)
+- `ANDROID_BUILD_CONFIG` — Build configuration: Debug or Release (default: `Debug`)
+- `ANDROID_BUILD_TASK` — Gradle task override (empty = auto-derive from config, e.g., assembleDebug)
 
 #### Emulator Behavior
 
@@ -149,9 +151,12 @@ The Android plugin runs two initialization hooks:
   "shell": {
     "scripts": {
       "build": [
-        "gradle assembleDebug"
+        "android.sh build"
       ],
-      "run": [
+      "build:release": [
+        "android.sh build --config Release"
+      ],
+      "start:app": [
         "android.sh run ${1:-${ANDROID_DEFAULT_DEVICE:-max}}"
       ]
     }
@@ -184,6 +189,10 @@ The Android plugin runs two initialization hooks:
 #### App Settings
 
 - `IOS_APP_ARTIFACT` - Path or glob pattern for .app bundle (relative to project root; empty = auto-detect via xcodebuild + search)
+- `IOS_APP_SCHEME` — Xcode scheme override (empty = auto-detect from project filename)
+- `IOS_APP_PROJECT` — Explicit .xcworkspace or .xcodeproj path (empty = auto-detect)
+- `IOS_BUILD_CONFIG` — Build configuration: Debug or Release (default: `Debug`)
+- `IOS_DERIVED_DATA_PATH` — DerivedData directory path (default: `{{ .Virtenv }}/DerivedData`)
 
 #### Performance Settings
 
@@ -261,8 +270,11 @@ The iOS plugin runs two initialization hooks:
   },
   "shell": {
     "scripts": {
-      "build:ios": [
-        "env -u LD -u LDFLAGS -u NIX_LDFLAGS -u NIX_CFLAGS_COMPILE -u NIX_CFLAGS_LINK xcodebuild -project ios.xcodeproj -scheme ios -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath .devbox/virtenv/ios/DerivedData build"
+      "build": [
+        "ios.sh build"
+      ],
+      "build:release": [
+        "ios.sh build --config Release"
       ],
       "start:app": [
         "ios.sh run ${1:-}"
@@ -366,12 +378,12 @@ Additional exports:
       ],
       "build:android": [
         "devbox run install",
-        "cd android && gradle assembleDebug"
+        "android.sh build"
       ],
       "build:ios": [
         "devbox run install",
         "cd ios && pod install --repo-update",
-        "cd ios && xcodebuild -workspace ReactNativeExample.xcworkspace -scheme ${IOS_APP_SCHEME} -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath ${DEVBOX_PROJECT_ROOT}/.devbox/virtenv/ios/DerivedData build"
+        "ios.sh build --quiet"
       ],
       "start:android": [
         "process-compose -f tests/dev-android.yaml"
@@ -421,10 +433,10 @@ React Native projects can skip unused platform setup:
   "shell": {
     "scripts": {
       "build:ios": [
-        "ANDROID_SKIP_SETUP=1 devbox run --pure xcodebuild ..."
+        "ANDROID_SKIP_SETUP=1 devbox run --pure ios.sh build"
       ],
       "build:android": [
-        "IOS_SKIP_SETUP=1 devbox run --pure gradle assembleDebug"
+        "IOS_SKIP_SETUP=1 devbox run --pure android.sh build"
       ]
     }
   }

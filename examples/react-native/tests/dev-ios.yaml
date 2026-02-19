@@ -119,12 +119,8 @@ processes:
     command: |
       set -e
 
-      # Use Debug build for fast compilation
-      BUILD_CONFIG="Debug"
-
-      PROJECT_ROOT="${DEVBOX_PROJECT_ROOT:-$(pwd)}"
-      echo "📲 Building React Native app (Debug)"
-      echo "Build configuration: $BUILD_CONFIG"
+      BUILD_CONFIG="${IOS_BUILD_CONFIG:-Debug}"
+      echo "📲 Building React Native app (${BUILD_CONFIG})"
 
       . ${REACT_NATIVE_VIRTENV}/metro/env-ios.sh
       echo "Metro port: $METRO_PORT"
@@ -149,28 +145,13 @@ processes:
 
       echo "Building for simulator: $DEVICE_UDID"
 
-      DERIVED_DATA_PATH="$PROJECT_ROOT/.devbox/virtenv/ios/DerivedData"
-      mkdir -p "$DERIVED_DATA_PATH"
-
-      # Build with xcodebuild (Debug for fast iteration)
-      (
-        cd ios
-        env -u LD -u LDFLAGS -u NIX_LDFLAGS -u NIX_CFLAGS_COMPILE -u NIX_CFLAGS_LINK \
-          NODE_BINARY="$NODE_BINARY" \
-          RCT_METRO_PORT="$METRO_PORT" \
-          xcodebuild \
-          -workspace ReactNativeExample.xcworkspace \
-          -scheme ${IOS_APP_SCHEME} \
-          -configuration "$BUILD_CONFIG" \
-          -destination "id=$DEVICE_UDID" \
-          -derivedDataPath "$DERIVED_DATA_PATH" \
-          -quiet \
-          build
-      )
+      # Build with ios.sh build
+      NODE_BINARY="$NODE_BINARY" RCT_METRO_PORT="$METRO_PORT" \
+        ios.sh build --config "$BUILD_CONFIG" --quiet
 
       # Install the built app
       echo "Installing app to simulator..."
-      APP_PATH="${DEVBOX_PROJECT_ROOT}/.devbox/virtenv/ios/DerivedData/Build/Products/Debug-iphonesimulator/ReactNativeExample.app"
+      APP_PATH="${IOS_DERIVED_DATA_PATH:-${DEVBOX_PROJECT_ROOT}/.devbox/virtenv/ios/DerivedData}/Build/Products/${BUILD_CONFIG}-iphonesimulator/ReactNativeExample.app"
 
       if [ ! -d "$APP_PATH" ]; then
         echo "ERROR: App bundle not found at $APP_PATH"

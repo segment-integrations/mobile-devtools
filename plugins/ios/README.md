@@ -15,8 +15,11 @@ devbox run ios.sh devices list
 # Start simulator
 devbox run start:sim
 
+# Build iOS app (auto-detects project)
+ios.sh build
+
 # Build, install, and launch app on simulator
-devbox run start:ios
+ios.sh run
 
 # Stop simulator
 devbox run stop:sim
@@ -73,8 +76,9 @@ devbox run ios.sh devices sync   # Ensure simulators match device definitions
 
 ### Build Commands
 ```sh
-devbox run build                 # Build iOS app
-devbox run test                  # Run unit tests
+ios.sh build                     # Build iOS app (auto-detects project)
+ios.sh build --config Release    # Build Release
+ios.sh build --action test       # Run xcodebuild tests
 devbox run test:e2e              # Run E2E tests with simulator
 ```
 
@@ -92,6 +96,10 @@ devbox run ios.sh info           # Show Xcode and SDK info
 - `IOS_DEFAULT_DEVICE` — used when no device name is provided (default: `max`)
 - `IOS_DEVICES` — comma-separated device names to evaluate (empty means all)
 - `IOS_APP_ARTIFACT` — path or glob for .app bundle (empty = auto-detect via xcodebuild + search)
+- `IOS_APP_SCHEME` — Xcode scheme override (empty = auto-detect from project name)
+- `IOS_APP_PROJECT` — explicit .xcworkspace or .xcodeproj path (empty = auto-detect)
+- `IOS_BUILD_CONFIG` — build configuration: Debug or Release (default: Debug)
+- `IOS_DERIVED_DATA_PATH` — DerivedData directory (default: .devbox/virtenv/ios/DerivedData)
 - `IOS_DEVELOPER_DIR` — path to Xcode developer directory (auto-detected if not set)
 - `IOS_DOWNLOAD_RUNTIME` — auto-download missing iOS runtimes (0/1, default: 0)
 
@@ -166,9 +174,9 @@ launchctl list | grep CoreSimulator
 ```
 
 ### Build Failures with Nix Flags
-If you see Nix-related flags causing issues, the build script automatically strips them:
+The iOS init hook now strips Nix compilation variables (`LD`, `LDFLAGS`, `NIX_LDFLAGS`, `NIX_CFLAGS_COMPILE`, `NIX_CFLAGS_LINK`) at shell startup, so `xcodebuild` works natively in devbox shell. If you encounter issues outside devbox shell, use the `ios.sh xcodebuild` wrapper:
 ```sh
-env -u LD -u LDFLAGS -u NIX_LDFLAGS xcodebuild ...
+ios.sh xcodebuild -project MyApp.xcodeproj -scheme MyApp build
 ```
 
 ## Reference

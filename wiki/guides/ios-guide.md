@@ -35,7 +35,7 @@ Create or modify your `devbox.json` to include the iOS plugin:
 }
 ```
 
-Use `-derivedDataPath DerivedData` in your xcodebuild command to keep build output project-local.
+The `ios.sh build` command stores build output in `.devbox/virtenv/ios/DerivedData` by default (configurable via `IOS_DERIVED_DATA_PATH`).
 
 ### Initial Setup
 
@@ -241,7 +241,10 @@ The plugin provides simulator and device management. Build and deploy commands a
   "shell": {
     "scripts": {
       "build:ios": [
-        "env -u LD -u LDFLAGS -u NIX_LDFLAGS -u NIX_CFLAGS_COMPILE -u NIX_CFLAGS_LINK xcodebuild -project MyApp.xcodeproj -scheme MyApp -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData build"
+        "ios.sh build"
+      ],
+      "build:release": [
+        "ios.sh build --config Release"
       ],
       "start:app": [
         "ios.sh run ${1:-}"
@@ -256,7 +259,7 @@ The `ios.sh run` command handles the full deployment pipeline: starts the simula
 **How app auto-detection works:** After building, `ios.sh run` finds your `.app` bundle using this precedence chain:
 
 1. `IOS_APP_ARTIFACT` env var — if set, resolves the path/glob relative to project root
-2. `xcodebuild -showBuildSettings` — queries your Xcode project for BUILT_PRODUCTS_DIR + FULL_PRODUCT_NAME
+2. `xcodebuild -showBuildSettings` — queries your Xcode project for BUILT_PRODUCTS_DIR + FULL_PRODUCT_NAME (auto-detected from project)
 3. Recursive search of the project directory for `.app` bundles, skipping `Pods/`, `.build/`, `node_modules/`, `.devbox/`, and similar directories
 4. Recursive search of the current working directory (if different from project root)
 
@@ -283,7 +286,7 @@ devbox run start:app
 devbox run start:app min
 ```
 
-See the [iOS example project](../../examples/ios/) for a complete working setup.
+See the [iOS example project](../../examples/ios/) for a complete working setup. The example project uses a local plugin path for development. If you use it as a template, change the `include` to the GitHub URL shown above.
 
 ### Complete Development Workflow Example
 
@@ -446,6 +449,9 @@ Key variables:
 - `IOS_DEFAULT_DEVICE` - Default device when none specified
 - `IOS_DEVICES` - Comma-separated device names to evaluate (empty = all)
 - `IOS_APP_ARTIFACT` - Path or glob for .app bundle (empty = auto-detect via xcodebuild + search)
+- `IOS_APP_SCHEME` - Xcode scheme override (empty = auto-detect from project name)
+- `IOS_BUILD_CONFIG` - Build configuration: Debug or Release (default: Debug)
+- `IOS_DERIVED_DATA_PATH` - DerivedData directory (default: .devbox/virtenv/ios/DerivedData)
 - `IOS_DOWNLOAD_RUNTIME` - Auto-download missing iOS runtimes (0/1, default: 1)
 
 ### Xcode Configuration
@@ -644,13 +650,13 @@ This shows:
 
 **Symptom**: Xcode build errors related to linker flags or Nix environment variables.
 
-**Solution**: Strip Nix-related flags from the build environment. Use:
+**Solution**: The iOS init hook now strips Nix compilation variables (`LD`, `LDFLAGS`, `NIX_LDFLAGS`, `NIX_CFLAGS_COMPILE`, `NIX_CFLAGS_LINK`) at shell startup, so `xcodebuild` works natively in devbox shell. If you still encounter issues, use `ios.sh build` which handles this automatically:
 
 ```bash
-env -u LD -u LDFLAGS -u NIX_LDFLAGS xcodebuild ...
+ios.sh build
 ```
 
-This ensures Xcode uses its native toolchain without interference from Nix.
+The `ios.sh xcodebuild` wrapper is also available for backward compatibility when running outside devbox shell.
 
 ### Lock File Out of Sync
 

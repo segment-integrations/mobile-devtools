@@ -11,6 +11,10 @@ if [ "${IOS_SKIP_SETUP:-0}" = "1" ]; then
   exit 0
 fi
 
+if [ "$(uname -s)" != "Darwin" ]; then
+  exit 0
+fi
+
 # Find virtenv directory
 VIRTENV_DIR="${IOS_SCRIPTS_DIR:-}/.."
 if [ -z "$VIRTENV_DIR" ] || [ "$VIRTENV_DIR" = "/.." ]; then

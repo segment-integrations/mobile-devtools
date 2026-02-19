@@ -128,8 +128,7 @@ ios_resolve_app_via_xcodebuild() {
   _xc_scheme="$(basename "$_xc_proj" | sed 's/\.\(xcworkspace\|xcodeproj\)$//')"
 
   # Query build settings
-  _settings="$(env -u LD -u LDFLAGS -u NIX_LDFLAGS -u NIX_CFLAGS_COMPILE -u NIX_CFLAGS_LINK \
-    xcodebuild "$_xc_flag" "$_xc_proj" -scheme "$_xc_scheme" \
+  _settings="$(ios_xcodebuild "$_xc_flag" "$_xc_proj" -scheme "$_xc_scheme" \
     -configuration Debug -destination 'generic/platform=iOS Simulator' \
     -showBuildSettings 2>/dev/null || true)"
 
@@ -273,7 +272,7 @@ ios_run_build() {
     return 0
   fi
 
-  # Try platform-specific build command first, then fall back to generic
+  # Try platform-specific build command first, then fall back to generic, then auto-detect
   if (cd "$_build_root" && "$_devbox_bin" run --list 2>/dev/null | grep -q "build:ios"); then
     ios_log_info "deploy.sh" "Running build:ios"
     (cd "$_build_root" && "$_devbox_bin" run --pure build:ios)
@@ -281,7 +280,8 @@ ios_run_build() {
     ios_log_info "deploy.sh" "Running build"
     (cd "$_build_root" && "$_devbox_bin" run --pure build)
   else
-    ios_log_debug "deploy.sh" "No build script found; skipping build step"
+    ios_log_info "deploy.sh" "No build:ios or build script found; using ios.sh build"
+    (cd "$_build_root" && ios.sh build)
   fi
 }
 

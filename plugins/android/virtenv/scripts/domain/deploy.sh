@@ -35,11 +35,14 @@ android_run_build() {
 
   echo "Building Android project: $project_root"
 
-  # Try platform-specific build command first (for React Native), then fall back to generic build
+  # Try platform-specific build command first, then generic, then auto-detect
   if (cd "$project_root" && devbox run --list 2>/dev/null | grep -q "build:android"); then
     (cd "$project_root" && devbox run --pure build:android)
-  else
+  elif (cd "$project_root" && devbox run --list 2>/dev/null | grep -q "build"); then
     (cd "$project_root" && devbox run --pure build)
+  else
+    android_log_info "deploy.sh" "No build:android or build script found; using android.sh build"
+    (cd "$project_root" && android.sh build)
   fi
 }
 
