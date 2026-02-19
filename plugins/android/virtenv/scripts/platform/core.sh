@@ -2,7 +2,7 @@
 # Android Plugin - Core SDK and Environment Setup
 # Extracted from env.sh to eliminate circular dependencies
 
-set -eu
+set -e
 
 if ! (return 0 2>/dev/null); then
   echo "ERROR: core.sh must be sourced, not executed directly" >&2

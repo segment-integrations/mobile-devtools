@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-set -eu
+set -e
 
 if ! (return 0 2>/dev/null); then
   echo "ERROR: validate.sh must be sourced" >&2

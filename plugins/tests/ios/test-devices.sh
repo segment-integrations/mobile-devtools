@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # iOS Plugin - devices.sh Integration Tests
 
-set -eu
+set -euo pipefail
 
 # Setup logging - redirect all output to log file
 SCRIPT_DIR_NAME="$(basename "$(dirname "$0")")"

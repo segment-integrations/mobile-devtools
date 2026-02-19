@@ -2,7 +2,7 @@
 # iOS Plugin - Simulator Lifecycle Management
 # See REFERENCE.md for detailed documentation
 
-set -eu
+set -e
 
 if ! (return 0 2>/dev/null); then
   echo "ERROR: simulator.sh must be sourced" >&2

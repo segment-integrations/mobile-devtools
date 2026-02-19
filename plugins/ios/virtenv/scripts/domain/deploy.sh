@@ -2,7 +2,7 @@
 # iOS Plugin - App Building and Deployment
 # See REFERENCE.md for detailed documentation
 
-set -eu
+set -e
 
 if ! (return 0 2>/dev/null); then
   echo "ERROR: deploy.sh must be sourced" >&2

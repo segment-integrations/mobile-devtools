@@ -2,7 +2,7 @@
 # Android Plugin - Emulator Lifecycle Management
 # See SCRIPTS.md for detailed documentation
 
-set -eu
+set -e
 
 if ! (return 0 2>/dev/null); then
   echo "ERROR: emulator.sh must be sourced, not executed directly" >&2

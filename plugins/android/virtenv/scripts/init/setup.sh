@@ -35,7 +35,7 @@ ANDROID_ENV_LOADED=1
 ANDROID_ENV_LOADED_PID="$$"
 export ANDROID_ENV_LOADED ANDROID_ENV_LOADED_PID
 
-set -eu
+set -e
 
 # ============================================================================
 # Source Dependencies

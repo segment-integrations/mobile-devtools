@@ -2,7 +2,7 @@
 # iOS Plugin - Build Command
 # Auto-detects Xcode project and builds with sensible defaults
 
-set -eu
+set -e
 
 if ! (return 0 2>/dev/null); then
   echo "ERROR: build.sh must be sourced, not executed directly" >&2

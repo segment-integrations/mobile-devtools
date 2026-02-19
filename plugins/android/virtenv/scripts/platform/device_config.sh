@@ -2,7 +2,7 @@
 # Android Plugin - Device Configuration Management
 # Extracted from avd.sh to eliminate circular dependencies
 
-set -eu
+set -e
 
 if ! (return 0 2>/dev/null); then
   echo "ERROR: device_config.sh must be sourced, not executed directly" >&2

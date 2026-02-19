@@ -2,7 +2,7 @@
 # Android Plugin - AVD Reset and Cleanup Operations
 # Extracted from avd.sh to eliminate circular dependencies
 
-set -eu
+set -e
 
 if ! (return 0 2>/dev/null); then
   echo "ERROR: avd_reset.sh must be sourced, not executed directly" >&2

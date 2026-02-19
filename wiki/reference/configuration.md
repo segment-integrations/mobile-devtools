@@ -368,7 +368,6 @@ Additional exports:
     "ANDROID_APP_ID": "com.reactnativeexample",
     "ANDROID_APP_APK": "android/app/build/outputs/apk/debug/app-debug.apk",
     "ANDROID_MAX_API": "35",
-    "DEVBOX_COREPACK_ENABLED": "",
     "ANDROID_SDK_REQUIRED": "0"
   },
   "shell": {

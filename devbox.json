@@ -12,8 +12,7 @@
     "REPORTS_DIR":      "reports",
     "TEST_RESULTS_DIR": "reports/results",
     "TEST_LOGS_DIR":    "reports/logs",
-    "TEST_TUI":         "false",
-    "DEVBOX_COREPACK_ENABLED": ""
+    "TEST_TUI":         "false"
   },
   "shell": {
     "scripts": {

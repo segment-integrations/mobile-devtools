@@ -2,7 +2,7 @@
 # Android Plugin - Core Utilities
 # See SCRIPTS.md for detailed documentation
 
-set -eu
+set -e
 
 if ! (return 0 2>/dev/null); then
   echo "ERROR: lib.sh must be sourced" >&2
