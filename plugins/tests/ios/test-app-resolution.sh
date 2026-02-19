@@ -7,123 +7,14 @@
 
 set -euo pipefail
 
-# Setup logging
-SCRIPT_DIR_NAME="$(basename "$(dirname "$0")")"
-SCRIPT_NAME="$(basename "$0" .sh)"
-mkdir -p "${TEST_LOGS_DIR:-reports/logs}"
-LOG_FILE="${TEST_LOGS_DIR:-reports/logs}/${SCRIPT_DIR_NAME}-${SCRIPT_NAME}.txt"
-exec > >(tee "$LOG_FILE")
-exec 2>&1
-
-# ============================================================================
-# Test Framework
-# ============================================================================
-
-test_passed=0
-test_failed=0
-test_name=""
-
-start_test() {
-  test_name="$1"
-  echo ""
-  echo "TEST: $test_name"
-}
-
-assert_equal() {
-  expected="$1"
-  actual="$2"
-  message="${3:-}"
-
-  if [ "$expected" = "$actual" ]; then
-    echo "  PASS${message:+: $message}"
-    test_passed=$((test_passed + 1))
-  else
-    echo "  FAIL${message:+: $message}"
-    echo "    Expected: '$expected'"
-    echo "    Actual:   '$actual'"
-    test_failed=$((test_failed + 1))
-  fi
-}
-
-assert_not_empty() {
-  actual="$1"
-  message="${2:-}"
-
-  if [ -n "$actual" ]; then
-    echo "  PASS${message:+: $message}"
-    test_passed=$((test_passed + 1))
-  else
-    echo "  FAIL${message:+: $message}"
-    echo "    Value was empty"
-    test_failed=$((test_failed + 1))
-  fi
-}
-
-assert_contains() {
-  haystack="$1"
-  needle="$2"
-  message="${3:-}"
-
-  if echo "$haystack" | grep -q "$needle"; then
-    echo "  PASS${message:+: $message}"
-    test_passed=$((test_passed + 1))
-  else
-    echo "  FAIL${message:+: $message}"
-    echo "    '$haystack' does not contain '$needle'"
-    test_failed=$((test_failed + 1))
-  fi
-}
-
-assert_failure() {
-  command_str="$1"
-  message="${2:-}"
-
-  if ! (eval "$command_str") >/dev/null 2>&1; then
-    echo "  PASS${message:+: $message}"
-    test_passed=$((test_passed + 1))
-  else
-    echo "  FAIL${message:+: $message}"
-    echo "    Command should have failed: $command_str"
-    test_failed=$((test_failed + 1))
-  fi
-}
-
-test_summary() {
-  total=$((test_passed + test_failed))
-  echo ""
-  echo "========================================"
-  echo "Test Summary"
-  echo "========================================"
-  echo "Total:  $total"
-  echo "Passed: $test_passed"
-  echo "Failed: $test_failed"
-  echo ""
-
-  results_dir="${TEST_RESULTS_DIR:-$(cd "$(dirname "$0")/../../../reports/results" 2>/dev/null && pwd || echo "/tmp")}"
-  mkdir -p "$results_dir" 2>/dev/null || true
-  cat > "$results_dir/ios-app-resolution.json" << EOF
-{
-  "suite": "ios-app-resolution",
-  "passed": $test_passed,
-  "failed": $test_failed,
-  "total": $total
-}
-EOF
-
-  if [ "$test_failed" -gt 0 ]; then
-    echo "RESULT: FAILED"
-    exit 1
-  else
-    echo "RESULT: ALL PASSED"
-    exit 0
-  fi
-}
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+. "$script_dir/../test-framework.sh"
+setup_logging
 
 # ============================================================================
 # Setup
 # ============================================================================
 
-script_dir="$(cd "$(dirname "$0")" && pwd)"
 deploy_path="$script_dir/../../ios/virtenv/scripts/domain/deploy.sh"
 lib_path="$script_dir/../../ios/virtenv/scripts/lib/lib.sh"
 core_path="$script_dir/../../ios/virtenv/scripts/platform/core.sh"
@@ -139,9 +30,8 @@ export IOS_SCRIPTS_DIR
 . "$deploy_path"
 
 # Create temp project structures
-TMPDIR_BASE="${TMPDIR:-/tmp}/ios-app-resolution-test-$$"
+TMPDIR_BASE="$(make_temp_dir "ios-app-resolution")"
 trap 'rm -rf "$TMPDIR_BASE"' EXIT
-mkdir -p "$TMPDIR_BASE"
 
 # Helper to create a fake .app bundle with Info.plist
 create_fake_app() {
@@ -319,4 +209,4 @@ assert_failure "ios_resolve_app_glob '$test_root' 'nonexistent/*.app'" "Should f
 # Summary
 # ============================================================================
 
-test_summary
+test_summary "ios-app-resolution"

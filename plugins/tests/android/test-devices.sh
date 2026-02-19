@@ -3,26 +3,9 @@
 
 set -euo pipefail
 
-# Setup logging - redirect all output to log file
-SCRIPT_DIR_NAME="$(basename "$(dirname "$0")")"
-SCRIPT_NAME="$(basename "$0" .sh)"
-mkdir -p "${TEST_LOGS_DIR:-reports/logs}"
-LOG_FILE="${TEST_LOGS_DIR:-reports/logs}/${SCRIPT_DIR_NAME}-${SCRIPT_NAME}.txt"
-exec > >(tee "$LOG_FILE")
-exec 2>&1
-
-test_passed=0
-test_failed=0
-
-assert_success() {
-  if eval "$1" >/dev/null 2>&1; then
-    echo "  ✓ PASS: $2"
-    test_passed=$((test_passed + 1))
-  else
-    echo "  ✗ FAIL: $2"
-    test_failed=$((test_failed + 1))
-  fi
-}
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+. "$script_dir/../test-framework.sh"
+setup_logging
 
 echo "========================================"
 echo "Android devices.sh Integration Tests"
@@ -30,7 +13,7 @@ echo "========================================"
 echo ""
 
 # Setup test environment
-test_root="/tmp/android-plugin-device-test-$$"
+test_root="$(make_temp_dir "android-devices")"
 mkdir -p "$test_root/devices"
 mkdir -p "$test_root/scripts/lib"
 mkdir -p "$test_root/scripts/platform"
@@ -38,7 +21,6 @@ mkdir -p "$test_root/scripts/domain"
 mkdir -p "$test_root/scripts/user"
 
 # Copy required scripts with new layer structure
-script_dir="$(cd "$(dirname "$0")" && pwd)"
 cp "$script_dir/../../android/virtenv/scripts/lib/lib.sh" "$test_root/scripts/lib/"
 cp "$script_dir/../../android/virtenv/scripts/platform/core.sh" "$test_root/scripts/platform/"
 cp "$script_dir/../../android/virtenv/scripts/platform/device_config.sh" "$test_root/scripts/platform/"
@@ -93,31 +75,8 @@ assert_success "[ ! -f '$test_root/devices/test_pixel.json' ]" "Device file remo
 # Cleanup
 rm -rf "$test_root"
 
-# Summary
-echo ""
-echo "========================================"
-total=$((test_passed + test_failed))
-echo "Total:  $total"
-echo "Passed: $test_passed"
-echo "Failed: $test_failed"
-echo ""
+# ============================================================================
+# Test Summary
+# ============================================================================
 
-# Write results file for summary aggregation
-results_dir="${TEST_RESULTS_DIR:-$(cd "$(dirname "$0")/../../../reports/results" 2>/dev/null && pwd || echo "/tmp")}"
-mkdir -p "$results_dir" 2>/dev/null || true
-cat > "$results_dir/android-devices.json" << EOF
-{
-  "suite": "android-devices",
-  "passed": $test_passed,
-  "failed": $test_failed,
-  "total": $total
-}
-EOF
-
-if [ "$test_failed" -gt 0 ]; then
-  echo "RESULT: ✗ FAILED"
-  exit 1
-else
-  echo "RESULT: ✓ ALL PASSED"
-  exit 0
-fi
+test_summary "android-devices"

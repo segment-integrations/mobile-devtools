@@ -5,125 +5,14 @@
 
 set -euo pipefail
 
-# Setup logging - redirect all output to log file
-SCRIPT_DIR_NAME="$(basename "$(dirname "$0")")"
-SCRIPT_NAME="$(basename "$0" .sh)"
-mkdir -p "${TEST_LOGS_DIR:-reports/logs}"
-LOG_FILE="${TEST_LOGS_DIR:-reports/logs}/${SCRIPT_DIR_NAME}-${SCRIPT_NAME}.txt"
-exec > >(tee "$LOG_FILE")
-exec 2>&1
-
-# ============================================================================
-# Test Framework
-# ============================================================================
-
-test_passed=0
-test_failed=0
-test_name=""
-
-start_test() {
-  test_name="$1"
-  echo ""
-  echo "TEST: $test_name"
-}
-
-assert_equal() {
-  expected="$1"
-  actual="$2"
-  message="${3:-}"
-
-  if [ "$expected" = "$actual" ]; then
-    echo "  ✓ PASS${message:+: $message}"
-    test_passed=$((test_passed + 1))
-  else
-    echo "  ✗ FAIL${message:+: $message}"
-    echo "    Expected: '$expected'"
-    echo "    Actual:   '$actual'"
-    test_failed=$((test_failed + 1))
-  fi
-}
-
-assert_success() {
-  command_str="$1"
-  message="${2:-}"
-
-  if eval "$command_str" >/dev/null 2>&1; then
-    echo "  ✓ PASS${message:+: $message}"
-    test_passed=$((test_passed + 1))
-  else
-    echo "  ✗ FAIL${message:+: $message}"
-    echo "    Command failed: $command_str"
-    test_failed=$((test_failed + 1))
-  fi
-}
-
-assert_failure() {
-  command_str="$1"
-  message="${2:-}"
-
-  # Run in subshell to prevent exit from killing test script
-  if ! (eval "$command_str") >/dev/null 2>&1; then
-    echo "  ✓ PASS${message:+: $message}"
-    test_passed=$((test_passed + 1))
-  else
-    echo "  ✗ FAIL${message:+: $message}"
-    echo "    Command should have failed: $command_str"
-    test_failed=$((test_failed + 1))
-  fi
-}
-
-assert_contains() {
-  haystack="$1"
-  needle="$2"
-  message="${3:-}"
-
-  if echo "$haystack" | grep -q "$needle"; then
-    echo "  ✓ PASS${message:+: $message}"
-    test_passed=$((test_passed + 1))
-  else
-    echo "  ✗ FAIL${message:+: $message}"
-    echo "    String '$haystack' does not contain '$needle'"
-    test_failed=$((test_failed + 1))
-  fi
-}
-
-test_summary() {
-  total=$((test_passed + test_failed))
-  echo ""
-  echo "========================================"
-  echo "Test Summary"
-  echo "========================================"
-  echo "Total:  $total"
-  echo "Passed: $test_passed"
-  echo "Failed: $test_failed"
-  echo ""
-
-  # Write results file for summary aggregation
-  results_dir="${TEST_RESULTS_DIR:-$(cd "$(dirname "$0")/../../../reports/results" 2>/dev/null && pwd || echo "/tmp")}"
-  mkdir -p "$results_dir" 2>/dev/null || true
-  cat > "$results_dir/react-native-lib.json" << EOF
-{
-  "suite": "react-native-lib",
-  "passed": $test_passed,
-  "failed": $test_failed,
-  "total": $total
-}
-EOF
-
-  if [ "$test_failed" -gt 0 ]; then
-    echo "RESULT: ✗ FAILED"
-    exit 1
-  else
-    echo "RESULT: ✓ ALL PASSED"
-    exit 0
-  fi
-}
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+. "$script_dir/../test-framework.sh"
+setup_logging
 
 # ============================================================================
 # Setup
 # ============================================================================
 
-script_dir="$(cd "$(dirname "$0")" && pwd)"
 lib_path="$script_dir/../../react-native/virtenv/scripts/lib/lib.sh"
 
 if [ ! -f "$lib_path" ]; then
@@ -132,7 +21,7 @@ if [ ! -f "$lib_path" ]; then
 fi
 
 # Create temporary test environment
-test_virtenv="/tmp/rn-plugin-test-$$"
+test_virtenv="$(make_temp_dir "rn-plugin")"
 mkdir -p "$test_virtenv/metro"
 export REACT_NATIVE_VIRTENV="$test_virtenv"
 
@@ -145,10 +34,6 @@ echo "React Native lib.sh Unit Tests"
 echo "========================================"
 echo "Testing: $lib_path"
 echo "Test Virtenv: $test_virtenv"
-
-# Prepare results directory
-results_base="${TEST_RESULTS_DIR:-$(cd "$script_dir/../../.." 2>/dev/null && pwd)/reports/results}"
-mkdir -p "$results_base"
 
 # ============================================================================
 # Tests: Port Allocation
@@ -303,4 +188,4 @@ assert_success "[ -L '$test_virtenv/metro/env-ios.sh' ]" "iOS env symlink should
 # Cleanup test environment
 rm -rf "$test_virtenv"
 
-test_summary
+test_summary "react-native-lib"

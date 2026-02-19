@@ -4,138 +4,10 @@
 
 set -euo pipefail
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-NC='\033[0m' # No Color
-
-# Counters
-tests_run=0
-tests_passed=0
-tests_failed=0
-
-# Test result tracking
-test_results=()
-
-# Helper functions
-log_test() {
-  echo ""
-  echo "========================================"
-  echo "TEST: $1"
-  echo "========================================"
-  tests_run=$((tests_run + 1))
-}
-
-assert_success() {
-  local cmd="$1"
-  local description="$2"
-
-  if eval "$cmd" >/dev/null 2>&1; then
-    echo -e "${GREEN}✓${NC} $description"
-    tests_passed=$((tests_passed + 1))
-    test_results+=("PASS: $description")
-    return 0
-  else
-    echo -e "${RED}✗${NC} $description"
-    echo "  Command failed: $cmd"
-    tests_failed=$((tests_failed + 1))
-    test_results+=("FAIL: $description")
-    return 1
-  fi
-}
-
-assert_failure() {
-  local cmd="$1"
-  local description="$2"
-
-  if ! eval "$cmd" >/dev/null 2>&1; then
-    echo -e "${GREEN}✓${NC} $description"
-    tests_passed=$((tests_passed + 1))
-    test_results+=("PASS: $description")
-    return 0
-  else
-    echo -e "${RED}✗${NC} $description"
-    echo "  Command should have failed: $cmd"
-    tests_failed=$((tests_failed + 1))
-    test_results+=("FAIL: $description")
-    return 1
-  fi
-}
-
-assert_output() {
-  local cmd="$1"
-  local expected="$2"
-  local description="$3"
-
-  local output
-  output=$(eval "$cmd" 2>&1 || true)
-
-  if echo "$output" | grep -q "$expected"; then
-    echo -e "${GREEN}✓${NC} $description"
-    tests_passed=$((tests_passed + 1))
-    test_results+=("PASS: $description")
-    return 0
-  else
-    echo -e "${RED}✗${NC} $description"
-    echo "  Expected to contain: $expected"
-    echo "  Got: $output"
-    tests_failed=$((tests_failed + 1))
-    test_results+=("FAIL: $description")
-    return 1
-  fi
-}
-
-assert_equals() {
-  local actual="$1"
-  local expected="$2"
-  local description="$3"
-
-  if [ "$actual" = "$expected" ]; then
-    echo -e "${GREEN}✓${NC} $description"
-    tests_passed=$((tests_passed + 1))
-    test_results+=("PASS: $description")
-    return 0
-  else
-    echo -e "${RED}✗${NC} $description"
-    echo "  Expected: $expected"
-    echo "  Got: $actual"
-    tests_failed=$((tests_failed + 1))
-    test_results+=("FAIL: $description")
-    return 1
-  fi
-}
-
-print_summary() {
-  echo ""
-  echo "========================================"
-  echo "TEST SUMMARY"
-  echo "========================================"
-  echo "Total tests: $tests_run"
-  echo -e "${GREEN}Passed: $tests_passed${NC}"
-  if [ "$tests_failed" -gt 0 ]; then
-    echo -e "${RED}Failed: $tests_failed${NC}"
-  else
-    echo "Failed: $tests_failed"
-  fi
-  echo ""
-
-  if [ "$tests_failed" -gt 0 ]; then
-    echo "Failed tests:"
-    for result in "${test_results[@]}"; do
-      if [[ "$result" == FAIL:* ]]; then
-        echo -e "  ${RED}✗${NC} ${result#FAIL: }"
-      fi
-    done
-    echo ""
-    return 1
-  fi
-
-  return 0
-}
-
-# Setup: Source the simulator script functions
+# Setup: Source the framework and simulator scripts
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$SCRIPT_DIR/../test-framework.sh"
+
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
 # Source iOS setup
@@ -194,7 +66,7 @@ assert_success "[ -n '$device_type' ]" "Matches 'iPhone 13' device type"
 # Test that generic "iPhone" without model number fails gracefully
 device_type=$(devicetype_id_for_name "iPhone" || echo "")
 if [ -z "$device_type" ]; then
-  echo -e "${YELLOW}⚠${NC} Generic 'iPhone' (as expected - needs specific model)"
+  echo "  Generic 'iPhone' not matched (as expected - needs specific model)"
   assert_success "true" "Generic device name handling works"
 else
   assert_success "[ -n '$device_type' ]" "Matches generic 'iPhone' device type"
@@ -222,7 +94,7 @@ if [ "$booted_count" -gt 0 ]; then
   assert_success "xcrun simctl list devices | grep '$booted_udid' | grep -q 'Booted'" "Detects booted simulator"
   assert_success "xcrun simctl bootstatus '$booted_udid'" "Can query boot status"
 else
-  echo -e "${YELLOW}⚠${NC} No booted simulators for state detection tests"
+  echo "  No booted simulators for state detection tests"
   assert_success "true" "Skipped - no booted simulators"
 fi
 
@@ -242,12 +114,12 @@ if [ -d "$devices_dir" ]; then
       if [ -n "$device_type" ]; then
         assert_success "[ -n '$device_type' ]" "Resolved device type for '$device_name'"
       else
-        echo -e "${YELLOW}⚠${NC} Could not resolve device type for '$device_name' (may not be available)"
+        echo "  Could not resolve device type for '$device_name' (may not be available)"
       fi
     fi
   done
 else
-  echo -e "${YELLOW}⚠${NC} No device definitions directory found"
+  echo "  No device definitions directory found"
 fi
 
 # Test 7: Simulator UDID lookup by name
@@ -263,9 +135,9 @@ if [ "$booted_count" -gt 0 ]; then
 
   # Find simulator by name
   found_udid=$(xcrun simctl list devices | grep "$device_name" | grep "Booted" | grep -oE '[0-9A-F-]{36}' | head -1 || echo "")
-  assert_equals "$found_udid" "$booted_udid" "Finds simulator UDID by device name"
+  assert_equal "$booted_udid" "$found_udid" "Finds simulator UDID by device name"
 else
-  echo -e "${YELLOW}⚠${NC} No booted simulators for lookup tests"
+  echo "  No booted simulators for lookup tests"
   assert_success "true" "Skipped - no booted simulators"
 fi
 
@@ -301,7 +173,7 @@ if [ -f "$lock_file" ]; then
     if [ -n "$device_type" ]; then
       assert_success "[ -n '$device_type' ]" "Device type resolved: $device_name"
     else
-      echo -e "${YELLOW}⚠${NC} Device type not available: $device_name"
+      echo "  Device type not available: $device_name"
     fi
 
     # Try to resolve runtime
@@ -309,11 +181,11 @@ if [ -f "$lock_file" ]; then
     if [ -n "$runtime_id" ]; then
       assert_success "[ -n '$runtime_id' ]" "Runtime resolved: iOS $device_runtime"
     else
-      echo -e "${YELLOW}⚠${NC} Runtime not available: iOS $device_runtime (may need download)"
+      echo "  Runtime not available: iOS $device_runtime (may need download)"
     fi
   done
 else
-  echo -e "${YELLOW}⚠${NC} No lock file found at: $lock_file"
+  echo "  No lock file found at: $lock_file"
   echo "Run 'devbox run ios.sh devices eval' to generate"
 fi
 
@@ -322,7 +194,7 @@ log_test "CoreSimulatorService health"
 if pgrep -q CoreSimulatorService; then
   assert_success "pgrep CoreSimulatorService" "CoreSimulatorService is running"
 else
-  echo -e "${YELLOW}⚠${NC} CoreSimulatorService not running (will start when needed)"
+  echo "  CoreSimulatorService not running (will start when needed)"
   assert_success "true" "CoreSimulatorService state noted"
 fi
 
@@ -339,5 +211,5 @@ test_sims=$(echo "$test_sims" | tr -d '\n')
 echo "Test simulators found: $test_sims"
 assert_success "[ '$test_sims' -ge 0 ]" "Can detect test simulators"
 
-# Print summary
-print_summary
+# Summary
+test_summary "ios-simulator-detection"

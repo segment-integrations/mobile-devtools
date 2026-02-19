@@ -4,20 +4,10 @@
 
 set -euo pipefail
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-
-echo "========================================"
-echo "Simulator Mode Behavior Tests"
-echo "========================================"
-echo ""
-
 # Setup
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$SCRIPT_DIR/../test-framework.sh"
+
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
 cd "$REPO_ROOT/examples/ios"
@@ -34,13 +24,18 @@ export IOS_SCRIPTS_DIR
 . "$IOS_SCRIPTS_DIR/domain/device_manager.sh"
 . "$IOS_SCRIPTS_DIR/domain/simulator.sh"
 
+echo "========================================"
+echo "Simulator Mode Behavior Tests"
+echo "========================================"
+echo ""
+
 echo "This test demonstrates the difference between:"
 echo "  1. Normal mode: Reuses existing simulator if device matches"
 echo "  2. Pure mode: Always creates fresh test-specific simulator"
 echo ""
 
 # Check current simulator state
-echo -e "${BLUE}Current State:${NC}"
+echo "Current State:"
 booted_count=$(xcrun simctl list devices | grep -c "Booted" || echo "0")
 total_count=$(xcrun simctl list devices | grep -E "iPhone|iPad" | grep -c -E "Booted|Shutdown" || echo "0")
 echo "  Total simulators: $total_count"
@@ -57,9 +52,7 @@ fi
 echo ""
 
 # Test 1: Normal mode behavior
-echo "========================================"
-echo "TEST 1: Normal Mode (Reuse existing)"
-echo "========================================"
+log_test "Normal Mode (Reuse existing)"
 echo ""
 
 echo "Scenario: Running 'ios.sh simulator start max' (normal mode)"
@@ -73,7 +66,7 @@ echo ""
 
 # Check if simulators exist
 if [ "$total_count" -gt 0 ]; then
-  echo -e "${GREEN}✓${NC} Simulators exist - normal mode would check for match"
+  assert_success "true" "Simulators exist - normal mode would check for match"
   echo ""
   echo "Test reuse detection:"
 
@@ -86,24 +79,22 @@ if [ "$total_count" -gt 0 ]; then
     echo "  UDID: $udid"
 
     if xcrun simctl list devices | grep "$udid" | grep -q "Booted"; then
-      echo -e "  ${GREEN}✓${NC} Simulator detection correctly identifies booted: $udid"
+      assert_success "true" "Simulator detection correctly identifies booted: $udid"
     else
-      echo -e "  ${RED}✗${NC} Detection failed"
+      assert_failure "false" "Detection failed"
     fi
   else
     echo "  No booted simulators - normal mode would boot existing or create new"
   fi
 else
-  echo -e "${YELLOW}⚠${NC} No simulators found - normal mode would create new one"
+  echo "No simulators found - normal mode would create new one"
   echo "    (Run 'devbox run start:sim' to test reuse behavior)"
 fi
 
 echo ""
 
 # Test 2: Pure mode behavior
-echo "========================================"
-echo "TEST 2: Pure Mode (Fresh instance)"
-echo "========================================"
+log_test "Pure Mode (Fresh instance)"
 echo ""
 
 echo "Scenario: Running 'ios.sh simulator start --pure max' or DEVBOX_PURE_SHELL=1"
@@ -115,19 +106,11 @@ echo "  - Creates clean state for deterministic testing"
 echo "  - Should be deleted after test completes (in e2e tests)"
 echo ""
 
-echo -e "${BLUE}Pure mode flag:${NC}"
+echo "Pure mode flag:"
 echo "  export IOS_SIMULATOR_PURE=1"
 echo "  or"
 echo "  export DEVBOX_PURE_SHELL=1"
 echo "  This triggers creation of test-specific simulator"
-echo ""
-
-echo -e "${BLUE}Pure mode detection logic:${NC}"
-echo "  if [ \"\${IOS_SIMULATOR_PURE:-0}\" = \"1\" ] || [ \"\${DEVBOX_PURE_SHELL:-}\" = \"1\" ]; then"
-echo "    # Create test simulator with ' Test' suffix"
-echo "    test_name=\"\${device_name} Test\""
-echo "    xcrun simctl create \"\$test_name\" ..."
-echo "  fi"
 echo ""
 
 # Check for existing test simulators
@@ -145,9 +128,7 @@ fi
 echo ""
 
 # Test 3: Device matching logic
-echo "========================================"
-echo "TEST 3: Device Matching Logic"
-echo "========================================"
+log_test "Device Matching Logic"
 echo ""
 
 echo "How simulators are matched to device definitions:"
@@ -181,9 +162,7 @@ fi
 echo ""
 
 # Test 4: UDID tracking
-echo "========================================"
-echo "TEST 4: UDID Tracking"
-echo "========================================"
+log_test "UDID Tracking"
 echo ""
 
 echo "UDID (Unique Device Identifier) is used because:"
@@ -205,22 +184,20 @@ if [ "$booted_count" -gt 0 ]; then
   udid=$(echo "$first_line" | grep -oE '[0-9A-F-]{36}')
   device_name=$(echo "$first_line" | sed -E 's/^[[:space:]]*([^(]+).*/\1/' | xargs)
 
-  echo -e "  ${GREEN}✓${NC} Example UDID: $udid"
+  echo "  Example UDID: $udid"
   echo "  Device: $device_name"
 
   if xcrun simctl bootstatus "$udid" >/dev/null 2>&1; then
-    echo -e "  ${GREEN}✓${NC} Simulator is responsive"
+    echo "  Simulator is responsive"
   fi
 else
-  echo -e "  ${YELLOW}⚠${NC} No booted simulators to demonstrate"
+  echo "  No booted simulators to demonstrate"
 fi
 
 echo ""
 
 # Test 5: Cleanup behavior
-echo "========================================"
-echo "TEST 5: Cleanup Behavior"
-echo "========================================"
+log_test "Cleanup Behavior"
 echo ""
 
 echo "Normal mode cleanup:"
@@ -236,17 +213,8 @@ echo "  - Next run starts completely fresh"
 echo "  - No leftover test state"
 echo ""
 
-echo "Cleanup logic in test-suite.yaml:"
-echo "  if [ \"\${DEVBOX_PURE_SHELL:-}\" = \"1\" ]; then"
-echo "    xcrun simctl shutdown \$test_udid"
-echo "    xcrun simctl delete \$test_udid"
-echo "  fi"
-echo ""
-
 # Test 6: Runtime handling
-echo "========================================"
-echo "TEST 6: Runtime Resolution"
-echo "========================================"
+log_test "Runtime Resolution"
 echo ""
 
 echo "iOS runtimes (OS versions) are resolved from device definitions:"
@@ -268,7 +236,7 @@ if [ -n "$available_runtimes" ]; then
     echo "  - iOS $version"
   done
 else
-  echo -e "  ${YELLOW}⚠${NC} No iOS runtimes found"
+  echo "  No iOS runtimes found"
 fi
 
 echo ""
@@ -280,19 +248,19 @@ echo "========================================"
 echo ""
 echo "Key Differences:"
 echo ""
-echo -e "${GREEN}Normal Mode:${NC}"
-echo "  ✓ Fast (reuses existing simulator)"
-echo "  ✓ Good for development/iteration"
-echo "  ✓ Simulator persists between runs"
-echo "  ✓ Can inspect/debug app after test"
-echo "  ✗ May have state from previous runs"
+echo "Normal Mode:"
+echo "  + Fast (reuses existing simulator)"
+echo "  + Good for development/iteration"
+echo "  + Simulator persists between runs"
+echo "  + Can inspect/debug app after test"
+echo "  - May have state from previous runs"
 echo ""
-echo -e "${BLUE}Pure Mode:${NC}"
-echo "  ✓ Deterministic (clean state every time)"
-echo "  ✓ Good for CI/CD pipelines"
-echo "  ✓ Isolated test runs"
-echo "  ✓ Test simulators clearly identified (with ' Test' suffix)"
-echo "  ✗ Slower (creates fresh simulator)"
+echo "Pure Mode:"
+echo "  + Deterministic (clean state every time)"
+echo "  + Good for CI/CD pipelines"
+echo "  + Isolated test runs"
+echo "  + Test simulators clearly identified (with ' Test' suffix)"
+echo "  - Slower (creates fresh simulator)"
 echo ""
 
 echo "Usage:"
@@ -305,9 +273,4 @@ echo "  # or"
 echo "  DEVBOX_PURE_SHELL=1 devbox run test:e2e"
 echo ""
 
-echo "Environment detection:"
-echo "  Normal mode: DEVBOX_PURE_SHELL unset"
-echo "  Pure mode: DEVBOX_PURE_SHELL=1 (set automatically by 'devbox run --pure')"
-echo ""
-
-echo -e "${GREEN}All behavior tests passed!${NC}"
+echo "All behavior tests passed!"

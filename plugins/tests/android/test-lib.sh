@@ -5,110 +5,14 @@
 
 set -euo pipefail
 
-# Setup logging - redirect all output to log file
-SCRIPT_DIR_NAME="$(basename "$(dirname "$0")")"
-SCRIPT_NAME="$(basename "$0" .sh)"
-mkdir -p "${TEST_LOGS_DIR:-reports/logs}"
-LOG_FILE="${TEST_LOGS_DIR:-reports/logs}/${SCRIPT_DIR_NAME}-${SCRIPT_NAME}.txt"
-exec > >(tee "$LOG_FILE")
-exec 2>&1
-
-# ============================================================================
-# Test Framework
-# ============================================================================
-
-test_passed=0
-test_failed=0
-test_name=""
-
-start_test() {
-  test_name="$1"
-  echo ""
-  echo "TEST: $test_name"
-}
-
-assert_equal() {
-  expected="$1"
-  actual="$2"
-  message="${3:-}"
-
-  if [ "$expected" = "$actual" ]; then
-    echo "  ✓ PASS${message:+: $message}"
-    test_passed=$((test_passed + 1))
-  else
-    echo "  ✗ FAIL${message:+: $message}"
-    echo "    Expected: '$expected'"
-    echo "    Actual:   '$actual'"
-    test_failed=$((test_failed + 1))
-  fi
-}
-
-assert_success() {
-  command_str="$1"
-  message="${2:-}"
-
-  if eval "$command_str" >/dev/null 2>&1; then
-    echo "  ✓ PASS${message:+: $message}"
-    test_passed=$((test_passed + 1))
-  else
-    echo "  ✗ FAIL${message:+: $message}"
-    echo "    Command failed: $command_str"
-    test_failed=$((test_failed + 1))
-  fi
-}
-
-assert_failure() {
-  command_str="$1"
-  message="${2:-}"
-
-  # Run in subshell to prevent exit from killing test script
-  if ! (eval "$command_str") >/dev/null 2>&1; then
-    echo "  ✓ PASS${message:+: $message}"
-    test_passed=$((test_passed + 1))
-  else
-    echo "  ✗ FAIL${message:+: $message}"
-    echo "    Command should have failed: $command_str"
-    test_failed=$((test_failed + 1))
-  fi
-}
-
-test_summary() {
-  total=$((test_passed + test_failed))
-  echo ""
-  echo "========================================"
-  echo "Test Summary"
-  echo "========================================"
-  echo "Total:  $total"
-  echo "Passed: $test_passed"
-  echo "Failed: $test_failed"
-  echo ""
-
-  # Write results file for summary aggregation
-  results_dir="${TEST_RESULTS_DIR:-$(cd "$(dirname "$0")/../../../reports/results" 2>/dev/null && pwd || echo "/tmp")}"
-  mkdir -p "$results_dir" 2>/dev/null || true
-  cat > "$results_dir/android-lib.json" << EOF
-{
-  "suite": "android-lib",
-  "passed": $test_passed,
-  "failed": $test_failed,
-  "total": $total
-}
-EOF
-
-  if [ "$test_failed" -gt 0 ]; then
-    echo "RESULT: ✗ FAILED"
-    exit 1
-  else
-    echo "RESULT: ✓ ALL PASSED"
-    exit 0
-  fi
-}
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+. "$script_dir/../test-framework.sh"
+setup_logging
 
 # ============================================================================
 # Setup
 # ============================================================================
 
-script_dir="$(cd "$(dirname "$0")" && pwd)"
 lib_path="$script_dir/../../android/virtenv/scripts/lib/lib.sh"
 
 if [ ! -f "$lib_path" ]; then
@@ -124,10 +28,6 @@ echo "========================================"
 echo "Android lib.sh Unit Tests"
 echo "========================================"
 echo "Testing: $lib_path"
-
-# Prepare results directory
-results_base="${TEST_RESULTS_DIR:-$(cd "$script_dir/../../.." 2>/dev/null && pwd)/reports/results}"
-mkdir -p "$results_base"
 
 # ============================================================================
 # Tests: String Normalization
@@ -164,28 +64,26 @@ assert_failure "android_sanitize_avd_name ''" "Should fail on empty string"
 # Tests: Checksum Functions
 # ============================================================================
 
-# Create temporary test directory with device files
-test_dir="/tmp/android-plugin-test-$$"
-mkdir -p "$test_dir"
-echo '{"name":"test1","api":28}' > "$test_dir/test1.json"
-echo '{"name":"test2","api":34}' > "$test_dir/test2.json"
+# Read-only checksum tests use example project fixtures
+example_devices="$(fixture_android_devices_dir)"
 
 start_test "android_compute_devices_checksum - generates checksum"
-result="$(android_compute_devices_checksum "$test_dir")"
+result="$(android_compute_devices_checksum "$example_devices")"
 assert_success "[ -n '$result' ]" "Should return non-empty checksum"
 
 start_test "android_compute_devices_checksum - stable checksum"
-checksum1="$(android_compute_devices_checksum "$test_dir")"
-checksum2="$(android_compute_devices_checksum "$test_dir")"
+checksum1="$(android_compute_devices_checksum "$example_devices")"
+checksum2="$(android_compute_devices_checksum "$example_devices")"
 assert_equal "$checksum1" "$checksum2" "Should return same checksum for same files"
 
+# Write test needs a temp dir
 start_test "android_compute_devices_checksum - different content = different checksum"
+test_dir="$(make_temp_dir "android-checksum")"
+echo '{"name":"test1","api":28}' > "$test_dir/test1.json"
 checksum_before="$(android_compute_devices_checksum "$test_dir")"
-echo '{"name":"test3","api":36}' > "$test_dir/test3.json"
+echo '{"name":"test2","api":36}' > "$test_dir/test2.json"
 checksum_after="$(android_compute_devices_checksum "$test_dir")"
 assert_success "[ '$checksum_before' != '$checksum_after' ]" "Should change when files change"
-
-# Cleanup
 rm -rf "$test_dir"
 
 start_test "android_compute_devices_checksum - fails on non-existent dir"
@@ -195,14 +93,13 @@ assert_failure "android_compute_devices_checksum '/nonexistent/path'" "Should fa
 # Tests: Path Resolution
 # ============================================================================
 
-# Create test environment for path resolution
-path_test_root="/tmp/android-path-test-$$"
-mkdir -p "$path_test_root/devbox.d/android/devices"
-echo '{"name":"test","api":30}' > "$path_test_root/devbox.d/android/devices/test.json"
+# Use example android project for path resolution
+example_android_dir="$REPO_ROOT/examples/android"
 
 # Save original and set test root
 SAVED_PROJECT_ROOT="${DEVBOX_PROJECT_ROOT:-}"
-export DEVBOX_PROJECT_ROOT="$path_test_root"
+unset ANDROID_CONFIG_DIR
+export DEVBOX_PROJECT_ROOT="$example_android_dir"
 
 start_test "android_resolve_project_path - finds existing file"
 result="$(android_resolve_project_path "devices" 2>/dev/null || true)"
@@ -214,7 +111,7 @@ fi
 
 start_test "android_resolve_project_path - finds directory"
 result="$(android_resolve_project_path "devices" 2>/dev/null || true)"
-expected="${path_test_root}/devbox.d/android/devices"
+expected="${example_android_dir}/devbox.d/android/devices"
 assert_equal "$expected" "$result" "Should resolve devices directory"
 
 start_test "android_resolve_project_path - fails on missing path"
@@ -222,11 +119,10 @@ assert_failure "android_resolve_project_path 'nonexistent.json'" "Should fail wh
 
 start_test "android_resolve_config_dir - finds config directory"
 result="$(android_resolve_config_dir 2>/dev/null || true)"
-expected="${path_test_root}/devbox.d/android"
+expected="${example_android_dir}/devbox.d/android"
 assert_equal "$expected" "$result" "Should find android config directory"
 
-# Cleanup path test directory and restore
-rm -rf "$path_test_root"
+# Restore
 if [ -n "$SAVED_PROJECT_ROOT" ]; then
   export DEVBOX_PROJECT_ROOT="$SAVED_PROJECT_ROOT"
 else
@@ -247,7 +143,7 @@ start_test "android_require_tool - fails for missing tool"
 assert_failure "android_require_tool 'nonexistent_tool_xyz'" "Should fail for missing tool"
 
 # Create test directory for dir_contains test
-test_sdk="/tmp/android-sdk-test-$$"
+test_sdk="$(make_temp_dir "android-sdk")"
 mkdir -p "$test_sdk/platform-tools"
 
 start_test "android_require_dir_contains - succeeds when path exists"
@@ -263,4 +159,4 @@ rm -rf "$test_sdk"
 # Test Summary
 # ============================================================================
 
-test_summary
+test_summary "android-lib"

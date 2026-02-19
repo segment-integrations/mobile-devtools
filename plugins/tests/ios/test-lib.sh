@@ -1,167 +1,97 @@
 #!/usr/bin/env bash
+# iOS Plugin - lib.sh Unit Tests
+
 set -euo pipefail
 
-# Setup logging - redirect all output to log file
-SCRIPT_DIR_NAME="$(basename "$(dirname "$0")")"
-SCRIPT_NAME="$(basename "$0" .sh)"
-mkdir -p "${TEST_LOGS_DIR:-reports/logs}"
-LOG_FILE="${TEST_LOGS_DIR:-reports/logs}/${SCRIPT_DIR_NAME}-${SCRIPT_NAME}.txt"
-exec > >(tee "$LOG_FILE")
-exec 2>&1
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+. "$script_dir/../test-framework.sh"
+setup_logging
 
-echo "Testing iOS lib.sh..."
-
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-IOS_SCRIPTS_DIR="${SCRIPT_DIR}/../../ios/virtenv/scripts"
+IOS_SCRIPTS_DIR="${script_dir}/../../ios/virtenv/scripts"
 export IOS_SCRIPTS_DIR
 
 # Source lib.sh (new location in lib/)
 . "${IOS_SCRIPTS_DIR}/lib/lib.sh"
 
-# Test 1: Load-once guard
-echo "  Test 1: Load-once guard"
+echo "========================================"
+echo "iOS lib.sh Unit Tests"
+echo "========================================"
+echo "Testing: ${IOS_SCRIPTS_DIR}/lib/lib.sh"
+
+# ============================================================================
+# Tests: Load Guards
+# ============================================================================
+
+start_test "Load-once guard"
 . "${IOS_SCRIPTS_DIR}/lib/lib.sh"
-if [ "${IOS_LIB_LOADED}" != "1" ]; then
-  echo "    FAIL: Load-once guard failed"
-  exit 1
-fi
-echo "    PASS"
+assert_equal "1" "${IOS_LIB_LOADED}" "Load-once guard should keep IOS_LIB_LOADED=1"
 
-# Test 2: Execution protection
-echo "  Test 2: Execution protection"
-if sh "${IOS_SCRIPTS_DIR}/lib/lib.sh" 2>/dev/null; then
-  echo "    FAIL: Execution protection failed"
-  exit 1
-fi
-echo "    PASS"
+start_test "Execution protection"
+assert_failure "sh '${IOS_SCRIPTS_DIR}/lib/lib.sh'" "Should fail when executed directly"
 
-# Test 3: ios_sanitize_device_name
-echo "  Test 3: ios_sanitize_device_name"
+# ============================================================================
+# Tests: String Normalization
+# ============================================================================
+
+start_test "ios_sanitize_device_name - preserves valid name"
 result="$(ios_sanitize_device_name "iPhone 15 Pro" || true)"
-if [ "$result" != "iPhone 15 Pro" ]; then
-  echo "    FAIL: Expected 'iPhone 15 Pro', got '$result'"
-  exit 1
-fi
+assert_equal "iPhone 15 Pro" "$result" "Should preserve valid device name"
+
+start_test "ios_sanitize_device_name - removes invalid chars"
 result="$(ios_sanitize_device_name "Test Device!@#" || true)"
-if [ "$result" != "Test Device" ]; then
-  echo "    FAIL: Expected 'Test Device', got '$result'"
-  exit 1
-fi
-echo "    PASS"
+assert_equal "Test Device" "$result" "Should remove invalid characters"
 
-# Create temporary test directory structure
-test_root="/tmp/ios-plugin-test-$$"
-mkdir -p "$test_root/devbox.d/ios/devices"
+# ============================================================================
+# Tests: Config Path Resolution (using example project fixtures)
+# ============================================================================
 
-# Create test device files
-cat > "$test_root/devbox.d/ios/devices/test1.json" <<'EOF'
-{
-  "name": "iPhone 15 Pro",
-  "runtime": "17.5"
-}
-EOF
+example_ios_dir="$REPO_ROOT/examples/ios"
 
-cat > "$test_root/devbox.d/ios/devices/test2.json" <<'EOF'
-{
-  "name": "iPhone 16",
-  "runtime": "18.0"
-}
-EOF
-
-# Test 4: ios_config_path
-echo "  Test 4: ios_config_path"
+start_test "ios_config_path"
 unset IOS_CONFIG_DIR
-DEVBOX_PROJECT_ROOT="$test_root"
+DEVBOX_PROJECT_ROOT="$example_ios_dir"
 export DEVBOX_PROJECT_ROOT
 config_path="$(ios_config_path 2>/dev/null || true)"
-if [ -z "$config_path" ]; then
-  echo "    FAIL: ios_config_path returned empty"
-  rm -rf "$test_root"
-  exit 1
-fi
-expected="$test_root/devbox.d/ios"
-if [ "$config_path" != "$expected" ]; then
-  echo "    FAIL: Expected '$expected', got '$config_path'"
-  rm -rf "$test_root"
-  exit 1
-fi
-echo "    PASS"
+expected="$example_ios_dir/devbox.d/ios"
+assert_equal "$expected" "$config_path" "Should resolve to example ios config dir"
 
-# Test 5: ios_devices_dir
-echo "  Test 5: ios_devices_dir"
+start_test "ios_devices_dir"
 unset IOS_DEVICES_DIR
 devices_dir="$(ios_devices_dir 2>/dev/null || true)"
-if [ -z "$devices_dir" ]; then
-  echo "    FAIL: ios_devices_dir returned empty"
-  rm -rf "$test_root"
-  exit 1
-fi
-expected="$test_root/devbox.d/ios/devices"
-if [ "$devices_dir" != "$expected" ]; then
-  echo "    FAIL: Expected '$expected', got '$devices_dir'"
-  rm -rf "$test_root"
-  exit 1
-fi
-if [ ! -d "$devices_dir" ]; then
-  echo "    FAIL: devices_dir doesn't exist: $devices_dir"
-  rm -rf "$test_root"
-  exit 1
-fi
-echo "    PASS"
+expected="$example_ios_dir/devbox.d/ios/devices"
+assert_equal "$expected" "$devices_dir" "Should resolve to example ios devices dir"
+assert_success "[ -d '$devices_dir' ]" "Devices dir should exist"
 
-# Test 6: ios_compute_devices_checksum
-echo "  Test 6: ios_compute_devices_checksum"
+# ============================================================================
+# Tests: Checksum (using example project fixtures)
+# ============================================================================
+
+start_test "ios_compute_devices_checksum - computes checksum"
 checksum1="$(ios_compute_devices_checksum "$devices_dir" || true)"
-if [ -z "$checksum1" ]; then
-  echo "    FAIL: Checksum computation failed"
-  rm -rf "$test_root"
-  exit 1
-fi
-if [ "${#checksum1}" -ne 64 ]; then
-  echo "    FAIL: Checksum length is not 64 characters: ${#checksum1}"
-  rm -rf "$test_root"
-  exit 1
-fi
-# Test checksum stability
+assert_not_empty "$checksum1" "Should compute checksum"
+assert_equal "64" "${#checksum1}" "Checksum should be 64 characters"
+
+start_test "ios_compute_devices_checksum - stable checksum"
 checksum2="$(ios_compute_devices_checksum "$devices_dir" || true)"
-if [ "$checksum1" != "$checksum2" ]; then
-  echo "    FAIL: Checksum not stable - got different results"
-  rm -rf "$test_root"
-  exit 1
-fi
-echo "    PASS"
+assert_equal "$checksum1" "$checksum2" "Checksum should be stable across calls"
 
-# Cleanup test directory
-rm -rf "$test_root"
+# ============================================================================
+# Tests: Requirement Functions
+# ============================================================================
 
-# Test 7: ios_require_jq
-echo "  Test 7: ios_require_jq"
+start_test "ios_require_jq"
 if command -v jq >/dev/null 2>&1; then
-  ios_require_jq
-  echo "    PASS"
+  assert_success "ios_require_jq" "Should succeed when jq is available"
 else
-  echo "    SKIP: jq not available"
+  echo "  SKIP: jq not available"
 fi
 
-# Test 8: ios_require_tool
-echo "  Test 8: ios_require_tool"
-ios_require_tool "sh" "sh is required" || { echo "    FAIL"; exit 1; }
-if (ios_require_tool "nonexistent_tool_xyz" 2>/dev/null); then
-  echo "    FAIL: Should have failed for nonexistent tool"
-  exit 1
-fi
-echo "    PASS"
+start_test "ios_require_tool"
+assert_success "ios_require_tool 'sh' 'sh is required'" "Should succeed for sh"
+assert_failure "ios_require_tool 'nonexistent_tool_xyz'" "Should fail for missing tool"
 
-# Write results file for summary aggregation
-results_dir="${TEST_RESULTS_DIR:-$(cd "$(dirname "$0")/../../../reports/results" 2>/dev/null && pwd || echo "/tmp")}"
-mkdir -p "$results_dir" 2>/dev/null || true
-cat > "$results_dir/ios-lib.json" << EOF
-{
-  "suite": "ios-lib",
-  "passed": 8,
-  "failed": 0,
-  "total": 8
-}
-EOF
+# ============================================================================
+# Test Summary
+# ============================================================================
 
-echo "All lib.sh tests passed!"
+test_summary "ios-lib"
