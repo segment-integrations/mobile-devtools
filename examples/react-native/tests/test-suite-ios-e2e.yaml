@@ -50,12 +50,13 @@ processes:
   # Phase 4: Start simulator
   ios-simulator:
     command: |
-      ios.sh simulator start ${IOS_DEVICE}
-
-      # In pure mode, keep process alive so cleanup can shut down test simulator
       if [ "${IN_NIX_SHELL:-}" = "pure" ] || [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
-        tail -f /dev/null
+        ios.sh simulator start --pure ${IOS_DEVICE}
+      else
+        ios.sh simulator start ${IOS_DEVICE}
       fi
+      # Keep process alive for readiness probe (process-compose services pattern)
+      tail -f /dev/null
     depends_on:
       sync-simulators:
         condition: process_completed_successfully

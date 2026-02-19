@@ -13,7 +13,12 @@ set -eu
 # ============================================================================
 # Initialize Android Environment
 # ============================================================================
-# SDK setup happens in init hook via setup.sh
+# Auto-setup SDK if not already done (e.g., when called from process-compose)
+if [ -z "${ANDROID_SDK_ROOT:-}" ] && [ -n "${ANDROID_SCRIPTS_DIR:-}" ]; then
+  if [ -f "${ANDROID_SCRIPTS_DIR}/init/setup.sh" ]; then
+    . "${ANDROID_SCRIPTS_DIR}/init/setup.sh"
+  fi
+fi
 
 # ============================================================================
 # Usage and Help

@@ -75,15 +75,14 @@ processes:
 
       if [ "${IN_NIX_SHELL:-}" = "pure" ] || [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
         echo "Starting fresh Android emulator (pure mode): $device"
-        android.sh emulator start "$device"
+        android.sh emulator start --pure "$device"
       else
         echo "Starting Android emulator: $device"
         unset ANDROID_EMULATOR_FOREGROUND
         android.sh emulator start "$device"
-
-        echo "Emulator will remain running after tests complete"
-        exit 0
       fi
+      # Keep process alive for readiness probe (process-compose services pattern)
+      tail -f /dev/null
     availability:
       restart: "no"
     readiness_probe:
@@ -98,12 +97,13 @@ processes:
   # Phase 4b: Start iOS simulator (parallel with Android)
   ios-simulator:
     command: |
-      ios.sh simulator start ${IOS_DEVICE}
-
-      # In pure mode, keep process alive so cleanup can shut down test simulator
       if [ "${IN_NIX_SHELL:-}" = "pure" ] || [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
-        tail -f /dev/null
+        ios.sh simulator start --pure ${IOS_DEVICE}
+      else
+        ios.sh simulator start ${IOS_DEVICE}
       fi
+      # Keep process alive for readiness probe (process-compose services pattern)
+      tail -f /dev/null
     depends_on:
       sync-simulators:
         condition: process_completed_successfully

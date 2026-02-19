@@ -51,7 +51,8 @@ processes:
       echo "Starting iOS simulator (${IOS_DEVICE})..."
       ios.sh simulator start ${IOS_DEVICE}
       echo "Simulator ready for development"
-      echo "Simulator will remain running for hot reload"
+      # Keep process alive for readiness probe (process-compose services pattern)
+      tail -f /dev/null
     depends_on:
       sync-simulators:
         condition: process_completed_successfully

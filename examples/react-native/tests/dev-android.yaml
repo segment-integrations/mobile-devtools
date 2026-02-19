@@ -49,8 +49,8 @@ processes:
       device="${ANDROID_DEFAULT_DEVICE:-max}"
       echo "Starting emulator: $device"
       android.sh emulator start "$device"
-
-      echo "Emulator will remain running for hot reload"
+      # Keep process alive for readiness probe (process-compose services pattern)
+      tail -f /dev/null
     availability:
       restart: "no"
     readiness_probe:

@@ -50,15 +50,14 @@ processes:
 
       if [ "${IN_NIX_SHELL:-}" = "pure" ] || [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
         echo "Starting fresh Android emulator (pure mode): $device"
-        android.sh emulator start "$device"
+        android.sh emulator start --pure "$device"
       else
         echo "Starting Android emulator: $device"
         unset ANDROID_EMULATOR_FOREGROUND
         android.sh emulator start "$device"
-
-        echo "Emulator will remain running after tests complete"
-        exit 0
       fi
+      # Keep process alive for readiness probe (process-compose services pattern)
+      tail -f /dev/null
     availability:
       restart: "no"
     readiness_probe:
