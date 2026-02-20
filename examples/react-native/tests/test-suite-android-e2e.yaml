@@ -35,8 +35,8 @@ processes:
     availability:
       restart: "no"
 
-  # Phase 4: Start emulator
-  android-emulator:
+  # Phase 4a: Launch emulator if not running
+  launch-emulator:
     depends_on:
       sync-avds:
         condition: process_completed_successfully
@@ -44,9 +44,15 @@ processes:
       - "ANDROID_EMULATOR_FOREGROUND=1"
     command: |
       set -e
-      echo "[ANDROID-EMULATOR] Starting emulator..."
       device="${ANDROID_DEFAULT_DEVICE:-max}"
 
+      # Check if emulator already running
+      if android.sh emulator ready 2>/dev/null; then
+        echo "Emulator already running, skipping launch"
+        exit 0
+      fi
+
+      echo "[ANDROID-EMULATOR] Starting emulator..."
       if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
         # Pure mode: foreground, process-compose manages lifecycle
         echo "Starting fresh Android emulator (pure mode): $device"
@@ -68,6 +74,27 @@ processes:
       timeout_seconds: 10
       success_threshold: 1
       failure_threshold: 24
+
+  # Phase 4b: Verify emulator ready
+  verify-emulator-ready:
+    command: |
+      echo "Verifying emulator is ready..."
+      max_wait=120
+      elapsed=0
+      while ! android.sh emulator ready 2>/dev/null; do
+        sleep 3
+        elapsed=$((elapsed + 3))
+        if [ $elapsed -ge $max_wait ]; then
+          echo "ERROR: Emulator not ready within ${max_wait}s" >&2
+          exit 1
+        fi
+      done
+      echo "✓ Emulator ready"
+    depends_on:
+      launch-emulator:
+        condition: process_completed
+    availability:
+      restart: "no"
 
   # Phase 5: Start Metro bundler
   metro-bundler:
@@ -113,8 +140,8 @@ processes:
     depends_on:
       build-android:
         condition: process_completed_successfully
-      android-emulator:
-        condition: process_healthy
+      verify-emulator-ready:
+        condition: process_completed_successfully
       metro-bundler:
         condition: process_healthy
     availability:

@@ -39,10 +39,18 @@ processes:
     availability:
       restart: "no"
 
-  # Phase 4: Start simulator
-  ios-simulator:
+  # Phase 4a: Launch simulator if not running
+  launch-simulator:
     command: |
       set -e
+
+      # Check if simulator already running
+      if ios.sh simulator ready 2>/dev/null; then
+        echo "Simulator already running, skipping launch"
+        exit 0
+      fi
+
+      echo "Starting iOS simulator..."
       if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
         # Pure mode: foreground, process-compose manages lifecycle
         ios.sh simulator start --pure ${IOS_DEVICE}
@@ -64,6 +72,27 @@ processes:
       timeout_seconds: 10
       success_threshold: 1
       failure_threshold: 12
+
+  # Phase 4b: Verify simulator ready
+  verify-simulator-ready:
+    command: |
+      echo "Verifying simulator is ready..."
+      max_wait=60
+      elapsed=0
+      while ! ios.sh simulator ready 2>/dev/null; do
+        sleep 2
+        elapsed=$((elapsed + 2))
+        if [ $elapsed -ge $max_wait ]; then
+          echo "ERROR: Simulator not ready within ${max_wait}s" >&2
+          exit 1
+        fi
+      done
+      echo "✓ Simulator ready"
+    depends_on:
+      launch-simulator:
+        condition: process_completed
+    availability:
+      restart: "no"
 
   # Phase 5: Start Metro bundler
   metro-bundler:
@@ -114,8 +143,8 @@ processes:
     depends_on:
       build-ios:
         condition: process_completed_successfully
-      ios-simulator:
-        condition: process_healthy
+      verify-simulator-ready:
+        condition: process_completed_successfully
       metro-bundler:
         condition: process_healthy
     availability:

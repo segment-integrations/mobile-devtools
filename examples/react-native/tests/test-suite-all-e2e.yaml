@@ -56,8 +56,8 @@ processes:
     availability:
       restart: "no"
 
-  # Phase 4a: Start Android emulator
-  android-emulator:
+  # Phase 4a: Launch Android emulator if not running
+  launch-emulator:
     depends_on:
       sync-avds:
         condition: process_completed_successfully
@@ -65,9 +65,15 @@ processes:
       - "ANDROID_EMULATOR_FOREGROUND=1"
     command: |
       set -e
-      echo "[ANDROID-EMULATOR] Starting emulator..."
       device="${ANDROID_DEFAULT_DEVICE:-max}"
 
+      # Check if emulator already running
+      if android.sh emulator ready 2>/dev/null; then
+        echo "Emulator already running, skipping launch"
+        exit 0
+      fi
+
+      echo "[ANDROID-EMULATOR] Starting emulator..."
       if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
         # Pure mode: foreground
         echo "Starting fresh Android emulator (pure mode): $device"
@@ -90,10 +96,39 @@ processes:
       success_threshold: 1
       failure_threshold: 24
 
-  # Phase 4b: Start iOS simulator (parallel with Android)
-  ios-simulator:
+  # Phase 4b: Verify Android emulator ready
+  verify-emulator-ready:
+    command: |
+      echo "Verifying emulator is ready..."
+      max_wait=120
+      elapsed=0
+      while ! android.sh emulator ready 2>/dev/null; do
+        sleep 3
+        elapsed=$((elapsed + 3))
+        if [ $elapsed -ge $max_wait ]; then
+          echo "ERROR: Emulator not ready within ${max_wait}s" >&2
+          exit 1
+        fi
+      done
+      echo "✓ Emulator ready"
+    depends_on:
+      launch-emulator:
+        condition: process_completed
+    availability:
+      restart: "no"
+
+  # Phase 4c: Launch iOS simulator if not running
+  launch-simulator:
     command: |
       set -e
+
+      # Check if simulator already running
+      if ios.sh simulator ready 2>/dev/null; then
+        echo "Simulator already running, skipping launch"
+        exit 0
+      fi
+
+      echo "Starting iOS simulator..."
       if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
         # Pure mode: foreground
         ios.sh simulator start --pure ${IOS_DEVICE}
@@ -115,6 +150,27 @@ processes:
       timeout_seconds: 10
       success_threshold: 1
       failure_threshold: 12
+
+  # Phase 4d: Verify iOS simulator ready
+  verify-simulator-ready:
+    command: |
+      echo "Verifying simulator is ready..."
+      max_wait=60
+      elapsed=0
+      while ! ios.sh simulator ready 2>/dev/null; do
+        sleep 2
+        elapsed=$((elapsed + 2))
+        if [ $elapsed -ge $max_wait ]; then
+          echo "ERROR: Simulator not ready within ${max_wait}s" >&2
+          exit 1
+        fi
+      done
+      echo "✓ Simulator ready"
+    depends_on:
+      launch-simulator:
+        condition: process_completed
+    availability:
+      restart: "no"
 
   # Phase 5: Start Metro bundler (shared by both platforms)
   metro-bundler:
@@ -183,8 +239,8 @@ processes:
     depends_on:
       build-android:
         condition: process_completed_successfully
-      android-emulator:
-        condition: process_healthy
+      verify-emulator-ready:
+        condition: process_completed_successfully
       metro-bundler:
         condition: process_healthy
     availability:
@@ -199,8 +255,8 @@ processes:
     depends_on:
       build-ios:
         condition: process_completed_successfully
-      ios-simulator:
-        condition: process_healthy
+      verify-simulator-ready:
+        condition: process_completed_successfully
       metro-bundler:
         condition: process_healthy
     availability:
