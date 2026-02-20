@@ -480,3 +480,35 @@ android_stop_emulator() {
     echo "✓ Emulators stopped"
   fi
 }
+
+# Check if the emulator is ready (boot completed)
+# Returns 0 if emulator is booted, 1 otherwise
+# Used by android.sh emulator start --wait-ready
+android_emulator_ready() {
+  # Resolve serial from state directory (suite-namespaced)
+  _suite="${SUITE_NAME:-default}"
+  _runtime_dir="${ANDROID_RUNTIME_DIR:-${ANDROID_USER_HOME:-}}"
+  if [ -z "$_runtime_dir" ]; then
+    _runtime_dir="${PWD}/.devbox/virtenv"
+  fi
+  _state_dir="$_runtime_dir/$_suite"
+
+  _serial=""
+  if [ -f "$_state_dir/emulator-serial.txt" ]; then
+    _serial="$(cat "$_state_dir/emulator-serial.txt")"
+  fi
+
+  # Fallback to legacy location
+  if [ -z "$_serial" ] && [ -n "$_runtime_dir" ] && [ -f "$_runtime_dir/emulator-serial.txt" ]; then
+    _serial="$(cat "$_runtime_dir/emulator-serial.txt")"
+  fi
+
+  if [ -z "$_serial" ]; then
+    return 1
+  fi
+
+  if adb -s "$_serial" shell getprop sys.boot_completed 2>/dev/null | grep -q "1"; then
+    return 0
+  fi
+  return 1
+}
