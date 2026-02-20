@@ -35,7 +35,7 @@ jobs:
       matrix:
         device: [min, max]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Enable KVM
         run: |
@@ -92,7 +92,7 @@ jobs:
           - device: max
             os: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup CocoaPods cache
         uses: actions/cache@v4
@@ -166,7 +166,7 @@ jobs:
             device: none
             os: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Node.js with cache
         uses: actions/setup-node@v4
