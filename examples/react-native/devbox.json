@@ -101,6 +101,9 @@
       ],
       "test:e2e:web": [
         "process-compose -f tests/test-suite-web-e2e.yaml --no-server --tui=${TEST_TUI:-false}"
+      ],
+      "test:e2e:all": [
+        "process-compose -f tests/test-suite-all-e2e.yaml --no-server --tui=${TEST_TUI:-false}"
       ]
     }
   }
