@@ -175,6 +175,10 @@ devbox_omit_nix_env() {
 
   # Darwin cleanup — runs unconditionally (even if devbox binary not found)
   if [ "$(uname -s)" = "Darwin" ]; then
+    # Unset standard build variables that Xcode tools read
+    # (shellenv --omit-nix-env handles the Nix-specific ones like NIX_LDFLAGS)
+    unset LD LDFLAGS CFLAGS
+
     if [ -x /usr/bin/clang ]; then
       CC=/usr/bin/clang
       CXX=/usr/bin/clang++
