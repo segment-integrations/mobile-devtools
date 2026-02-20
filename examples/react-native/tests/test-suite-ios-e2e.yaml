@@ -76,6 +76,9 @@ processes:
   # Phase 4b: Verify simulator ready
   verify-simulator-ready:
     command: |
+      # Wait a moment for launch to start
+      sleep 3
+
       echo "Verifying simulator is ready..."
       max_wait=60
       elapsed=0
@@ -89,8 +92,8 @@ processes:
       done
       echo "✓ Simulator ready"
     depends_on:
-      launch-simulator:
-        condition: process_completed
+      sync-simulators:
+        condition: process_completed_successfully
     availability:
       restart: "no"
 

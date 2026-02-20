@@ -99,6 +99,9 @@ processes:
   # Phase 4b: Verify Android emulator ready
   verify-emulator-ready:
     command: |
+      # Wait a moment for launch to start
+      sleep 5
+
       echo "Verifying emulator is ready..."
       max_wait=120
       elapsed=0
@@ -112,8 +115,8 @@ processes:
       done
       echo "✓ Emulator ready"
     depends_on:
-      launch-emulator:
-        condition: process_completed
+      sync-avds:
+        condition: process_completed_successfully
     availability:
       restart: "no"
 
@@ -154,6 +157,9 @@ processes:
   # Phase 4d: Verify iOS simulator ready
   verify-simulator-ready:
     command: |
+      # Wait a moment for launch to start
+      sleep 3
+
       echo "Verifying simulator is ready..."
       max_wait=60
       elapsed=0
@@ -167,8 +173,8 @@ processes:
       done
       echo "✓ Simulator ready"
     depends_on:
-      launch-simulator:
-        condition: process_completed
+      sync-simulators:
+        condition: process_completed_successfully
     availability:
       restart: "no"
 

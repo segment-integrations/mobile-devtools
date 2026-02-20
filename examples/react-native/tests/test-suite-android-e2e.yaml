@@ -78,6 +78,9 @@ processes:
   # Phase 4b: Verify emulator ready
   verify-emulator-ready:
     command: |
+      # Wait a moment for launch to start
+      sleep 5
+
       echo "Verifying emulator is ready..."
       max_wait=120
       elapsed=0
@@ -91,8 +94,8 @@ processes:
       done
       echo "✓ Emulator ready"
     depends_on:
-      launch-emulator:
-        condition: process_completed
+      sync-avds:
+        condition: process_completed_successfully
     availability:
       restart: "no"
 
