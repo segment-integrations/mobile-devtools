@@ -32,10 +32,10 @@ echo "Validating Node.js syntax..."
 # Change to repo root to use devbox run
 cd "${SCRIPT_DIR}/../.." || exit 1
 if devbox run node --check plugins/devbox-mcp/src/index.js >/dev/null 2>&1; then
-  TEST_PASS=$((TEST_PASS + 1))
+  test_passed=$((test_passed + 1))
   echo "✓ Server JavaScript syntax is valid"
 else
-  TEST_FAIL=$((TEST_FAIL + 1))
+  test_failed=$((test_failed + 1))
   echo "✗ Server JavaScript syntax has errors"
 fi
 cd "${SCRIPT_DIR}" || exit 1
@@ -45,10 +45,10 @@ echo "Checking required tools are defined..."
 required_tools="devbox_run devbox_list devbox_add devbox_info devbox_search devbox_docs_search devbox_docs_list devbox_docs_read devbox_init devbox_shell_env devbox_sync"
 for tool in $required_tools; do
   if grep -q "name: \"$tool\"" "${MCP_DIR}/src/index.js"; then
-    TEST_PASS=$((TEST_PASS + 1))
+    test_passed=$((test_passed + 1))
     echo "✓ Tool defined: $tool"
   else
-    TEST_FAIL=$((TEST_FAIL + 1))
+    test_failed=$((test_failed + 1))
     echo "✗ Tool missing: $tool"
   fi
 done
@@ -60,4 +60,4 @@ assert_file_contains "${MCP_DIR}/src/index.js" "StdioServerTransport" "Server im
 # Test 8: Check server has proper error handling
 assert_file_contains "${MCP_DIR}/src/index.js" "catch.*error" "Server has error handling"
 
-test_summary
+test_summary "devbox-mcp-server"

@@ -23,9 +23,12 @@
 *.cache
 .claude/
 
-# Test results (only last run kept locally)
+# Test results and temp dirs (only last run kept locally)
 /reports/
+/reports/tmp/
 /test-results/
+tests/test-results/
 examples/*/reports/
 examples/*/test-results/
 plugins/*/tests/reports/
+plugins/*/tests/test-results/

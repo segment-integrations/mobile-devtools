@@ -8,14 +8,14 @@ The repository uses GitHub Actions with three main workflows to ensure code qual
 
 ### Workflow Types
 
-1. **PR Fast Checks** - Quick validation for every PR (30-45 minutes)
-2. **Full E2E Tests** - Comprehensive platform testing (45-60 minutes per platform)
+1. **PR Fast Checks** - Quick validation for every PR
+2. **Full E2E Tests** - Comprehensive platform testing
 3. **MCP Publishing** - Automated semantic versioning and NPM publishing
 
 ### Design Philosophy
 
 The CI/CD system prioritizes:
-- **Fast feedback** - PRs get results in under 45 minutes
+- **Fast feedback** - PRs get fast feedback
 - **Platform coverage** - Tests minimum and maximum supported platform versions
 - **Cost efficiency** - Android tests run on Linux, iOS only on macOS
 - **Parallelization** - Matrix strategy runs tests concurrently
@@ -41,7 +41,7 @@ Automatically cancels outdated workflow runs when new commits are pushed to the 
 
 ### Jobs
 
-#### 1. Fast Tests (ubuntu-24.04, ~20 minutes)
+#### 1. Fast Tests (ubuntu-24.04)
 
 Runs linting, unit tests, and integration tests without device emulation.
 
@@ -62,7 +62,7 @@ devbox run test:fast
 **Artifacts uploaded:**
 - `fast-test-reports` - Test results and logs from `test-results/` and `reports/`
 
-#### 2. Android E2E (ubuntu-24.04 with KVM, ~30 minutes, matrix: min/max)
+#### 2. Android E2E (ubuntu-24.04 with KVM, matrix: min/max)
 
 End-to-end tests with real Android emulators.
 
@@ -98,7 +98,7 @@ TEST_TUI: false          # Disable interactive terminal UI
 **Artifacts uploaded:**
 - `android-{min|max}-reports` - Test reports from `reports/` and APK outputs
 
-#### 3. iOS E2E (macos-14/15, ~25 minutes, matrix: min/max)
+#### 3. iOS E2E (macos-14/15, matrix: min/max)
 
 End-to-end tests with real iOS simulators.
 
@@ -137,7 +137,7 @@ TEST_TUI: false          # Disable interactive terminal UI
 **Artifacts uploaded:**
 - `ios-{min|max}-reports` - Test reports and CoreSimulator logs
 
-#### 4. React Native E2E (ubuntu/macos, ~45 minutes, matrix: android/ios × min/max + web)
+#### 4. React Native E2E (ubuntu/macos, matrix: android/ios × min/max + web)
 
 Cross-platform React Native tests covering Android, iOS, and web.
 
@@ -177,9 +177,9 @@ TEST_TUI: false
 3. Setup platform-specific caches (Gradle/CocoaPods/Xcode)
 4. Install Devbox with package caching
 5. Run platform-specific test:
-   - Android: `bash tests/run-android-tests.sh` (wrapper for optimization)
-   - iOS: `bash tests/run-ios-tests.sh` (wrapper for optimization)
-   - Web: `devbox run test:e2e:web`
+   - Android: `devbox run --pure -e IOS_SKIP_SETUP=1 -e EMU_HEADLESS=1 test:e2e:android`
+   - iOS: `devbox run --pure -e ANDROID_SKIP_SETUP=1 -e SIM_HEADLESS=1 test:e2e:ios`
+   - Web: `devbox run --pure -e ANDROID_SKIP_SETUP=1 -e IOS_SKIP_SETUP=1 test:e2e:web`
 6. Upload artifacts on success or failure
 
 **Artifacts uploaded:**
@@ -205,14 +205,6 @@ if: always()
 ```
 
 Fails if any dependent job fails, preventing merge of broken code.
-
-### Timing Expectations
-
-- **Fast Tests**: 15-20 minutes
-- **Android E2E** (per device): 25-30 minutes
-- **iOS E2E** (per device): 20-25 minutes
-- **React Native E2E** (per platform): 35-45 minutes
-- **Total** (all jobs parallel): 30-45 minutes
 
 ## Full E2E Workflow (`e2e-full.yml`)
 
@@ -242,7 +234,7 @@ When triggering manually, you can selectively run tests by toggling inputs:
 
 ### Job Configurations
 
-#### Android E2E (ubuntu-24.04, ~45 minutes, matrix: min/max)
+#### Android E2E (ubuntu-24.04, matrix: min/max)
 
 Similar to PR checks but with extended timeouts for more thorough testing.
 
@@ -251,7 +243,7 @@ Similar to PR checks but with extended timeouts for more thorough testing.
 - `TEST_TIMEOUT: 600` (10 minutes vs 5 minutes)
 - `timeout-minutes: 45` (job timeout vs 30 minutes)
 
-#### iOS E2E (macos-14/15, ~45 minutes, matrix: min/max)
+#### iOS E2E (macos-14/15, matrix: min/max)
 
 Similar to PR checks but with extended timeouts.
 
@@ -260,7 +252,7 @@ Similar to PR checks but with extended timeouts.
 - `TEST_TIMEOUT: 600` (10 minutes vs 5 minutes)
 - `timeout-minutes: 45` (job timeout vs 25 minutes)
 
-#### React Native E2E (ubuntu/macos, ~60 minutes, matrix: android/ios × min/max + web)
+#### React Native E2E (ubuntu/macos, matrix: android/ios × min/max + web)
 
 Similar to PR checks but with extended timeouts.
 
@@ -282,13 +274,6 @@ Similar to PR checks but with extended timeouts.
 **React Native:**
 - All Android and iOS versions above
 - Web build (no device needed)
-
-### Timing Expectations
-
-- **Android E2E** (per device): 40-45 minutes
-- **iOS E2E** (per device): 35-45 minutes
-- **React Native E2E** (per platform): 50-60 minutes
-- **Total** (all jobs parallel): 50-60 minutes
 
 ## MCP Publishing Workflow (`publish-mcp.yml`)
 
@@ -316,7 +301,7 @@ on:
 
 ### Jobs
 
-#### 1. Test (ubuntu-24.04, ~10 minutes)
+#### 1. Test (ubuntu-24.04)
 
 Validates the package before publishing.
 
@@ -331,7 +316,7 @@ devbox run test:plugin:devbox-mcp
 **Artifacts uploaded:**
 - `test-reports` - Test results from `test-results/` and `reports/`
 
-#### 2. Release (ubuntu-24.04, ~10 minutes)
+#### 2. Release (ubuntu-24.04)
 
 Runs semantic-release to determine version and publish to NPM.
 
@@ -355,7 +340,7 @@ Runs semantic-release to determine version and publish to NPM.
 **Artifacts uploaded:**
 - `release-info` - Updated CHANGELOG.md (only if released)
 
-#### 3. Dry Run (ubuntu-24.04, ~10 minutes)
+#### 3. Dry Run (ubuntu-24.04)
 
 Tests the release process without publishing.
 
@@ -437,7 +422,6 @@ All workflows use comprehensive caching to speed up builds:
 - **Action:** `jetify-com/devbox-install-action@v0.14.0`
 - **Config:** `enable-cache: true`
 - **Caches:** Nix store, devbox packages, shell environments
-- **Speedup:** 5-10 minutes per run
 
 #### Gradle Cache (Android)
 ```yaml
@@ -449,7 +433,6 @@ with:
   key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
   restore-keys: ${{ runner.os }}-gradle-
 ```
-- **Speedup:** 2-5 minutes per build
 
 #### CocoaPods Cache (iOS)
 ```yaml
@@ -461,7 +444,6 @@ with:
   key: ${{ runner.os }}-pods-${{ hashFiles('**/Podfile.lock') }}
   restore-keys: ${{ runner.os }}-pods-
 ```
-- **Speedup:** 1-3 minutes per build
 
 #### Xcode Build Cache (iOS)
 ```yaml
@@ -471,7 +453,6 @@ with:
   key: ${{ runner.os }}-xcode-${{ hashFiles('**/*.xcodeproj/**', '**/*.xcworkspace/**') }}
   restore-keys: ${{ runner.os }}-xcode-
 ```
-- **Speedup:** 3-7 minutes per build
 
 #### Node.js/npm Cache (React Native)
 ```yaml
@@ -481,7 +462,6 @@ with:
   cache: 'npm'
   cache-dependency-path: examples/react-native/package-lock.json
 ```
-- **Speedup:** 1-2 minutes per build
 
 ### Matrix Parallelization
 
@@ -511,7 +491,7 @@ max:9i8h7g6f5e4d3c2b1a0j
 **Benefits:**
 - Nix only evaluates SDK versions for devices in the lock file
 - Skips evaluation of unused intermediate API levels
-- Reduces Nix flake evaluation time by 50-70%
+- Significantly reduces Nix flake evaluation time
 
 **Maintenance:**
 ```bash
@@ -782,21 +762,13 @@ devbox run test:e2e
 cd examples/react-native
 
 # Android
-EMU_HEADLESS=1 \
-BOOT_TIMEOUT=240 \
-TEST_TIMEOUT=600 \
-ANDROID_DEFAULT_DEVICE=min \
-bash tests/run-android-tests.sh
+devbox run --pure -e IOS_SKIP_SETUP=1 -e EMU_HEADLESS=1 test:e2e:android
 
 # iOS
-SIM_HEADLESS=1 \
-BOOT_TIMEOUT=240 \
-TEST_TIMEOUT=600 \
-IOS_DEFAULT_DEVICE=min \
-bash tests/run-ios-tests.sh
+devbox run --pure -e ANDROID_SKIP_SETUP=1 -e SIM_HEADLESS=1 test:e2e:ios
 
 # Web
-devbox run test:e2e:web
+devbox run --pure -e ANDROID_SKIP_SETUP=1 -e IOS_SKIP_SETUP=1 test:e2e:web
 ```
 
 ### Examining Logs
@@ -1016,19 +988,16 @@ Update `.github/workflows/README.md` when adding new workflows with:
 ### Current Workflow Costs (estimated per run)
 
 **PR Checks:**
-- Fast Tests (Linux, 20 min): $0.16
-- Android E2E (Linux, 2×30 min): $0.48
-- iOS E2E (macOS, 2×25 min): $8.00
-- React Native E2E (Linux+macOS, 5×45 min): ~$12.00
-- **Total per PR**: ~$20.64
+- Fast Tests (Linux): low cost
+- Android E2E (Linux, 2 matrix jobs): low cost
+- iOS E2E (macOS, 2 matrix jobs): higher cost due to macOS pricing
+- React Native E2E (Linux+macOS, 5 matrix jobs): highest cost component
 
 **Full E2E:**
-- Similar to PR checks but longer timeouts
-- **Total per run**: ~$25-30
+- Similar to PR checks but with longer timeouts
 
 **MCP Publishing:**
-- Test + Release (Linux, 2×10 min): $0.16
-- **Total per release**: ~$0.16
+- Test + Release (Linux): minimal cost
 
 ### Optimization Impact
 
@@ -1038,14 +1007,14 @@ Update `.github/workflows/README.md` when adding new workflows with:
 - **Savings**: 10x cost reduction for Android tests
 
 **Using matrix parallelization:**
-- Without: 2 jobs × 30 min = 60 min total
-- With: max(30 min, 30 min) = 30 min total
-- **Savings**: 50% time reduction, same cost
+- Without: Jobs run sequentially, total wall time is sum of all jobs
+- With: Jobs run concurrently, total wall time is the slowest single job
+- **Savings**: Significant wall-time reduction, same total compute cost
 
 **Using caching:**
-- First run: Full build (40 min)
-- Cached run: Partial build (25 min)
-- **Savings**: 37% time reduction
+- First run: Full build with no cached dependencies
+- Cached run: Partial build reusing cached dependencies
+- **Savings**: Meaningful reduction in build time per run
 
 ### Free Tier Limits
 

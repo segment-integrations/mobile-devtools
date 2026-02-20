@@ -5,14 +5,14 @@ Reproducible, project-local development environments for Android, iOS, and React
 ## Quick Start
 
 ```bash
+# Install devbox (if you haven't already)
+curl -fsSL https://get.jetify.com/devbox | bash
+
 # Initialize devbox in your project
 devbox init
-
-# Add the Android plugin include to your devbox.json
-# (devbox add only works for packages, not plugins — edit devbox.json manually)
 ```
 
-Add the plugin to your `devbox.json`:
+Replace the contents of your `devbox.json` with the Android plugin:
 
 ```json
 {
@@ -27,18 +27,20 @@ Add the plugin to your `devbox.json`:
 }
 ```
 
+> **Note:** Plugins are added via `include` in `devbox.json`, not with `devbox add`. The plugin provides the Android SDK, emulator, and device management tools. You add your own build tooling (JDK, Gradle) as packages.
+
 ```bash
-# Enter development environment
+# Enter development environment (downloads SDK on first run)
 devbox shell
 
-# Start emulator and run app
+# List available devices
+devbox run android.sh devices list
+
+# Start the default emulator
 devbox run start:emu
-devbox run start:app
 ```
 
-The app's package name is auto-detected from the APK at install time.
-
-**New to devbox-plugins?** Check out the [Quick Start Guide](wiki/guides/quick-start.md) for detailed setup instructions.
+**New to devbox-plugins?** Check out the [Quick Start Guide](wiki/guides/quick-start.md) for a complete walkthrough including how to set up build and deploy scripts.
 
 ## Features
 
@@ -94,7 +96,7 @@ Composition layer over Android and iOS with Metro bundler management.
 
 ### For Users
 
-- **[Quick Start](wiki/guides/quick-start.md)** - Get started in 5 minutes
+- **[Quick Start](wiki/guides/quick-start.md)** - Set up your first project
 - **[Device Management](wiki/guides/device-management.md)** - Managing emulators and simulators
 - **[Testing Guide](wiki/guides/testing.md)** - Testing strategies and best practices
 - **[Troubleshooting](wiki/guides/troubleshooting.md)** - Common issues and solutions
@@ -111,34 +113,37 @@ Composition layer over Android and iOS with Metro bundler management.
 
 ## Examples
 
-The repository includes example projects demonstrating plugin usage:
+The repository includes example projects demonstrating full workflows including build scripts, deploy commands, and E2E test suites:
 
-- **[examples/android](examples/android/)** - Minimal Android app
-- **[examples/ios](examples/ios/)** - Swift package example
-- **[examples/react-native](examples/react-native/)** - React Native app with Android, iOS, and Web
+- **[examples/android](examples/android/)** - Minimal Android app with Gradle build
+- **[examples/ios](examples/ios/)** - Swift package with xcodebuild
+- **[examples/react-native](examples/react-native/)** - React Native app with Android, iOS, and Web targets
 
-Each example includes device definitions, test suites, and build scripts.
+These examples show how to wire up your own build and deploy scripts on top of the plugin-provided device and emulator management.
 
-## Common Commands
+## Plugin-Provided Commands
+
+The plugins provide device management, emulator/simulator control, and diagnostics. Build and deploy commands are project-specific — you define them in your own `devbox.json` (see the [Quick Start Guide](wiki/guides/quick-start.md) or the [examples](examples/) for patterns).
 
 ```bash
-# Android
-devbox run start:emu        # Start Android emulator
-devbox run start:app        # Build, install, and launch app
-devbox run stop:emu         # Stop emulator
+# Android emulator
+devbox run start:emu [device]   # Start Android emulator
+devbox run stop:emu             # Stop emulator
+devbox run reset:emu            # Reset emulator state
 
-# iOS
-devbox run start:sim        # Start iOS simulator
-devbox run start:ios        # Build and launch app
-devbox run stop:sim         # Stop simulator
+# iOS simulator
+devbox run start:sim [device]   # Start iOS simulator
+devbox run stop:sim             # Stop simulator
 
 # Device management
 devbox run android.sh devices list
+devbox run android.sh devices create mydevice --api 30 --device pixel
 devbox run ios.sh devices list
+devbox run ios.sh devices create mydevice --runtime 18.0
 
-# Testing
-devbox run test:fast        # Quick tests (~2-5 min)
-devbox run test:e2e         # Full E2E tests (~15-30 min)
+# Diagnostics
+devbox run doctor               # Check environment health
+devbox run verify:setup         # Quick verification
 ```
 
 ## Requirements
@@ -146,10 +151,6 @@ devbox run test:e2e         # Full E2E tests (~15-30 min)
 - **[Devbox](https://www.jetify.com/devbox)** - Install with `curl -fsSL https://get.jetify.com/devbox | bash`
 - **macOS** - Required for iOS plugin (Xcode required)
 - **Linux** - Supported for Android and React Native (Android only)
-
-## License
-
-MIT
 
 ## Support
 

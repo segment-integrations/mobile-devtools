@@ -120,8 +120,7 @@ Lock files are generated from device definitions to optimize CI builds:
 ```json
 {
   "devices": ["min", "max"],
-  "checksum": "def456...",
-  "generated_at": "2026-02-02T12:00:00Z"
+  "checksum": "def456..."
 }
 ```
 
@@ -315,8 +314,8 @@ DEBUG=1 devbox shell
 
 - name: Test Android Plugin
   run: |
-    EMU_HEADLESS=1 devbox run --pure start-emu max
-    devbox run --pure stop-emu
+    EMU_HEADLESS=1 devbox run --pure start:emu max
+    devbox run --pure stop:emu
 ```
 
 ### Performance Tips

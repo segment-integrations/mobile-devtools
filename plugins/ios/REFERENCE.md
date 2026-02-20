@@ -42,12 +42,12 @@ Configure the plugin by setting environment variables in `devbox.json` or `plugi
 - `IOS_XCODE_ENV_PATH` — Additional PATH entries for Xcode tools
 - `IOS_DOWNLOAD_RUNTIME` — Auto-download missing runtimes (1=yes, 0=no; default: 1)
 
-### App Build Settings
-- `IOS_APP_PROJECT` — Xcode project path (default: "ios.xcodeproj")
-- `IOS_APP_SCHEME` — Xcode build scheme (default: matches project name)
-- `IOS_APP_BUNDLE_ID` — App bundle identifier (default: "com.example.ios")
-- `IOS_APP_ARTIFACT` — App bundle path/glob after build (default: "DerivedData/Build/Products/Debug-iphonesimulator/*.app")
-- `IOS_APP_DERIVED_DATA` — Xcode derived data directory (default: ".devbox/virtenv/ios/DerivedData")
+### App Settings
+- `IOS_APP_ARTIFACT` — Path or glob pattern for .app bundle (relative to project root; empty = auto-detect)
+- `IOS_APP_SCHEME` — Xcode scheme override (empty = auto-detect from project filename)
+- `IOS_APP_PROJECT` — Explicit .xcworkspace or .xcodeproj path (empty = auto-detect)
+- `IOS_BUILD_CONFIG` — Build configuration: Debug or Release (default: "Debug")
+- `IOS_DERIVED_DATA_PATH` — DerivedData directory path (default: `.devbox/virtenv/ios/DerivedData`)
 
 ### Performance Settings
 - `IOS_SKIP_SETUP` — Skip iOS environment setup during shell initialization (1=skip, 0=setup; default: 0)
@@ -60,37 +60,114 @@ Configure the plugin by setting environment variables in `devbox.json` or `plugi
 
 Start simulator:
 ```bash
-devbox run --pure start-sim [device]
+ios.sh simulator start [--pure] [device]
 ```
 - If `device` is specified, uses that device name
 - Otherwise uses `IOS_DEFAULT_DEVICE`
 - Boots simulator if not already running
+- `--pure`: Creates a fresh, isolated test simulator with clean state (for deterministic tests)
+- Auto-detects pure mode when `DEVBOX_PURE_SHELL=1` (set by `devbox run --pure`)
+- `REUSE_SIM=1`: Override pure mode to reuse existing simulator (e.g., `devbox run --pure -e REUSE_SIM=1`)
+- Saves simulator UDID to `$IOS_RUNTIME_DIR/${SUITE_NAME:-default}/simulator-udid.txt`
+- In pure mode, test simulator name includes suite label for isolation (e.g., `"iPhone 17 (iOS 26.2) Test-ios-e2e"`)
+
+**Convenience aliases:**
+- `devbox run --pure start:sim [device]` (equivalent to `ios.sh simulator start` without `--pure`)
+- `devbox run --pure stop:sim` (equivalent to `ios.sh simulator stop`)
 
 Stop simulator:
 ```bash
-devbox run --pure stop-sim
+ios.sh simulator stop
 ```
-- Shuts down all running simulators
+- In pure mode (test simulator exists): shuts down and deletes the test simulator, cleans up state files
+- In normal mode: shuts down the simulator via `ios_stop()`
 
-### Build and Run
-
-Build and run app:
+Check simulator readiness:
 ```bash
-devbox run --pure start-ios [device]
+ios.sh simulator ready
 ```
-- Runs `devbox run --pure build-ios` first
-- Installs app bundle matched by `IOS_APP_ARTIFACT`
-- Launches app on simulator
-- If `device` specified, uses that device; otherwise uses `IOS_DEFAULT_DEVICE`
+- Silent readiness probe: exit 0 if simulator is booted, exit 1 if not
+- Reads UDID from suite-namespaced state file, falls back to finding any booted simulator
+- Designed for use as a process-compose readiness probe
 
-Build only:
+Reset simulators:
 ```bash
-devbox run --pure build-ios
+ios.sh simulator reset
 ```
-- Builds Xcode project using `IOS_APP_PROJECT` and `IOS_APP_SCHEME`
-- Outputs to `IOS_APP_DERIVED_DATA`
-- Configuration: Debug
-- Destination: iOS Simulator
+- Stops all running simulators
+- Deletes simulators matching device definitions
+
+### Deploy
+
+```bash
+ios.sh deploy [app_path]
+```
+- Installs and launches an app on an already-running simulator (no build, no simulator start)
+- If `app_path` is provided, installs the specified .app bundle
+- If no arguments, auto-detects .app using `ios_find_app()` (same resolution as `run`)
+- Reads simulator UDID from suite-namespaced state file
+- Extracts bundle ID from the app's `Info.plist`
+- Saves bundle ID to `$IOS_RUNTIME_DIR/${SUITE_NAME:-default}/bundle-id.txt`
+
+### App Lifecycle
+
+```bash
+ios.sh app status
+```
+- Checks if the deployed app is running on the simulator
+- Exit 0 if running, exit 1 if not
+- Reads bundle ID and simulator UDID from suite-namespaced state files
+
+```bash
+ios.sh app stop
+```
+- Terminates the deployed app via `xcrun simctl terminate`
+- Reads bundle ID and simulator UDID from suite-namespaced state files
+
+### Xcode Build Wrapper
+
+```bash
+ios.sh xcodebuild [args...]
+```
+- Runs `xcodebuild` with Nix-incompatible environment variables removed
+- Unsets `LD`, `LDFLAGS`, `NIX_LDFLAGS`, `NIX_CFLAGS_COMPILE`, and `NIX_CFLAGS_LINK` in a subshell
+- All arguments are forwarded directly to `xcodebuild`
+- The caller's environment is not affected (stripping happens in a subshell)
+
+Use this in `devbox.json` build scripts instead of manually stripping Nix flags:
+```json
+{
+  "shell": {
+    "scripts": {
+      "build:ios": [
+        "ios.sh xcodebuild -project MyApp.xcodeproj -scheme MyApp -configuration Debug -destination 'generic/platform=iOS Simulator' build"
+      ]
+    }
+  }
+}
+```
+
+The iOS init hook strips Nix compilation variables at shell startup, so `xcodebuild` works natively in devbox shell. The `ios.sh xcodebuild` subcommand forwards directly to `xcodebuild`.
+
+### Run App
+
+```bash
+ios.sh run [app_path] [device]
+```
+- Starts simulator, builds, resolves, installs, and launches the app
+- If `app_path` is provided, skips build step and installs the provided .app bundle
+- If no arguments, builds project and auto-detects the .app bundle
+
+**.app resolution precedence (when no explicit path):**
+
+1. `IOS_APP_ARTIFACT` env var — glob resolved relative to project root
+2. `xcodebuild -showBuildSettings` — queries BUILT_PRODUCTS_DIR + FULL_PRODUCT_NAME from the Xcode project
+3. Recursive search of project root for `*.app` directories (excludes Pods/, .build/, SourcePackages/, node_modules/, .devbox/, DerivedData/ModuleCache/)
+4. Recursive search of `$PWD` if different from project root (same exclusions)
+
+Bundle ID is auto-extracted from the .app's `Info.plist` via PlistBuddy, or from `xcodebuild -showBuildSettings` if available.
+
+**Build script detection:** The `run` command tries `build:ios` first, then falls back to `build`. Define a build script in `devbox.json` using native tools (e.g., `xcodebuild`).
 
 ### Device Management
 
@@ -261,14 +338,12 @@ The `devices.lock` file tracks which devices should be created:
       "runtime": "17.5"
     }
   ],
-  "checksum": "abc123...",
-  "generated_at": "2026-02-09T12:00:00Z"
+  "checksum": "abc123..."
 }
 ```
 
 - `devices`: Array of device definitions to create
 - `checksum`: SHA-256 hash of all device definition files (for validation)
-- `generated_at`: ISO 8601 timestamp
 
 ## Script Architecture
 
@@ -284,6 +359,7 @@ Scripts are organized in 5 layers (see `wiki/project/ARCHITECTURE.md` for detail
 **Layer 3 - domain/**: Domain operations
 - `domain/device_manager.sh` — Runtime resolution, simulator operations
 - `domain/simulator.sh` — Simulator lifecycle management
+- `domain/build.sh` — Build command (auto-detect and build Xcode project)
 - `domain/deploy.sh` — App building and deployment
 - `domain/validate.sh` — Non-blocking validation
 
@@ -308,13 +384,20 @@ These are set automatically by the plugin:
 - `PATH` — Updated with Xcode tools and plugin scripts
 - `IOS_NODE_BINARY` — Node.js binary path (if available, for React Native)
 
+### Runtime State
+
+- `IOS_RUNTIME_DIR` — Directory for runtime state files (default: `.devbox/virtenv/ios/runtime`)
+- `SUITE_NAME` — Test suite name for state isolation (default: "default")
+  - Each suite gets its own subdirectory under `$IOS_RUNTIME_DIR/$SUITE_NAME/`
+  - State files: `simulator-udid.txt`, `test-simulator-udid.txt` (pure mode only), `bundle-id.txt`
+  - Set in process-compose environment blocks for parallel test execution
+
 ### Runtime Variables
 
 Set during simulator/app operations:
 
 - `IOS_SIM_UDID` — UUID of running simulator
 - `IOS_SIM_NAME` — Name of running simulator
-- `IOS_APP_BUNDLE_PATH` — Resolved app bundle path after build
 
 ## Troubleshooting
 
@@ -379,10 +462,10 @@ devbox run --pure ios.sh devices eval
 **Symptom:** Xcode build errors
 
 **Checklist:**
-1. Check `IOS_APP_PROJECT` points to correct `.xcodeproj`
-2. Verify `IOS_APP_SCHEME` exists in project
+1. Check that your `.xcodeproj` or `.xcworkspace` exists in the project root
+2. Verify `build:ios` or `build` script in devbox.json is correct
 3. Ensure derived data directory is writable
-4. Clean build: `rm -rf .devbox/virtenv/ios/DerivedData`
+4. Clean build: `rm -rf DerivedData` or the path your build script uses
 
 ## Platform Requirements
 
@@ -390,6 +473,7 @@ devbox run --pure ios.sh devices eval
 - **Xcode** — Install from App Store or use Xcode Command Line Tools
 - **iOS Simulator** — Included with Xcode
 - **Devbox** — Required for plugin system
+- **Non-Darwin:** On non-macOS platforms, the iOS plugin init hooks exit immediately without errors, allowing cross-platform devbox.json files that include both Android and iOS plugins.
 
 ## Best Practices
 
@@ -410,9 +494,9 @@ devbox run --pure ios.sh devices eval
 - Keep command-line tools updated
 
 ### Build Configuration
-- Use project-relative paths for `IOS_APP_ARTIFACT`
-- Commit derived data to `.gitignore`
-- Use consistent scheme names across projects
+- Use project-relative paths for `IOS_APP_ARTIFACT` when auto-detect doesn't work
+- Commit derived data directories to `.gitignore`
+- Auto-detect works best when a single `.xcodeproj` or `.xcworkspace` exists in project root
 
 ## Example Workflows
 
@@ -442,10 +526,10 @@ ios.sh devices list
 ios.sh devices eval
 
 # Start simulator
-devbox run start-sim
+devbox run start:sim
 
 # Build and run app
-devbox run start-ios
+ios.sh run
 ```
 
 ### Adding New Device

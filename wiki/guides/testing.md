@@ -6,9 +6,9 @@ This guide covers testing strategies, test execution, and debugging for all plat
 
 The repository includes three categories of tests:
 
-- **Unit Tests** - Test individual functions and components in isolation. Fast execution (10-30 seconds).
-- **Integration Tests** - Test plugin workflows and device management. Medium speed (30-60 seconds).
-- **E2E Tests** - Test complete application lifecycle from build to deployment. Slow execution (5-15 minutes).
+- **Unit Tests** - Test individual functions and components in isolation. Fast execution.
+- **Integration Tests** - Test plugin workflows and device management. Medium speed.
+- **E2E Tests** - Test complete application lifecycle from build to deployment. Slow execution.
 
 All tests use [process-compose](https://github.com/F1bonacc1/process-compose) for orchestration, providing concurrent execution, dependency management, health checks, and structured logging.
 
@@ -17,13 +17,13 @@ All tests use [process-compose](https://github.com/F1bonacc1/process-compose) fo
 ### Fast Tests
 
 ```bash
-# Unit tests only (~10-30 seconds)
+# Unit tests only
 devbox run test:plugin:unit
 
-# Integration tests only (~30-60 seconds)
+# Integration tests only
 devbox run test:integration
 
-# Everything except E2E (~1-2 minutes)
+# Everything except E2E
 devbox run test:fast
 ```
 
@@ -43,7 +43,7 @@ devbox run test:rn
 ### E2E Tests
 
 ```bash
-# All E2E tests (~10-15 minutes)
+# All E2E tests
 devbox run test:e2e
 
 # Individual platforms
@@ -55,7 +55,7 @@ devbox run test:e2e:rn
 ### Complete Suite
 
 ```bash
-# Everything (~30-60 minutes)
+# Everything
 devbox run test
 ```
 
@@ -156,8 +156,6 @@ The Android E2E test follows this sequence:
 5. **Verify** - Checks that app is running
 6. **Cleanup** - Stops app and emulator in pure mode
 
-**Duration:** 2-3 minutes with warm cache
-
 ### Configuration
 
 Configure Android tests via environment variables in `devbox.json`:
@@ -219,8 +217,6 @@ The iOS E2E test follows this sequence:
 5. **Verify** - Checks that app is running
 6. **Cleanup** - Cleans up test simulators in pure mode
 
-**Duration:** 3-5 minutes with warm build cache
-
 ### Configuration
 
 Configure iOS tests via environment variables in `devbox.json`:
@@ -274,24 +270,17 @@ devbox run test:e2e:all        # Both platforms in parallel
 
 ### Platform-Specific Optimization
 
-Wrapper scripts skip the unused platform for faster startup:
+Skip the unused platform with `-e` flags for faster startup:
 
 ```bash
 # iOS tests only (skips Android SDK evaluation)
-./tests/run-ios-tests.sh
-
-# Android tests only (skips iOS setup)
-./tests/run-android-tests.sh
-```
-
-These scripts use the correct `-e` flag syntax to pass environment variables in pure mode:
-
-```bash
-# iOS wrapper skips Android
 devbox run --pure -e ANDROID_SKIP_SETUP=1 test:e2e:ios
 
-# Android wrapper skips iOS
+# Android tests only (skips iOS setup)
 devbox run --pure -e IOS_SKIP_SETUP=1 test:e2e:android
+
+# Web tests (skips both mobile platforms)
+devbox run --pure -e ANDROID_SKIP_SETUP=1 -e IOS_SKIP_SETUP=1 test:e2e:web
 ```
 
 ### React Native E2E Test Flow
@@ -308,11 +297,9 @@ React Native E2E tests follow this sequence:
 8. **Verify** - Check app is running
 9. **Cleanup** - Stop Metro, app, and device in pure mode
 
-**Duration:** 5-8 minutes per platform with warm cache
-
 ### Metro Bundler Management
 
-The React Native plugin provides robust Metro bundler management with isolated state for parallel testing.
+The React Native plugin provides Metro bundler management with isolated state for parallel testing.
 
 #### Automatic Metro Management
 
@@ -1015,7 +1002,7 @@ run_tests test_new_feature
 2. Add to process-compose config:
 
 ```yaml
-# tests/process-compose-unit-tests.yaml
+# tests/unit-tests.yaml
 test-android-new-feature:
   command: "bash plugins/tests/android/test-new-feature.sh"
   depends_on:

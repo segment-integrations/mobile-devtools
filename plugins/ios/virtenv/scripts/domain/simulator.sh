@@ -2,7 +2,7 @@
 # iOS Plugin - Simulator Lifecycle Management
 # See REFERENCE.md for detailed documentation
 
-set -eu
+set -e
 
 if ! (return 0 2>/dev/null); then
   echo "ERROR: simulator.sh must be sourced" >&2
@@ -194,4 +194,39 @@ ios_service() {
     [ "$state" = "Shutdown" ] && break
     sleep 5
   done
+}
+
+# Check if the simulator is ready (booted)
+# Returns 0 if simulator is booted, 1 otherwise
+# Used by ios.sh simulator start --wait-ready
+ios_simulator_ready() {
+  # Resolve UDID from state directory (suite-namespaced)
+  _suite="${SUITE_NAME:-default}"
+  _runtime_dir="${IOS_RUNTIME_DIR:-${DEVBOX_VIRTENV:-}}"
+  if [ -z "$_runtime_dir" ]; then
+    _runtime_dir="${PWD}/.devbox/virtenv"
+  fi
+  _state_dir="$_runtime_dir/ios/$_suite"
+
+  _udid=""
+  if [ -f "$_state_dir/simulator-udid.txt" ]; then
+    _udid="$(cat "$_state_dir/simulator-udid.txt")"
+  fi
+
+  # Fallback: check IOS_SIM_UDID env var
+  if [ -z "$_udid" ]; then
+    _udid="${IOS_SIM_UDID:-}"
+  fi
+
+  if [ -z "$_udid" ]; then
+    return 1
+  fi
+
+  # Check if simulator is booted
+  _state="$(xcrun simctl list devices -j | jq -r --arg udid "$_udid" '.devices[]?[]? | select(.udid == $udid) | .state' 2>/dev/null | head -n1)"
+
+  if [ "$_state" = "Booted" ]; then
+    return 0
+  fi
+  return 1
 }

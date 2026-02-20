@@ -226,7 +226,3 @@ devbox_docs_read({
   - Create at: https://github.com/settings/tokens
   - Requires: `public_repo` or `repo` read access
   - Configure via `GITHUB_TOKEN` environment variable in MCP config
-
-## License
-
-MIT

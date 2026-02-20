@@ -20,12 +20,12 @@ REPO_ROOT="$SCRIPT_DIR/../../.."
 . "$REPO_ROOT/plugins/tests/test-framework.sh"
 
 # Setup test environment
-TEST_ROOT="/tmp/ios-integration-test-$$"
+TEST_ROOT="$(make_temp_dir "ios-integration")"
 mkdir -p "$TEST_ROOT/devbox.d/ios/devices"
 mkdir -p "$TEST_ROOT/devbox.d/ios/scripts"
 
-# Copy fixtures
-cp "$SCRIPT_DIR/../../fixtures/ios/devices/"*.json "$TEST_ROOT/devbox.d/ios/devices/"
+# Copy device fixtures from example project
+cp "$REPO_ROOT/examples/ios/devbox.d/ios/devices/"*.json "$TEST_ROOT/devbox.d/ios/devices/"
 
 # Copy plugin scripts (layered structure)
 cp -r "$REPO_ROOT/plugins/ios/virtenv/scripts/"* "$TEST_ROOT/devbox.d/ios/scripts/"
@@ -42,10 +42,10 @@ cd "$TEST_ROOT"
 # Test 1: Device list command
 echo "Test: Device listing..."
 if sh "$IOS_SCRIPTS_DIR/user/devices.sh" list >/dev/null 2>&1; then
-  TEST_PASS=$((TEST_PASS + 1))
+  test_passed=$((test_passed + 1))
   echo "✓ Device list command succeeds"
 else
-  TEST_FAIL=$((TEST_FAIL + 1))
+  test_failed=$((test_failed + 1))
   echo "✗ Device list command failed"
 fi
 
@@ -55,7 +55,7 @@ if sh "$IOS_SCRIPTS_DIR/user/devices.sh" eval >/dev/null 2>&1; then
   assert_file_exists "$IOS_DEVICES_DIR/devices.lock" "Lock file created after eval"
 else
   echo "✗ Device eval command failed"
-  TEST_FAIL=$((TEST_FAIL + 1))
+  test_failed=$((test_failed + 1))
 fi
 
 # Test 3: Lock file structure
@@ -63,14 +63,14 @@ echo "Test: Lock file structure..."
 if [ -f "$IOS_DEVICES_DIR/devices.lock" ]; then
   # Lock file should be valid JSON with devices array
   if jq -e '.devices' "$IOS_DEVICES_DIR/devices.lock" >/dev/null 2>&1; then
-    TEST_PASS=$((TEST_PASS + 1))
+    test_passed=$((test_passed + 1))
     echo "✓ Lock file has valid structure"
   else
-    TEST_FAIL=$((TEST_FAIL + 1))
+    test_failed=$((test_failed + 1))
     echo "✗ Lock file has invalid format"
   fi
 else
-  TEST_FAIL=$((TEST_FAIL + 1))
+  test_failed=$((test_failed + 1))
   echo "✗ Lock file not found"
 fi
 
@@ -79,10 +79,10 @@ echo "Test: Device count validation..."
 device_count=$(jq '.devices | length' "$IOS_DEVICES_DIR/devices.lock")
 expected_count=$(ls -1 "$IOS_DEVICES_DIR"/*.json | wc -l | tr -d ' ')
 if [ "$device_count" = "$expected_count" ]; then
-  TEST_PASS=$((TEST_PASS + 1))
+  test_passed=$((test_passed + 1))
   echo "✓ All devices included in lock file ($device_count devices)"
 else
-  TEST_FAIL=$((TEST_FAIL + 1))
+  test_failed=$((test_failed + 1))
   echo "✗ Device count mismatch (expected $expected_count, got $device_count)"
 fi
 

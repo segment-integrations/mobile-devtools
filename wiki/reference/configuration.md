@@ -12,22 +12,8 @@ Complete reference for configuring the Android, iOS, and React Native devbox plu
 }
 ```
 
-Or use path-based inclusion:
-```json
-{
-  "include": ["github:segment-integrations/devbox-plugins?dir=plugins/android"]
-}
-```
-
 ### iOS Plugin
 
-```json
-{
-  "include": ["github:segment-integrations/devbox-plugins?dir=plugins/ios"]
-}
-```
-
-Or use path-based inclusion:
 ```json
 {
   "include": ["github:segment-integrations/devbox-plugins?dir=plugins/ios"]
@@ -38,13 +24,6 @@ Or use path-based inclusion:
 
 The React Native plugin automatically includes both Android and iOS plugins:
 
-```json
-{
-  "include": ["github:segment-integrations/devbox-plugins?dir=plugins/react-native"]
-}
-```
-
-Or use path-based inclusion:
 ```json
 {
   "include": ["github:segment-integrations/devbox-plugins?dir=plugins/react-native"]
@@ -93,6 +72,8 @@ Or use path-based inclusion:
 
 - `ANDROID_APP_APK` - Path or glob pattern for APK (relative to project root)
 - `ANDROID_APP_ID` - Android application ID (e.g., `com.example.app`)
+- `ANDROID_BUILD_CONFIG` — Build configuration: Debug or Release (default: `Debug`)
+- `ANDROID_BUILD_TASK` — Gradle task override (empty = auto-derive from config, e.g., assembleDebug)
 
 #### Emulator Behavior
 
@@ -172,7 +153,10 @@ The Android plugin runs two initialization hooks:
       "build": [
         "gradle assembleDebug"
       ],
-      "run": [
+      "build:release": [
+        "gradle assembleRelease"
+      ],
+      "start:app": [
         "android.sh run ${1:-${ANDROID_DEFAULT_DEVICE:-max}}"
       ]
     }
@@ -202,13 +186,13 @@ The Android plugin runs two initialization hooks:
 - `IOS_XCODE_ENV_PATH` - Additional PATH entries for Xcode tools
 - `IOS_DOWNLOAD_RUNTIME` - Auto-download missing runtimes (1=yes, 0=no, default: `1`)
 
-#### App Build Settings
+#### App Settings
 
-- `IOS_APP_PROJECT` - Xcode project path (default: `ios.xcodeproj`)
-- `IOS_APP_SCHEME` - Xcode build scheme (default: matches project name)
-- `IOS_APP_BUNDLE_ID` - App bundle identifier (default: `com.example.ios`)
-- `IOS_APP_ARTIFACT` - App bundle path/glob after build (default: `DerivedData/Build/Products/Debug-iphonesimulator/*.app`)
-- `IOS_APP_DERIVED_DATA` - Xcode derived data directory (default: `.devbox/virtenv/ios/DerivedData`)
+- `IOS_APP_ARTIFACT` - Path or glob pattern for .app bundle (relative to project root; empty = auto-detect via xcodebuild + search)
+- `IOS_APP_SCHEME` — Xcode scheme override (empty = auto-detect from project filename)
+- `IOS_APP_PROJECT` — Explicit .xcworkspace or .xcodeproj path (empty = auto-detect)
+- `IOS_BUILD_CONFIG` — Build configuration: Debug or Release (default: `Debug`)
+- `IOS_DERIVED_DATA_PATH` — DerivedData directory path (default: `{{ .Virtenv }}/DerivedData`)
 
 #### Performance Settings
 
@@ -235,7 +219,6 @@ Set during simulator/app operations:
 
 - `IOS_SIM_UDID` - UUID of running simulator
 - `IOS_SIM_NAME` - Name of running simulator
-- `IOS_APP_BUNDLE_PATH` - Resolved app bundle path after build
 
 ### Included Packages
 
@@ -283,21 +266,18 @@ The iOS plugin runs two initialization hooks:
   },
   "env": {
     "IOS_DEFAULT_DEVICE": "max",
-    "IOS_DEVICES": "min,max",
-    "IOS_APP_PROJECT": "ios.xcodeproj",
-    "IOS_APP_SCHEME": "ios",
-    "IOS_APP_BUNDLE_ID": "com.example.ios",
-    "IOS_APP_ARTIFACT": ".devbox/virtenv/ios/DerivedData/Build/Products/Debug-iphonesimulator/ios.app"
+    "IOS_DEVICES": "min,max"
   },
   "shell": {
     "scripts": {
-      "build": [
-        "xcodebuild -project ${IOS_APP_PROJECT} -scheme ${IOS_APP_SCHEME} -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath .devbox/virtenv/ios/DerivedData build"
+      "build:ios": [
+        "ios.sh xcodebuild -scheme MyApp -configuration Debug -destination 'generic/platform=iOS Simulator' build"
       ],
-      "start:ios": [
-        "ios.sh simulator start ${1:-${IOS_DEFAULT_DEVICE:-max}}",
-        "xcrun simctl install booted ${IOS_APP_ARTIFACT}",
-        "xcrun simctl launch booted ${IOS_APP_BUNDLE_ID}"
+      "build:release": [
+        "ios.sh xcodebuild -scheme MyApp -configuration Release build"
+      ],
+      "start:app": [
+        "ios.sh run ${1:-}"
       ]
     }
   }
@@ -385,14 +365,9 @@ Additional exports:
     "gradle@latest"
   ],
   "env": {
-    "IOS_APP_PROJECT": "ReactNativeExample.xcodeproj",
-    "IOS_APP_SCHEME": "ReactNativeExample",
-    "IOS_APP_BUNDLE_ID": "org.reactjs.native.example.ReactNativeExample",
-    "IOS_APP_ARTIFACT": ".devbox/virtenv/ios/DerivedData/Build/Products/Debug-iphonesimulator/ReactNativeExample.app",
     "ANDROID_APP_ID": "com.reactnativeexample",
     "ANDROID_APP_APK": "android/app/build/outputs/apk/debug/app-debug.apk",
     "ANDROID_MAX_API": "35",
-    "DEVBOX_COREPACK_ENABLED": "",
     "ANDROID_SDK_REQUIRED": "0"
   },
   "shell": {
@@ -402,12 +377,12 @@ Additional exports:
       ],
       "build:android": [
         "devbox run install",
-        "cd android && gradle assembleDebug"
+        "cd android && ./gradlew assembleDebug"
       ],
       "build:ios": [
         "devbox run install",
         "cd ios && pod install --repo-update",
-        "cd ios && xcodebuild -workspace ReactNativeExample.xcworkspace -scheme ${IOS_APP_SCHEME} -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath ${DEVBOX_PROJECT_ROOT}/.devbox/virtenv/ios/DerivedData build"
+        "ios.sh xcodebuild -workspace MyApp.xcworkspace -scheme MyApp -configuration Debug -destination 'generic/platform=iOS Simulator' build"
       ],
       "start:android": [
         "process-compose -f tests/dev-android.yaml"
@@ -457,10 +432,10 @@ React Native projects can skip unused platform setup:
   "shell": {
     "scripts": {
       "build:ios": [
-        "ANDROID_SKIP_SETUP=1 devbox run --pure xcodebuild ..."
+        "ANDROID_SKIP_SETUP=1 devbox run --pure build:ios"
       ],
       "build:android": [
-        "IOS_SKIP_SETUP=1 devbox run --pure gradle assembleDebug"
+        "IOS_SKIP_SETUP=1 devbox run --pure build:android"
       ]
     }
   }
@@ -552,6 +527,8 @@ Customize Metro bundler port range:
 
 Device definitions in `devbox.d/android/devices/*.json`:
 
+> **Note:** The actual directory name under `devbox.d/` depends on how the plugin is included. When using GitHub includes (e.g., `github:segment-integrations/devbox-plugins?dir=plugins/android`), the directory name is derived from the repository path (e.g., `devbox.d/segment-integrations.devbox-plugins.android/devices/`). When using local path includes, it matches the plugin directory name.
+
 ```json
 {
   "name": "pixel_api30",
@@ -573,6 +550,8 @@ Device definitions in `devbox.d/android/devices/*.json`:
 ### iOS Device Schema
 
 Device definitions in `devbox.d/ios/devices/*.json`:
+
+> **Note:** The actual directory name under `devbox.d/` depends on how the plugin is included, same as the Android plugin above. For example, with GitHub includes it becomes `devbox.d/segment-integrations.devbox-plugins.ios/devices/`.
 
 ```json
 {
@@ -615,6 +594,8 @@ Example iOS `max.json`:
 
 Generated at `devbox.d/android/devices/devices.lock` by `android.sh devices eval`.
 
+> **Note:** The actual path depends on how the plugin is included. See the note in the Device Definitions section above.
+
 Format (plain text):
 ```
 device_name:checksum
@@ -625,6 +606,8 @@ max:789ghi012jkl
 ### iOS Lock File
 
 Generated at `devbox.d/ios/devices/devices.lock` by `ios.sh devices eval`.
+
+> **Note:** The actual path depends on how the plugin is included. See the note in the Device Definitions section above.
 
 Format (JSON):
 ```json
@@ -639,8 +622,7 @@ Format (JSON):
       "runtime": "17.5"
     }
   ],
-  "checksum": "abc123...",
-  "generated_at": "2026-02-09T12:00:00Z"
+  "checksum": "abc123..."
 }
 ```
 

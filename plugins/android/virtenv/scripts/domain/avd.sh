@@ -2,7 +2,7 @@
 # Android Plugin - AVD Manager Operations
 # Extracted from avd.sh to eliminate circular dependencies
 
-set -eu
+set -e
 
 if ! (return 0 2>/dev/null); then
   echo "ERROR: avd_manager.sh must be sourced, not executed directly" >&2

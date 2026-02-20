@@ -1,10 +1,10 @@
 {
   "name": "react-native",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Aggregates the Android and iOS Devbox plugins for React Native projects.",
   "include": [
-    "github:segment-integrations/devbox-plugins?dir=plugins/android&ref=main",
-    "github:segment-integrations/devbox-plugins?dir=plugins/ios&ref=main"
+    "path:../android/plugin.json",
+    "path:../ios/plugin.json"
   ],
   "packages": {
     "curl": "latest",
@@ -40,7 +40,7 @@
   },
   "shell": {
     "init_hook": [
-      "source {{ .Virtenv }}/scripts/init/init-hook.sh",
+      ". {{ .Virtenv }}/scripts/init/init-hook.sh",
       "export NODE_BINARY=\"$(command -v node)\""
     ],
     "scripts": {

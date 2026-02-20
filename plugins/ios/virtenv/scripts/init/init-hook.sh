@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
-# iOS plugin initialization script
+# iOS Plugin - Initialization Hook
 # Generates devices.lock from IOS_DEVICES environment variable
-# This runs before env.sh is sourced
+# This runs before setup.sh is sourced
 
 set -e
 
 # Skip all iOS initialization if IOS_SKIP_SETUP=1
 # Useful for Android-only contexts in React Native plugin
 if [ "${IOS_SKIP_SETUP:-0}" = "1" ]; then
+  exit 0
+fi
+
+if [ "$(uname -s)" != "Darwin" ]; then
   exit 0
 fi
 
@@ -97,14 +101,10 @@ else
   checksum=""
 fi
 
-# Generate timestamp
-timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date +%Y-%m-%dT%H:%M:%SZ)"
-
 # Create devices.lock with jq
 echo "$devices_array" | jq \
   --arg cs "$checksum" \
-  --arg ts "$timestamp" \
-  '{devices: ., checksum: $cs, generated_at: $ts}' \
+  '{devices: ., checksum: $cs}' \
   > "$DEVICES_LOCK" 2>/dev/null || exit 0
 
 # Make all scripts executable

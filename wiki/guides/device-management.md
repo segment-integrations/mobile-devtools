@@ -17,7 +17,7 @@ Device management in Devbox plugins follows a declarative approach. You define d
 
 ### Android Device Definitions
 
-Android device definitions specify AVD (Android Virtual Device) configurations. Each file in `devbox.d/android/devices/*.json` defines one device.
+Android device definitions specify AVD (Android Virtual Device) configurations. Each JSON file in your devices directory defines one device.
 
 **Schema:**
 ```json
@@ -74,7 +74,7 @@ Android device definitions specify AVD (Android Virtual Device) configurations. 
 
 ### iOS Device Definitions
 
-iOS device definitions specify simulator configurations. Each file in `devbox.d/ios/devices/*.json` defines one simulator.
+iOS device definitions specify simulator configurations. Each JSON file in your devices directory defines one simulator.
 
 **Schema:**
 ```json
@@ -127,16 +127,14 @@ Use `min.json` and `max.json` as standard device names for testing minimum and m
 - Standardized across projects
 
 **Example directory structure:**
-```
-devbox.d/android/devices/
-├── min.json          # API 21 - minimum supported
-├── max.json          # API 36 - latest available
-└── pixel_api28.json  # Custom device for specific testing
 
-devbox.d/ios/devices/
-├── min.json          # iOS 15.4 - minimum supported
-├── max.json          # iOS 26.2 - latest available
-└── ipad_pro.json     # Custom device for tablet testing
+The exact path of the devices directory depends on how the plugin is included in your project (local path vs GitHub reference). Inside your `devbox.d` folder, you will have a platform directory containing a `devices/` subdirectory:
+
+```
+<your-devices-directory>/
+├── min.json          # Minimum supported version (e.g., API 21 or iOS 15.4)
+├── max.json          # Latest available version (e.g., API 36 or iOS 26.2)
+└── custom.json       # Custom device for specific testing
 ```
 
 **CI usage:**
@@ -368,16 +366,16 @@ Lock files optimize CI builds by limiting which SDK versions and system images a
 Without lock files:
 - Nix evaluates all possible device configurations
 - Downloads system images for all API levels
-- Slow CI builds (can add 10+ minutes)
+- Slower CI builds
 
 With lock files:
 - Only evaluates specified devices
 - Downloads only required system images
-- Fast CI builds (evaluates in seconds)
+- Faster CI builds
 
 ### Android Lock File
 
-**Location:** `devbox.d/android/devices/devices.lock`
+**Location:** `devices.lock` inside your Android devices directory
 
 **Format:**
 ```json
@@ -396,19 +394,17 @@ With lock files:
       "tag": "google_apis"
     }
   ],
-  "checksum": "2f3ab0e3cefd3e9909185c0717dc9d63038da1e81625eb6fce585e3af446bfef",
-  "generated_at": "2026-02-12T06:54:22Z"
+  "checksum": "2f3ab0e3cefd3e9909185c0717dc9d63038da1e81625eb6fce585e3af446bfef"
 }
 ```
 
 **Fields:**
 - `devices` - Array of device configurations to evaluate
 - `checksum` - SHA-256 hash of all device definition files
-- `generated_at` - ISO 8601 timestamp
 
 ### iOS Lock File
 
-**Location:** `devbox.d/ios/devices/devices.lock`
+**Location:** `devices.lock` inside your iOS devices directory
 
 **Format:**
 ```json
@@ -423,8 +419,7 @@ With lock files:
       "runtime": "15.4"
     }
   ],
-  "checksum": "dd575d31a5adf2f471655389df301215f6ef7130ca284d433929b08b68e42890",
-  "generated_at": "2026-02-12T06:55:59Z"
+  "checksum": "dd575d31a5adf2f471655389df301215f6ef7130ca284d433929b08b68e42890"
 }
 ```
 
@@ -582,7 +577,8 @@ set -euo pipefail
 for device in min max; do
   echo "Testing on $device"
   devbox run android.sh emulator start "$device"
-  devbox run test:android
+  # Run your project-specific test command here
+  # e.g., devbox run ./gradlew connectedAndroidTest
   devbox run android.sh emulator stop
 done
 ```
@@ -595,7 +591,8 @@ set -euo pipefail
 for device in min max; do
   echo "Testing on $device"
   devbox run ios.sh simulator start "$device"
-  devbox run test:ios
+  # Run your project-specific test command here
+  # e.g., devbox run xcodebuild test -scheme MyApp
   devbox run ios.sh simulator stop
 done
 ```
@@ -612,7 +609,7 @@ processes:
   test-android-min:
     command: |
       devbox run android.sh emulator start min
-      devbox run test:android
+      # Run your project-specific test command here
     depends_on:
       setup:
         condition: process_completed
@@ -620,7 +617,7 @@ processes:
   test-android-max:
     command: |
       devbox run android.sh emulator start max
-      devbox run test:android
+      # Run your project-specific test command here
     depends_on:
       setup:
         condition: process_completed
@@ -628,7 +625,7 @@ processes:
   test-ios-min:
     command: |
       devbox run ios.sh simulator start min
-      devbox run test:ios
+      # Run your project-specific test command here
     depends_on:
       setup:
         condition: process_completed
@@ -636,7 +633,7 @@ processes:
   test-ios-max:
     command: |
       devbox run ios.sh simulator start max
-      devbox run test:ios
+      # Run your project-specific test command here
     depends_on:
       setup:
         condition: process_completed
@@ -667,26 +664,23 @@ Override device selection for individual test runs.
 
 **Android:**
 ```bash
-# Use default device
-devbox run test:android
+# Start emulator with default device
+devbox run android.sh emulator start
 
-# Override for specific device
-ANDROID_DEVICE_NAME=pixel_api28 devbox run test:android
-
-# Legacy override variable
-TARGET_DEVICE=pixel_api28 devbox run test:android
+# Start emulator with specific device
+devbox run android.sh emulator start pixel_api28
 ```
 
 **iOS:**
 ```bash
-# Use default device
-devbox run test:ios
+# Start simulator with default device
+devbox run ios.sh simulator start
 
-# Override for specific device (via command argument)
-devbox run test:ios iphone15
-
-# Or set device in test suite configuration
+# Start simulator with specific device
+devbox run ios.sh simulator start iphone15
 ```
+
+Build, test, and deploy commands are project-specific and must be defined by you in your `devbox.json` scripts section.
 
 ### Matrix Testing
 
@@ -705,7 +699,8 @@ for device in "${ANDROID_DEVICES[@]}"; do
   for config in "${CONFIGS[@]}"; do
     echo "Testing Android $device with $config"
     devbox run android.sh emulator start "$device"
-    devbox run test:android:$config
+    # Run your project-specific test command here, e.g.:
+    # devbox run ./gradlew connectedAndroidTest -PbuildType="$config"
     devbox run android.sh emulator stop
   done
 done
@@ -714,7 +709,8 @@ for device in "${IOS_DEVICES[@]}"; do
   for config in "${CONFIGS[@]}"; do
     echo "Testing iOS $device with $config"
     devbox run ios.sh simulator start "$device"
-    devbox run test:ios:$config
+    # Run your project-specific test command here, e.g.:
+    # devbox run xcodebuild test -scheme MyApp -configuration "$config"
     devbox run ios.sh simulator stop
   done
 done
@@ -744,15 +740,15 @@ Specify a default device used when no device is explicitly provided.
 }
 ```
 
-**Usage:**
+**Usage with plugin-provided commands:**
 ```bash
-# Uses default device
-devbox run start:app
-devbox run start:ios
+# Start emulator/simulator with default device
+devbox run android.sh emulator start
+devbox run ios.sh simulator start
 
-# Override with specific device
-devbox run start:app min
-devbox run start:ios min
+# Start emulator/simulator with specific device
+devbox run android.sh emulator start min
+devbox run ios.sh simulator start min
 ```
 
 ### CI Device Selection
@@ -783,7 +779,7 @@ jobs:
       - uses: actions/checkout@v3
       - run: devbox install
       - run: devbox run android.sh emulator start ${{ matrix.device }}
-      - run: devbox run test:android
+      - run: devbox run your-android-test-script  # Define in devbox.json scripts
       - run: devbox run android.sh emulator stop
 
   test-ios:
@@ -795,7 +791,7 @@ jobs:
       - uses: actions/checkout@v3
       - run: devbox install
       - run: devbox run ios.sh simulator start ${{ matrix.device }}
-      - run: devbox run test:ios
+      - run: devbox run your-ios-test-script  # Define in devbox.json scripts
       - run: devbox run ios.sh simulator stop
 ```
 
@@ -877,8 +873,8 @@ Use clear, descriptive names for devices.
 Commit device definitions and lock files.
 
 **What to commit:**
-- `devbox.d/*/devices/*.json` - Device definitions
-- `devbox.d/*/devices/devices.lock` - Lock files
+- `*.json` files in your devices directories - Device definitions
+- `devices.lock` files in your devices directories - Lock files
 
 **What to ignore:**
 - `.devbox/virtenv/` - Generated runtime files
@@ -914,8 +910,8 @@ devbox run android.sh devices create pixel_api35 \
 # Regenerate lock file
 devbox run android.sh devices eval
 
-# Commit both
-git add devbox.d/android/devices/
+# Commit both the device definition and updated lock file
+git add <your-android-devices-directory>/
 git commit -m "feat(android): add pixel_api35 device"
 ```
 
@@ -937,8 +933,8 @@ devbox run android.sh devices update max --api 36
 # Regenerate lock
 devbox run android.sh devices eval
 
-# Test compatibility
-devbox run test:android max
+# Test compatibility by starting the emulator with the updated device
+devbox run android.sh emulator start max
 ```
 
 ### Performance Optimization
@@ -980,7 +976,7 @@ Execution continues. Regenerate lock file when convenient.
 
 **Missing device definition (error):**
 ```
-[ERROR] Device 'pixel_api30' not found in devbox.d/android/devices/
+[ERROR] Device 'pixel_api30' not found in devices directory
         Available devices: min, max
 ```
 Execution stops. Create device or use an available device name.
@@ -1011,18 +1007,19 @@ For React Native or hybrid apps, manage both Android and iOS devices.
 ```
 
 **Directory structure:**
+
+The exact layout of your `devbox.d` directory depends on how the plugin is included (local path vs GitHub reference). Each platform will have its own devices directory containing your device definitions and lock file:
+
 ```
-devbox.d/
-├── android/
-│   └── devices/
-│       ├── min.json
-│       ├── max.json
-│       └── devices.lock
-└── ios/
-    └── devices/
-        ├── min.json
-        ├── max.json
-        └── devices.lock
+<android-devices-directory>/
+├── min.json
+├── max.json
+└── devices.lock
+
+<ios-devices-directory>/
+├── min.json
+├── max.json
+└── devices.lock
 ```
 
 **Testing workflow:**
@@ -1030,14 +1027,14 @@ devbox.d/
 # Android testing
 devbox run android.sh devices list
 devbox run android.sh devices eval
-devbox run start:app min
-devbox run start:app max
+devbox run android.sh emulator start min
+devbox run android.sh emulator start max
 
 # iOS testing
 devbox run ios.sh devices list
 devbox run ios.sh devices eval
-devbox run start:ios min
-devbox run start:ios max
+devbox run ios.sh simulator start min
+devbox run ios.sh simulator start max
 ```
 
 ## Troubleshooting
@@ -1051,8 +1048,8 @@ devbox run start:ios max
 # List available devices
 devbox run {platform}.sh devices list
 
-# Check file exists
-ls devbox.d/{platform}/devices/
+# Check file exists in your devices directory
+ls <your-devices-directory>/
 
 # Ensure filename matches (case-sensitive)
 # device-name.json should match exactly
@@ -1068,9 +1065,8 @@ ls devbox.d/{platform}/devices/
 devbox run android.sh devices eval
 devbox run ios.sh devices eval
 
-# Commit updated lock file
-git add devbox.d/*/devices/devices.lock
-git commit -m "chore: update device lock files"
+# Commit updated lock files from your devices directories
+git commit -am "chore: update device lock files"
 ```
 
 ### Android System Image Not Found

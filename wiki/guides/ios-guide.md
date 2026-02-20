@@ -6,11 +6,13 @@ A complete guide to iOS development using the Devbox iOS plugin. This guide cove
 
 The iOS plugin enables reproducible iOS development by automatically discovering Xcode and managing iOS simulators project-locally. It provides:
 
-- **Project-local simulator management**: Device definitions stored in `devbox.d/ios/devices/`, isolated from system-wide simulator configuration
+- **Project-local simulator management**: Device definitions stored in your devbox.d directory, isolated from system-wide simulator configuration
 - **Automatic Xcode discovery**: Multi-strategy detection with caching for fast shell initialization
 - **Device management**: JSON-based device definitions with CLI commands for creating, updating, and managing simulators
-- **Development scripts**: Runtime scripts for building, running, and debugging iOS apps
-- **Testing infrastructure**: E2E test suites with process-compose for automated testing
+- **Simulator control**: Scripts for starting and stopping simulators
+- **App deployment**: `ios.sh run` auto-detects your `.app` bundle, extracts the bundle ID, and deploys to the simulator
+
+The plugin auto-detects your Xcode project, `.app` path, and bundle ID at runtime. You define a `build:ios` script in your `devbox.json` to handle the actual Xcode build, then `ios.sh run` handles everything else. See [Adding Build Scripts](#adding-build-and-deploy-scripts) for patterns.
 
 Pure shells with `devbox run --pure` create test-specific simulators and clean up after execution, ensuring isolated, reproducible testing.
 
@@ -18,9 +20,10 @@ Pure shells with `devbox run --pure` create test-specific simulators and clean u
 
 ### Prerequisites
 
-- macOS (iOS development requires macOS)
-- [Xcode](https://apps.apple.com/app/xcode/id497799835) installed from the App Store, or Xcode Command Line Tools
+- macOS with [Xcode](https://apps.apple.com/app/xcode/id497799835) installed
 - [Devbox](https://www.jetify.com/devbox/docs/installing_devbox/) installed
+
+Devbox handles downloading other tools — you don't need to install them separately.
 
 ### Adding the Plugin to Your Project
 
@@ -28,14 +31,11 @@ Create or modify your `devbox.json` to include the iOS plugin:
 
 ```json
 {
-  "include": ["github:segment-integrations/devbox-plugins?dir=plugins/ios"],
-  "env": {
-    "IOS_APP_PROJECT": "MyApp.xcodeproj",
-    "IOS_APP_SCHEME": "MyApp",
-    "IOS_APP_BUNDLE_ID": "com.example.myapp"
-  }
+  "include": ["github:segment-integrations/devbox-plugins?dir=plugins/ios"]
 }
 ```
+
+Build output is stored in `.devbox/virtenv/ios/DerivedData` by default (configurable via `IOS_DERIVED_DATA_PATH`).
 
 ### Initial Setup
 
@@ -47,8 +47,8 @@ devbox shell
 
 This command:
 1. Discovers Xcode installation automatically
-2. Creates device definitions in `devbox.d/ios/devices/`
-3. Sets up runtime scripts in `.devbox/virtenv/ios/scripts/`
+2. Creates device definitions in your devbox.d directory
+3. Sets up runtime scripts
 4. Configures environment variables for iOS development
 5. Caches Xcode path for fast subsequent initialization
 
@@ -70,14 +70,16 @@ This checks for Xcode installation, command-line tools, xcrun and simctl availab
 
 ## Device Management
 
-Device definitions are JSON files stored in `devbox.d/ios/devices/`. Each device specifies an iOS simulator configuration.
+Device definitions are JSON files that describe simulator configurations. Each plugin install creates a `devices/` directory inside your `devbox.d/` folder with default device files.
 
 ### Default Devices
 
 The plugin includes two default devices:
 
-- `min.json` - Minimum supported iOS version (iOS 15.4)
-- `max.json` - Latest iOS version (currently iOS 26.2)
+- `min.json` - Minimum supported iOS version (iOS 15.4, named `iPhone 13`)
+- `max.json` - Latest iOS version (iOS 26.2, named `iPhone 17`)
+
+These files live in your `devbox.d/` directory, which is the devbox plugin configuration folder. The plugin creates a subdirectory there with a `devices/` folder containing them (e.g., `devbox.d/<plugin-dir>/devices/min.json`). The filenames (`min`, `max`) are short nicknames you use in commands. The `name` field inside each JSON file is the simulator display name that appears in device listings.
 
 ### Listing Devices
 
@@ -87,7 +89,7 @@ View all available device definitions:
 devbox run ios.sh devices list
 ```
 
-Output shows device names, display names, and iOS runtime versions.
+Output shows device names and iOS runtime versions.
 
 ### Viewing Available Device Types and Runtimes
 
@@ -177,7 +179,7 @@ After creating, updating, or deleting devices, regenerate the lock file:
 devbox run ios.sh devices eval
 ```
 
-The lock file (`devbox.d/ios/devices/devices.lock`) tracks which devices should be created and includes checksums for validation. Commit this file to version control.
+The lock file (in your devices directory) tracks which devices should be created and includes checksums for validation. Commit this file to version control.
 
 ### Syncing Simulators
 
@@ -197,24 +199,6 @@ Run this after modifying device files or pulling changes.
 
 ## Development Workflow
 
-### Building Your App
-
-Build the iOS app using Xcode:
-
-```bash
-# Standard build
-devbox run build
-
-# Or build with xcodebuild directly
-xcodebuild -project ${IOS_APP_PROJECT} -scheme ${IOS_APP_SCHEME} -configuration Debug \
-  -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData build
-```
-
-The plugin automatically configures the build environment, setting `DEVELOPER_DIR` and adding Xcode tools to PATH. Builds are configured for:
-- Destination: iOS Simulator
-- Configuration: Debug
-- Output: `IOS_APP_DERIVED_DATA` (default: `.devbox/virtenv/ios/DerivedData`)
-
 ### Starting a Simulator
 
 Start an iOS simulator for testing:
@@ -223,7 +207,7 @@ Start an iOS simulator for testing:
 # Start default device
 devbox run start:sim
 
-# Start specific device
+# Start specific device by nickname
 devbox run start:sim iphone15
 ```
 
@@ -239,33 +223,6 @@ Set the default device in `devbox.json`:
 }
 ```
 
-### Running Your App
-
-Build, install, and launch your app on the simulator:
-
-```bash
-# Build and run on default device
-devbox run start:ios
-
-# Build and run on specific device
-devbox run start:ios iphone15
-```
-
-The `start-ios` command:
-1. Builds the app (runs `build-ios`)
-2. Installs the app bundle matched by `IOS_APP_ARTIFACT`
-3. Launches the app on the simulator
-
-The app artifact path is auto-detected based on your Xcode configuration. You can override it:
-
-```json
-{
-  "env": {
-    "IOS_APP_ARTIFACT": ".devbox/virtenv/ios/DerivedData/Build/Products/Debug-iphonesimulator/MyApp.app"
-  }
-}
-```
-
 ### Stopping the Simulator
 
 Stop all running simulators:
@@ -274,7 +231,62 @@ Stop all running simulators:
 devbox run stop:sim
 ```
 
-This shuts down all iOS simulators.
+### Adding Build and Deploy Scripts
+
+The plugin provides simulator and device management. Build and deploy commands are specific to your Xcode project, so you define them in your `devbox.json`. Here's a typical setup:
+
+```json
+{
+  "include": ["github:segment-integrations/devbox-plugins?dir=plugins/ios"],
+  "shell": {
+    "scripts": {
+      "build:ios": [
+        "ios.sh xcodebuild -scheme MyApp -configuration Debug -destination 'generic/platform=iOS Simulator' build"
+      ],
+      "build:release": [
+        "ios.sh xcodebuild -scheme MyApp -configuration Release build"
+      ],
+      "start:app": [
+        "ios.sh run ${1:-}"
+      ]
+    }
+  }
+}
+```
+
+The `ios.sh run` command handles the full deployment pipeline: starts the simulator, runs your `build:ios` script, auto-detects the `.app` bundle, extracts the bundle ID from `Info.plist`, installs, and launches. The `${1:-}` syntax passes an optional device nickname through.
+
+**How app auto-detection works:** After building, `ios.sh run` finds your `.app` bundle using this precedence chain:
+
+1. `IOS_APP_ARTIFACT` env var — if set, resolves the path/glob relative to project root
+2. `xcodebuild -showBuildSettings` — queries your Xcode project for BUILT_PRODUCTS_DIR + FULL_PRODUCT_NAME (auto-detected from project)
+3. Recursive search of the project directory for `.app` bundles, skipping `Pods/`, `.build/`, `node_modules/`, `.devbox/`, and similar directories
+4. Recursive search of the current working directory (if different from project root)
+
+In most projects, step 2 or 3 finds the right `.app` automatically with no configuration needed. If auto-detection doesn't work (e.g., multiple `.app` bundles, non-standard project layout), set `IOS_APP_ARTIFACT` explicitly:
+
+```json
+{
+  "env": {
+    "IOS_APP_ARTIFACT": "DerivedData/Build/Products/Debug-iphonesimulator/MyApp.app"
+  }
+}
+```
+
+With the scripts defined above, you can:
+
+```bash
+# Build the app
+devbox run build:ios
+
+# Start simulator, install, and launch
+devbox run start:app
+
+# Run on a specific device
+devbox run start:app min
+```
+
+See the [iOS example project](../../examples/ios/) for a complete working setup. The example project uses a local plugin path for development. If you use it as a template, change the `include` to the GitHub URL shown above.
 
 ### Complete Development Workflow Example
 
@@ -284,49 +296,41 @@ Typical development session:
 # 1. Enter devbox shell
 devbox shell
 
-# 2. Start simulator
-devbox run start:sim max
+# 2. Build and deploy (starts simulator, builds, installs, and launches)
+devbox run start:app
 
-# 3. Build and run app
-devbox run build
-devbox run start:ios max
-
-# 4. Make code changes, rebuild, and redeploy
-devbox run build
-devbox run start:ios max
+# 3. Make code changes, rebuild, and redeploy
+devbox run start:app
 
 # 5. Stop simulator when done
 devbox run stop:sim
-```
-
-For a streamlined workflow, use the combined command that handles everything:
-
-```bash
-# Build, install, and launch in one command
-devbox run start:ios
 ```
 
 ## Testing
 
 ### Running E2E Tests
 
-The plugin includes E2E test infrastructure using process-compose. Example projects include test suites that:
+The [iOS example project](../../examples/ios/) includes E2E test infrastructure using process-compose. You can use it as a template for your own project.
 
-1. Build the app
-2. Sync simulators with device definitions
-3. Start the simulator
-4. Deploy and launch the app
-5. Verify the app is running
-6. Clean up (stop app and simulator in pure mode)
-
-Run the complete E2E test:
+Copy the example test suite:
 
 ```bash
-cd examples/ios
-devbox run test:e2e
+cp -r examples/ios/tests/ your-project/tests/
 ```
 
-Duration: 3-5 minutes (faster with warm build cache)
+Add a test script to your `devbox.json`:
+
+```json
+{
+  "shell": {
+    "scripts": {
+      "test:e2e": [
+        "process-compose -f tests/test-suite.yaml --no-server --tui=${TEST_TUI:-false}"
+      ]
+    }
+  }
+}
+```
 
 ### Normal Mode vs Pure Mode
 
@@ -348,14 +352,9 @@ devbox run test:e2e
 
 ```bash
 devbox run --pure test:e2e
-
-# Or in CI:
-IN_NIX_SHELL=pure devbox run test:e2e
 ```
 
-The `IN_NIX_SHELL` environment variable is automatically set by devbox:
-- `IN_NIX_SHELL=impure` - Normal mode
-- `IN_NIX_SHELL=pure` - Pure mode (set by `--pure` flag)
+The `DEVBOX_PURE_SHELL` environment variable is automatically set by devbox when using the `--pure` flag. Scripts auto-detect this to determine whether to create fresh, isolated emulators/simulators.
 
 ### Interactive Monitoring
 
@@ -369,23 +368,11 @@ The TUI shows process status, logs, and resource usage during test execution.
 
 ### Adding Tests to Your Project
 
-Copy the example test suite:
-
-```bash
-cp -r examples/ios/tests/ your-project/tests/
-```
-
 Configure for your app in `devbox.json`:
 
 ```json
 {
   "include": ["github:segment-integrations/devbox-plugins?dir=plugins/ios"],
-  "env": {
-    "IOS_APP_PROJECT": "YourApp.xcodeproj",
-    "IOS_APP_SCHEME": "YourApp",
-    "IOS_APP_BUNDLE_ID": "com.yourcompany.yourapp",
-    "IOS_APP_ARTIFACT": ".devbox/virtenv/ios/DerivedData/Build/Products/Debug-iphonesimulator/YourApp.app"
-  },
   "shell": {
     "scripts": {
       "test:e2e": [
@@ -430,12 +417,9 @@ Environment variables:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `IOS_APP_PROJECT` | Path to .xcodeproj or .xcworkspace | Required |
-| `IOS_APP_SCHEME` | Xcode build scheme | Required |
-| `IOS_APP_BUNDLE_ID` | App bundle identifier | Required |
-| `IOS_APP_ARTIFACT` | Path to built .app bundle | Auto-detected |
+| `IOS_APP_ARTIFACT` | Path or glob for .app bundle | Auto-detect |
 | `IOS_DEFAULT_DEVICE` | Default simulator device | `max` |
-| `IOS_DOWNLOAD_RUNTIME` | Auto-download missing runtimes (0/1) | `0` |
+| `IOS_DOWNLOAD_RUNTIME` | Auto-download missing runtimes (0/1) | `1` |
 | `TEST_TUI` | Show process-compose TUI (true/false) | `false` |
 | `BOOT_TIMEOUT` | Simulator boot timeout (seconds) | `120` |
 | `TEST_TIMEOUT` | Overall test timeout (seconds) | `300` |
@@ -451,11 +435,7 @@ Configure the plugin by setting environment variables in `devbox.json`:
   "env": {
     "IOS_DEFAULT_DEVICE": "max",
     "IOS_DEVICES": "min,max",
-    "IOS_APP_PROJECT": "ios.xcodeproj",
-    "IOS_APP_SCHEME": "ios",
-    "IOS_APP_BUNDLE_ID": "com.example.ios",
-    "IOS_APP_ARTIFACT": ".devbox/virtenv/ios/DerivedData/Build/Products/Debug-iphonesimulator/ios.app",
-    "IOS_DOWNLOAD_RUNTIME": "0"
+    "IOS_DOWNLOAD_RUNTIME": "1"
   }
 }
 ```
@@ -463,18 +443,18 @@ Configure the plugin by setting environment variables in `devbox.json`:
 Key variables:
 - `IOS_DEFAULT_DEVICE` - Default device when none specified
 - `IOS_DEVICES` - Comma-separated device names to evaluate (empty = all)
-- `IOS_APP_PROJECT` - Path to .xcodeproj or .xcworkspace
-- `IOS_APP_SCHEME` - Xcode build scheme
-- `IOS_APP_BUNDLE_ID` - App bundle identifier
-- `IOS_APP_ARTIFACT` - Path to built .app bundle (auto-detected if not set)
-- `IOS_DOWNLOAD_RUNTIME` - Auto-download missing iOS runtimes (0/1)
+- `IOS_APP_ARTIFACT` - Path or glob for .app bundle (empty = auto-detect via xcodebuild + search)
+- `IOS_APP_SCHEME` - Xcode scheme override (empty = auto-detect from project name)
+- `IOS_BUILD_CONFIG` - Build configuration: Debug or Release (default: Debug)
+- `IOS_DERIVED_DATA_PATH` - DerivedData directory (default: .devbox/virtenv/ios/DerivedData)
+- `IOS_DOWNLOAD_RUNTIME` - Auto-download missing iOS runtimes (0/1, default: 1)
 
 ### Xcode Configuration
 
 The plugin automatically discovers Xcode using multiple fallback strategies:
 
 1. Check `IOS_DEVELOPER_DIR` environment variable
-2. Check cache file (`.devbox/virtenv/ios/.xcode_dev_dir.cache`, 1-hour TTL)
+2. Check cache file (1-hour TTL)
 3. Find latest Xcode in `/Applications/Xcode*.app` by version number
 4. Use `xcode-select -p` output
 5. Fallback to `/Applications/Xcode.app/Contents/Developer`
@@ -488,8 +468,6 @@ Override discovery by setting `IOS_DEVELOPER_DIR`:
   }
 }
 ```
-
-The discovered path is cached for 1 hour to improve shell startup performance.
 
 ### Performance Optimization
 
@@ -542,10 +520,7 @@ This shows:
 - Scripts directory
 - Default device
 - Selected devices (from `IOS_DEVICES`)
-- App project path
-- App scheme
-- App bundle ID
-- App artifact path
+- App artifact path (or auto-detect)
 - Runtime download setting
 
 ## Troubleshooting
@@ -642,9 +617,9 @@ This shows:
 
 **Solutions**:
 
-1. Verify app bundle exists:
+1. Verify app bundle exists (check your build output directory):
    ```bash
-   ls -la $IOS_APP_ARTIFACT
+   find . -name '*.app' -type d -not -path '*/.devbox/*'
    ```
 
 2. Check simulator is booted:
@@ -652,27 +627,29 @@ This shows:
    xcrun simctl list devices | grep Booted
    ```
 
-3. Verify bundle ID:
+3. Verify bundle ID from a .app bundle:
    ```bash
-   defaults read "$IOS_APP_ARTIFACT/Info.plist" CFBundleIdentifier
+   /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' /path/to/MyApp.app/Info.plist
    ```
 
-4. Check app bundle structure:
-   ```bash
-   ls -la "$IOS_APP_ARTIFACT/"
+4. If auto-detection fails, set `IOS_APP_ARTIFACT` explicitly in `devbox.json`:
+   ```json
+   {
+     "env": {
+       "IOS_APP_ARTIFACT": "DerivedData/Build/Products/Debug-iphonesimulator/MyApp.app"
+     }
+   }
    ```
 
 ### Build Failures with Nix Flags
 
 **Symptom**: Xcode build errors related to linker flags or Nix environment variables.
 
-**Solution**: The plugin automatically strips Nix-related flags from the build environment. If you still encounter issues, the build script uses:
+**Solution**: The iOS init hook strips Nix compilation variables (`LD`, `LDFLAGS`, `NIX_LDFLAGS`, `NIX_CFLAGS_COMPILE`, `NIX_CFLAGS_LINK`) at shell startup, so `xcodebuild` works natively in devbox shell. If you still encounter issues, use the `ios.sh xcodebuild` wrapper which strips these variables in a subshell:
 
 ```bash
-env -u LD -u LDFLAGS -u NIX_LDFLAGS xcodebuild ...
+ios.sh xcodebuild -scheme MyApp build
 ```
-
-This ensures Xcode uses its native toolchain without interference from Nix.
 
 ### Lock File Out of Sync
 
@@ -700,8 +677,6 @@ Commit the updated lock file to version control.
 2. Check system resources (CPU, memory):
    ```bash
    top
-   # or
-   htop
    ```
 
 3. View simulator logs:
@@ -726,9 +701,6 @@ IOS_DEBUG=1 devbox shell
 
 # Global debug
 DEBUG=1 devbox shell
-
-# Debug during tests
-IOS_DEBUG=1 devbox run test:e2e
 ```
 
 Debug logs show:
@@ -742,13 +714,13 @@ Debug logs show:
 
 **Check Test Logs:**
 
-Test logs are written to `reports/ios-e2e-logs/`:
+Test logs are written to `reports/`:
 
 ```bash
 # View all logs
-ls -la reports/ios-e2e-logs/
+ls -la reports/
 
-# View specific process log
+# View specific process log (paths depend on your test suite configuration)
 cat reports/ios-e2e-logs/build-app.log
 cat reports/ios-e2e-logs/ios-simulator.log
 cat reports/ios-e2e-logs/deploy-app.log
@@ -766,13 +738,6 @@ xcrun simctl list devices | grep "Booted"
 # View simulator logs
 tail -f ~/Library/Logs/CoreSimulator/*/system.log
 ```
-
-**Common Issues:**
-
-- **Build Failures**: Check Xcode installation, verify project path, check scheme exists, view build log
-- **Simulator Won't Start**: Check CoreSimulatorService, restart service, check disk space, view simulator log
-- **App Won't Install**: Verify app bundle exists, check simulator is booted, check bundle ID
-- **Timeout Errors**: Increase `BOOT_TIMEOUT` for slow machines, increase `TEST_TIMEOUT` for large builds, check system resources
 
 ## Common Use Cases
 
@@ -799,9 +764,13 @@ Test your app across multiple iOS versions:
 
 4. Test on each device:
    ```bash
-   devbox run start:ios iphone_ios15
-   devbox run start:ios iphone_ios17
-   devbox run start:ios iphone_ios18
+   devbox run start:sim iphone_ios15
+   # run your tests...
+   devbox run stop:sim
+
+   devbox run start:sim iphone_ios18
+   # run your tests...
+   devbox run stop:sim
    ```
 
 ### CI/CD Integration
@@ -901,7 +870,7 @@ The device name in the JSON file should match the device type from `xcrun simctl
 
 ### Example Projects
 
-- **[iOS Example](../../examples/ios/)**: Minimal iOS app demonstrating plugin usage
+- **[iOS Example](../../examples/ios/)**: Complete iOS app with build scripts, deploy commands, and E2E test suites
 - **[React Native Example](../../examples/react-native/)**: Cross-platform app using both iOS and Android plugins
 
 ### Community and Support

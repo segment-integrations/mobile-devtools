@@ -33,7 +33,7 @@
       ],
       "test:unit": [
         "echo 'Running orchestrated unit tests...'",
-        "process-compose -f tests/process-compose-unit-tests.yaml --tui=${TEST_TUI:-false}"
+        "process-compose -f tests/unit-tests.yaml --tui=${TEST_TUI:-false}"
       ],
       "test:e2e:android": [
         "echo 'Running Android example E2E test...'",
@@ -49,7 +49,7 @@
       ],
       "test:e2e": [
         "echo 'Running E2E tests (orchestrated: android+ios parallel, then rn)...'",
-        "process-compose -f tests/process-compose-e2e.yaml --no-server --tui=${TEST_TUI:-false}"
+        "process-compose -f tests/e2e.yaml --no-server --tui=${TEST_TUI:-false}"
       ],
       "test": [
         "echo '========================================'",
@@ -107,6 +107,9 @@
       "test:plugin:android:apk-detection": [
         "(cd examples/android && devbox run bash ../../plugins/tests/android/test-apk-detection.sh)"
       ],
+      "test:plugin:android:apk-resolution": [
+        "bash plugins/tests/android/test-apk-resolution.sh"
+      ],
       "test:plugin:android:emulator-detection": [
         "(cd examples/android && devbox run bash ../../plugins/tests/android/test-emulator-detection.sh)"
       ],
@@ -116,7 +119,8 @@
       "test:plugin:android": [
         "devbox run test:plugin:android:lib",
         "devbox run test:plugin:android:devices",
-        "devbox run test:plugin:android:apk-detection"
+        "devbox run test:plugin:android:apk-detection",
+        "devbox run test:plugin:android:apk-resolution"
       ],
       "test:plugin:android:all": [
         "echo 'Running all Android plugin tests (including emulator tests)...'",
@@ -131,9 +135,13 @@
       "test:plugin:ios:devices": [
         "sh plugins/tests/ios/test-devices.sh"
       ],
+      "test:plugin:ios:app-resolution": [
+        "bash plugins/tests/ios/test-app-resolution.sh"
+      ],
       "test:plugin:ios": [
         "devbox run test:plugin:ios:lib",
-        "devbox run test:plugin:ios:devices"
+        "devbox run test:plugin:ios:devices",
+        "devbox run test:plugin:ios:app-resolution"
       ],
       "test:plugin:devbox-mcp": [
         "echo 'Running devbox-mcp plugin tests...'",
@@ -187,10 +195,9 @@
         "bash scripts/bump.sh \"${@}\""
       ],
       "test:fast": [
-        "echo 'Running fast tests (lint + unit + integration)...'",
+        "echo 'Running fast tests (lint + unit + integration in parallel)...'",
         "devbox run lint",
-        "devbox run test:plugin:unit",
-        "devbox run test:integration",
+        "devbox run test:unit",
         "bash tests/test-summary.sh"
       ]
     }

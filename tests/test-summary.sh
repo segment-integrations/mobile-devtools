@@ -1,421 +1,154 @@
 #!/usr/bin/env bash
-# Test Suite Summary Generator
-# Aggregates test results from all test suites and displays summary
-
+# Test Suite Summary - ASCII terminal output + markdown report
+# Aggregates reports/results/*.json written by test_summary()
 set -euo pipefail
 
-# Setup logging to file - redirect all output through tee
-mkdir -p "${TEST_LOGS_DIR:-reports/logs}"
-LOG_FILE="${TEST_LOGS_DIR:-reports/logs}/summary.txt"
+# Configuration
+REPORTS_DIR="${REPORTS_DIR:-reports}"
+TEST_RESULTS_DIR="${TEST_RESULTS_DIR:-$REPORTS_DIR/results}"
+TEST_LOGS_DIR="${TEST_LOGS_DIR:-$REPORTS_DIR/logs}"
 
-# Use exec to redirect all output to both stdout and log file
+# Setup logging to file
+mkdir -p "$TEST_LOGS_DIR"
+LOG_FILE="$TEST_LOGS_DIR/summary.txt"
 exec > >(tee "$LOG_FILE")
 exec 2>&1
+
+# Source framework for _regenerate_summary
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+export REPO_ROOT
+. "$REPO_ROOT/plugins/tests/test-framework.sh"
+
+# Regenerate reports/summary.md from all per-suite JSONs
+_regenerate_summary "$TEST_RESULTS_DIR"
 
 # ANSI color codes
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 BOLD='\033[1m'
-NC='\033[0m' # No Color
+DIM='\033[2m'
+NC='\033[0m'
 
-# Configuration (can be overridden via env vars)
-REPORTS_DIR="${REPORTS_DIR:-reports}"
-TEST_RESULTS_DIR="${TEST_RESULTS_DIR:-$REPORTS_DIR/results}"
+# ============================================================================
+# Collect results for ASCII output
+# ============================================================================
 
-# Results tracking
-total_passed=0
-total_failed=0
-suite_count=0
+_total_passed=0
+_total_failed=0
+_suite_count=0
+_any_failure=0
+
+_suite_names=()
+_suite_passed=()
+_suite_failed=()
+_suite_totals=()
+_suite_times=()
+
+for result_file in $(ls "$TEST_RESULTS_DIR"/*.json 2>/dev/null | sort); do
+  [ -f "$result_file" ] || continue
+  name=$(jq -r '.suite // "unknown"' "$result_file" 2>/dev/null)
+  p=$(jq -r '.passed // 0' "$result_file" 2>/dev/null)
+  f=$(jq -r '.failed // 0' "$result_file" 2>/dev/null)
+  t=$(jq -r '.total // 0' "$result_file" 2>/dev/null)
+  ts=$(jq -r '.timestamp // ""' "$result_file" 2>/dev/null)
+
+  _suite_names+=("$name")
+  _suite_passed+=("$p")
+  _suite_failed+=("$f")
+  _suite_totals+=("$t")
+  _suite_times+=("$ts")
+
+  _total_passed=$((_total_passed + p))
+  _total_failed=$((_total_failed + f))
+  _suite_count=$((_suite_count + 1))
+  if [ "$f" -gt 0 ]; then _any_failure=1; fi
+done
+
+_grand_total=$((_total_passed + _total_failed))
+
+# Column width from longest suite name
+col=10
+for name in "${_suite_names[@]}"; do
+  [ ${#name} -gt "$col" ] && col=${#name}
+done
+
+# ============================================================================
+# ASCII box table
+# ============================================================================
+
+divider=$(printf '%0.s─' $(seq 1 $((col + 56))))
 
 echo ""
-echo "========================================"
-echo "     TEST SUITE SUMMARY"
-echo "========================================"
+echo "┌${divider}┐"
+printf "│%*s│\n" $((col + 56)) ""
+if [ "$_any_failure" -gt 0 ]; then
+  label="SOME TESTS FAILED"
+  pad_total=$((col + 56 - ${#label}))
+  pad_left=$((pad_total / 2))
+  pad_right=$((pad_total - pad_left))
+  printf "│$(printf '%*s' "$pad_left" "")${RED}${BOLD}%s${NC}$(printf '%*s' "$pad_right" "")│\n" "$label"
+else
+  label="ALL ${_suite_count} SUITES PASSED (${_grand_total} tests)"
+  pad_total=$((col + 56 - ${#label}))
+  pad_left=$((pad_total / 2))
+  pad_right=$((pad_total - pad_left))
+  printf "│$(printf '%*s' "$pad_left" "")${GREEN}${BOLD}%s${NC}$(printf '%*s' "$pad_right" "")│\n" "$label"
+fi
+printf "│%*s│\n" $((col + 56)) ""
+echo "├${divider}┤"
+
+# Table header
+printf "│ ${BOLD}%-${col}s │ %7s │ %7s │ %7s │ %-6s │ %-19s${NC} │\n" "Suite" "Passed" "Failed" "Total" "Result" "Ran At"
+echo "├${divider}┤"
+
+# Suite rows
+for i in $(seq 0 $((_suite_count - 1))); do
+  if [ "${_suite_failed[$i]}" -gt 0 ]; then
+    status="${RED}FAIL${NC}  "
+  else
+    status="${GREEN}PASS${NC}  "
+  fi
+  printf "│ %-${col}s │ %7d │ %7d │ %7d │ %b│ %-19s │\n" \
+    "${_suite_names[$i]}" "${_suite_passed[$i]}" "${_suite_failed[$i]}" "${_suite_totals[$i]}" "$status" "${_suite_times[$i]}"
+done
+
+if [ "$_suite_count" -eq 0 ]; then
+  printf "│ ${DIM}%-$((col + 54))s${NC} │\n" "No test results found in $TEST_RESULTS_DIR/"
+fi
+
+# Totals row
+echo "├${divider}┤"
+if [ "$_any_failure" -gt 0 ]; then
+  result_label="${RED}${BOLD}FAIL${NC}  "
+else
+  result_label="${GREEN}${BOLD}PASS${NC}  "
+fi
+printf "│ ${BOLD}%-${col}s${NC} │ ${BOLD}%7d${NC} │ ${BOLD}%7d${NC} │ ${BOLD}%7d${NC} │ %b│ %-19s │\n" \
+  "TOTAL" "$_total_passed" "$_total_failed" "$_grand_total" "$result_label" ""
+echo "└${divider}┘"
 echo ""
 
-# Parse lint results
-if [ -d "$REPORTS_DIR/devbox-lint-logs" ]; then
-  echo -e "${BOLD}Linting & Validation:${NC}"
-  lint_passed=0
-  lint_failed=0
-
-  for process in lint-android-scripts lint-ios-scripts lint-react-native-scripts validate-pr-checks-workflow validate-e2e-full-workflow; do
-    log_file="$REPORTS_DIR/devbox-lint-logs/$process/out.log"
-    if [ -f "$log_file" ]; then
-      if grep -q "✓\|PASS\|valid" "$log_file" 2>/dev/null; then
-        lint_passed=$((lint_passed + 1))
-      elif grep -q "✗\|FAIL\|error" "$log_file" 2>/dev/null; then
-        lint_failed=$((lint_failed + 1))
-      fi
-    fi
+# Log file listing
+if ls "$TEST_LOGS_DIR"/*.txt >/dev/null 2>&1; then
+  echo -e "${DIM}Log files:${NC}"
+  for log in "$TEST_LOGS_DIR"/*.txt; do
+    echo -e "  ${DIM}$log${NC}"
   done
-
-  if [ $lint_failed -eq 0 ]; then
-    echo -e "  ${GREEN}✓${NC} Shellcheck & Workflows: ${lint_passed} checks passed"
-  else
-    echo -e "  ${RED}✗${NC} Shellcheck & Workflows: ${lint_passed} passed, ${lint_failed} failed"
-  fi
-
-  total_passed=$((total_passed + lint_passed))
-  total_failed=$((total_failed + lint_failed))
-  suite_count=$((suite_count + 1))
-fi
-
-# Parse Android plugin unit tests
-echo ""
-echo -e "${BOLD}Android Plugin Tests:${NC}"
-android_passed=0
-android_failed=0
-
-# Check for JSON result files
-if [ -f "$TEST_RESULTS_DIR/android-lib.json" ]; then
-  passed=$(jq -r '.passed' $TEST_RESULTS_DIR/android-lib.json)
-  failed=$(jq -r '.failed' $TEST_RESULTS_DIR/android-lib.json)
-  android_passed=$((android_passed + passed))
-  android_failed=$((android_failed + failed))
-
-  if [ "$failed" -eq 0 ]; then
-    echo -e "  ${GREEN}✓${NC} lib.sh: ${passed} tests passed"
-  else
-    echo -e "  ${RED}✗${NC} lib.sh: ${passed} passed, ${failed} failed"
-  fi
-else
-  echo -e "  ${NC}⚠ lib.sh: no results found${NC}"
-fi
-
-if [ -f "$TEST_RESULTS_DIR/android-devices.json" ]; then
-  passed=$(jq -r '.passed' $TEST_RESULTS_DIR/android-devices.json)
-  failed=$(jq -r '.failed' $TEST_RESULTS_DIR/android-devices.json)
-  android_passed=$((android_passed + passed))
-  android_failed=$((android_failed + failed))
-
-  if [ "$failed" -eq 0 ]; then
-    echo -e "  ${GREEN}✓${NC} devices.sh: ${passed} tests passed"
-  else
-    echo -e "  ${RED}✗${NC} devices.sh: ${passed} passed, ${failed} failed"
-  fi
-else
-  echo -e "  ${NC}⚠ devices.sh: no results found${NC}"
-fi
-
-total_passed=$((total_passed + android_passed))
-total_failed=$((total_failed + android_failed))
-if [ $android_passed -gt 0 ] || [ $android_failed -gt 0 ]; then
-  suite_count=$((suite_count + 1))
-fi
-
-# Parse iOS plugin unit tests
-echo ""
-echo -e "${BOLD}iOS Plugin Tests:${NC}"
-ios_passed=0
-ios_failed=0
-
-# Check for JSON result files
-if [ -f "$TEST_RESULTS_DIR/ios-lib.json" ]; then
-  passed=$(jq -r '.passed' $TEST_RESULTS_DIR/ios-lib.json)
-  failed=$(jq -r '.failed' $TEST_RESULTS_DIR/ios-lib.json)
-  ios_passed=$((ios_passed + passed))
-  ios_failed=$((ios_failed + failed))
-
-  if [ "$failed" -eq 0 ]; then
-    echo -e "  ${GREEN}✓${NC} lib.sh: ${passed} tests passed"
-  else
-    echo -e "  ${RED}✗${NC} lib.sh: ${passed} passed, ${failed} failed"
-  fi
-else
-  echo -e "  ${NC}⚠ lib.sh: no results found${NC}"
-fi
-
-if [ -f "$TEST_RESULTS_DIR/ios-devices.json" ]; then
-  passed=$(jq -r '.passed' $TEST_RESULTS_DIR/ios-devices.json)
-  failed=$(jq -r '.failed' $TEST_RESULTS_DIR/ios-devices.json)
-  ios_passed=$((ios_passed + passed))
-  ios_failed=$((ios_failed + failed))
-
-  if [ "$failed" -eq 0 ]; then
-    echo -e "  ${GREEN}✓${NC} devices.sh: ${passed} tests passed"
-  else
-    echo -e "  ${RED}✗${NC} devices.sh: ${passed} passed, ${failed} failed"
-  fi
-else
-  echo -e "  ${NC}⚠ devices.sh: no results found${NC}"
-fi
-
-total_passed=$((total_passed + ios_passed))
-total_failed=$((total_failed + ios_failed))
-if [ $ios_passed -gt 0 ] || [ $ios_failed -gt 0 ]; then
-  suite_count=$((suite_count + 1))
-fi
-
-# Parse React Native plugin unit tests
-echo ""
-echo -e "${BOLD}React Native Plugin Tests:${NC}"
-rn_passed=0
-rn_failed=0
-
-if [ -f "$TEST_RESULTS_DIR/react-native-lib.json" ]; then
-  passed=$(jq -r '.passed' $TEST_RESULTS_DIR/react-native-lib.json)
-  failed=$(jq -r '.failed' $TEST_RESULTS_DIR/react-native-lib.json)
-  rn_passed=$((rn_passed + passed))
-  rn_failed=$((rn_failed + failed))
-
-  if [ "$failed" -eq 0 ]; then
-    echo -e "  ${GREEN}✓${NC} lib.sh: ${passed} tests passed"
-  else
-    echo -e "  ${RED}✗${NC} lib.sh: ${passed} passed, ${failed} failed"
-  fi
-else
-  echo -e "  ${NC}⚠ lib.sh: no results found${NC}"
-fi
-
-total_passed=$((total_passed + rn_passed))
-total_failed=$((total_failed + rn_failed))
-if [ $rn_passed -gt 0 ] || [ $rn_failed -gt 0 ]; then
-  suite_count=$((suite_count + 1))
-fi
-
-# Parse integration tests
-echo ""
-echo -e "${BOLD}Integration Tests:${NC}"
-integration_passed=0
-integration_failed=0
-
-# Android integration tests
-if [ -f "$TEST_RESULTS_DIR/android-integration-device-mgmt.json" ]; then
-  passed=$(jq -r '.passed' $TEST_RESULTS_DIR/android-integration-device-mgmt.json)
-  failed=$(jq -r '.failed' $TEST_RESULTS_DIR/android-integration-device-mgmt.json)
-  integration_passed=$((integration_passed + passed))
-  integration_failed=$((integration_failed + failed))
-
-  if [ "$failed" -eq 0 ]; then
-    echo -e "  ${GREEN}✓${NC} android device mgmt: ${passed} tests passed"
-  else
-    echo -e "  ${RED}✗${NC} android device mgmt: ${passed} passed, ${failed} failed"
-  fi
-else
-  echo -e "  ${NC}⚠ android device mgmt: no results found${NC}"
-fi
-
-if [ -f "$TEST_RESULTS_DIR/android-integration-validation.json" ]; then
-  passed=$(jq -r '.passed' $TEST_RESULTS_DIR/android-integration-validation.json)
-  failed=$(jq -r '.failed' $TEST_RESULTS_DIR/android-integration-validation.json)
-  integration_passed=$((integration_passed + passed))
-  integration_failed=$((integration_failed + failed))
-
-  if [ "$failed" -eq 0 ]; then
-    echo -e "  ${GREEN}✓${NC} android validation: ${passed} tests passed"
-  else
-    echo -e "  ${RED}✗${NC} android validation: ${passed} passed, ${failed} failed"
-  fi
-else
-  echo -e "  ${NC}⚠ android validation: no results found${NC}"
-fi
-
-# iOS integration tests
-if [ -f "$TEST_RESULTS_DIR/ios-integration-device-mgmt.json" ]; then
-  passed=$(jq -r '.passed' $TEST_RESULTS_DIR/ios-integration-device-mgmt.json)
-  failed=$(jq -r '.failed' $TEST_RESULTS_DIR/ios-integration-device-mgmt.json)
-  integration_passed=$((integration_passed + passed))
-  integration_failed=$((integration_failed + failed))
-
-  if [ "$failed" -eq 0 ]; then
-    echo -e "  ${GREEN}✓${NC} ios device mgmt: ${passed} tests passed"
-  else
-    echo -e "  ${RED}✗${NC} ios device mgmt: ${passed} passed, ${failed} failed"
-  fi
-else
-  echo -e "  ${NC}⚠ ios device mgmt: no results found${NC}"
-fi
-
-if [ -f "$TEST_RESULTS_DIR/ios-integration-cache.json" ]; then
-  passed=$(jq -r '.passed' $TEST_RESULTS_DIR/ios-integration-cache.json)
-  failed=$(jq -r '.failed' $TEST_RESULTS_DIR/ios-integration-cache.json)
-  integration_passed=$((integration_passed + passed))
-  integration_failed=$((integration_failed + failed))
-
-  if [ "$failed" -eq 0 ]; then
-    echo -e "  ${GREEN}✓${NC} ios cache: ${passed} tests passed"
-  else
-    echo -e "  ${RED}✗${NC} ios cache: ${passed} passed, ${failed} failed"
-  fi
-else
-  echo -e "  ${NC}⚠ ios cache: no results found${NC}"
-fi
-
-total_passed=$((total_passed + integration_passed))
-total_failed=$((total_failed + integration_failed))
-if [ $integration_passed -gt 0 ] || [ $integration_failed -gt 0 ]; then
-  suite_count=$((suite_count + 1))
-fi
-
-# Parse devbox-mcp tests
-if [ -d "$REPORTS_DIR/devbox-mcp-logs" ]; then
   echo ""
-  echo -e "${BOLD}Devbox MCP Tests:${NC}"
-  mcp_passed=0
-  mcp_failed=0
-
-  log_file="$REPORTS_DIR/devbox-mcp-logs/test-mcp-tools/out.log"
-  if [ -f "$log_file" ]; then
-    log_content=$(cat "$log_file")
-    if echo "$log_content" | grep -q "Passed:"; then
-      passed=$(echo "$log_content" | grep "Passed:" | awk '{print $2}')
-      failed=$(echo "$log_content" | grep "Failed:" | awk '{print $2}')
-      mcp_passed=$passed
-      mcp_failed=$failed
-
-      if [ "$failed" -eq 0 ]; then
-        echo -e "  ${GREEN}✓${NC} MCP Tools: ${passed} tests passed"
-      else
-        echo -e "  ${RED}✗${NC} MCP Tools: ${passed} passed, ${failed} failed"
-      fi
-    fi
-  fi
-
-  total_passed=$((total_passed + mcp_passed))
-  total_failed=$((total_failed + mcp_failed))
-  suite_count=$((suite_count + 1))
 fi
 
-# Final summary
+echo -e "${DIM}Result files: $TEST_RESULTS_DIR/*.json${NC}"
+echo -e "${DIM}Markdown report: $REPORTS_DIR/summary.md${NC}"
 echo ""
-echo "========================================"
-if [ $total_failed -eq 0 ]; then
-  echo -e "${GREEN}${BOLD}     ALL TESTS PASSED ✓${NC}"
-else
-  echo -e "${RED}${BOLD}     SOME TESTS FAILED ✗${NC}"
+
+# TUI mode: sleep so the user can read the summary before process-compose exits
+if [ "${TEST_TUI:-false}" = "true" ] || [ "${TEST_TUI:-0}" = "1" ]; then
+  echo -e "${DIM}TUI mode: waiting 30s before exit (Ctrl+C to skip)...${NC}"
+  sleep 30 || true
 fi
-echo "========================================"
-echo ""
-echo "Results:"
-echo "  Test Suites: ${suite_count}"
-echo -e "  ${GREEN}Passed: ${total_passed}${NC}"
-if [ $total_failed -gt 0 ]; then
-  echo -e "  ${RED}Failed: ${total_failed}${NC}"
-else
-  echo "  Failed: 0"
-fi
-echo ""
-echo "Test Log Files:"
-echo "  $REPORTS_DIR/logs/android-test-lib.txt"
-echo "  $REPORTS_DIR/logs/android-test-devices.txt"
-echo "  $REPORTS_DIR/logs/android-test-device-mgmt.txt"
-echo "  $REPORTS_DIR/logs/android-test-validation.txt"
-echo "  $REPORTS_DIR/logs/ios-test-lib.txt"
-echo "  $REPORTS_DIR/logs/ios-test-devices.txt"
-echo "  $REPORTS_DIR/logs/ios-test-device-mgmt.txt"
-echo "  $REPORTS_DIR/logs/ios-test-cache.txt"
-echo "  $REPORTS_DIR/logs/react-native-test-lib.txt"
-echo "  $REPORTS_DIR/logs/summary.txt"
-echo ""
-echo "Lint Logs:"
-echo "  $REPORTS_DIR/devbox-lint-logs/"
-echo ""
-echo "Result Files:"
-echo "  $REPORTS_DIR/results/*.json"
-echo ""
-
-# Write markdown summary
-summary_file="$REPORTS_DIR/summary.md"
-mkdir -p "$REPORTS_DIR"
-
-cat > "$summary_file" << MDEOF
-# Test Suite Summary
-
-**Generated:** $(date '+%Y-%m-%d %H:%M:%S')
-
-## Overall Results
-
-$(if [ $total_failed -eq 0 ]; then echo "✅ **ALL TESTS PASSED**"; else echo "❌ **SOME TESTS FAILED**"; fi)
-
-- **Test Suites:** ${suite_count}
-- **Total Passed:** ${total_passed}
-- **Total Failed:** ${total_failed}
-
----
-
-## Test Breakdown
-
-### Linting & Validation
-$(if [ -d "$REPORTS_DIR/devbox-lint-logs" ]; then
-  echo "- Android scripts: ✅"
-  echo "- iOS scripts: ✅"
-  echo "- React Native scripts: ✅"
-  echo "- Workflow validation: ✅"
-else
-  echo "No lint results found"
-fi)
-
-### Android Plugin Tests
-$(if [ $android_passed -gt 0 ] || [ $android_failed -gt 0 ]; then
-  echo "- lib.sh: $(if [ $android_failed -eq 0 ]; then echo "✅"; else echo "❌"; fi) (Passed: $android_passed, Failed: $android_failed)"
-  echo "- devices.sh: ✅"
-else
-  echo "No Android test results found"
-fi)
-
-### iOS Plugin Tests
-$(if [ $ios_passed -gt 0 ] || [ $ios_failed -gt 0 ]; then
-  echo "- lib.sh: $(if [ $ios_failed -eq 0 ]; then echo "✅"; else echo "❌"; fi) (Passed: $ios_passed, Failed: $ios_failed)"
-else
-  echo "No iOS test results found"
-fi)
-
-### React Native Plugin Tests
-$(if [ $rn_passed -gt 0 ] || [ $rn_failed -gt 0 ]; then
-  echo "- lib.sh: $(if [ $rn_failed -eq 0 ]; then echo "✅"; else echo "❌"; fi) (Passed: $rn_passed, Failed: $rn_failed)"
-else
-  echo "No React Native test results found"
-fi)
-
-### Integration Tests
-$(if [ $integration_passed -gt 0 ] || [ $integration_failed -gt 0 ]; then
-  echo "- Android device mgmt: $(if [ $integration_failed -eq 0 ]; then echo "✅"; else echo "⚠️"; fi)"
-  echo "- Android validation: ✅"
-  echo "- iOS device mgmt: ✅"
-  echo "- iOS cache: ✅"
-  echo ""
-  echo "Total: Passed: $integration_passed, Failed: $integration_failed"
-else
-  echo "No integration test results found"
-fi)
-
-### Devbox MCP Tests
-$(if [ -d "$REPORTS_DIR/devbox-mcp-logs" ]; then
-  if [ -f "$REPORTS_DIR/devbox-mcp-logs/test-mcp-tools/out.log" ]; then
-    log=$(cat "$REPORTS_DIR/devbox-mcp-logs/test-mcp-tools/out.log")
-    if echo "$log" | grep -q "Passed:"; then
-      passed=$(echo "$log" | grep "Passed:" | awk '{print $2}')
-      failed=$(echo "$log" | grep "Failed:" | awk '{print $2}')
-      echo "- MCP Tools: $(if [ "$failed" -eq 0 ]; then echo "✅"; else echo "❌"; fi) (Passed: $passed, Failed: $failed)"
-    else
-      echo "- MCP Tools: ✅"
-    fi
-  else
-    echo "- MCP Tools: ✅"
-  fi
-else
-  echo "No devbox-mcp test results found"
-fi)
-
----
-
-## Log Files
-
-Detailed logs available in:
-- \`$REPORTS_DIR/devbox-lint-logs/\`
-- \`$REPORTS_DIR/devbox-unit-tests-logs/\`
-- \`$REPORTS_DIR/devbox-mcp-logs/\`
-
----
-
-_Run \`devbox run test:fast\` to regenerate this summary_
-MDEOF
-
-echo "Summary written to: $summary_file"
-echo ""
 
 # Exit with failure if any tests failed
-if [ $total_failed -gt 0 ]; then
+if [ "$_any_failure" -gt 0 ]; then
   exit 1
 fi

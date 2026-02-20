@@ -50,11 +50,9 @@ devbox run test:e2e
 
 ```bash
 devbox run --pure test:e2e
-# or in CI:
-IN_NIX_SHELL=pure devbox run test:e2e
 ```
 
-The test suite automatically detects `IN_NIX_SHELL=pure` and adjusts cleanup behavior.
+The test suite automatically detects `DEVBOX_PURE_SHELL=1` (set by `--pure`) and adjusts cleanup behavior.
 
 ## Copy to Your Project
 
@@ -217,7 +215,7 @@ deploy-app (phase 4) ─────┘ depends on simulator ready
   ↓
 verify-app-running (phase 5)
   ↓
-cleanup (phase 6) - conditional based on IN_NIX_SHELL
+cleanup (phase 6) - conditional based on DEVBOX_PURE_SHELL
   ↓
 summary (phase 7)
 ```

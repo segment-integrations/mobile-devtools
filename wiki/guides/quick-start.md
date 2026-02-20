@@ -1,18 +1,18 @@
 # Quick Start Guide
 
-Get up and running with Android, iOS, or React Native development in 5 minutes.
+Set up a project-local Android or iOS development environment from scratch.
 
 ## Prerequisites
 
-Install Devbox if you haven't already:
+Install [Devbox](https://www.jetify.com/devbox/docs/installing_devbox/) if you haven't already:
 
 ```sh
 curl -fsSL https://get.jetify.com/devbox | bash
 ```
 
-## Choose Your Platform
+Devbox handles downloading all build tools (JDK, Gradle, Xcode CLI tools, etc.) so you don't need to install them separately.
 
-Pick your platform and follow the quickstart below:
+## Choose Your Platform
 
 - **[Android](#android-quickstart)** - Native Android development with emulators
 - **[iOS](#ios-quickstart)** - Native iOS development with simulators (macOS only)
@@ -24,12 +24,68 @@ Pick your platform and follow the quickstart below:
 
 ### 1. Initialize Your Project
 
+In your existing Android project directory:
+
 ```sh
-# Initialize devbox in your existing Android project
 devbox init
 ```
 
-Add the Android plugin to your `devbox.json`:
+Replace the contents of your `devbox.json` with:
+
+```json
+{
+  "include": ["github:segment-integrations/devbox-plugins?dir=plugins/android"],
+  "packages": {
+    "jdk17": "latest",
+    "gradle": "latest"
+  }
+}
+```
+
+The `include` line adds the Android plugin from GitHub. Devbox downloads the Android SDK, emulator, and device management tools automatically. The `packages` section adds JDK and Gradle for building your app.
+
+> **Note:** Plugins are included via URL in `devbox.json`, not with `devbox add`. You cannot use `devbox add plugin:android`.
+
+### 2. Enter the Development Environment
+
+```sh
+devbox shell
+```
+
+On first run, this downloads the Android SDK via Nix. Subsequent runs are fast. The SDK is stored project-locally — nothing is written to `~/.android`.
+
+Two quick devbox concepts:
+- `devbox shell` enters an interactive shell with all tools on your PATH
+- `devbox run <script>` runs a single command or script from your `devbox.json`
+
+### 3. List Available Devices
+
+```sh
+devbox run android.sh devices list
+```
+
+You'll see the two default device definitions:
+
+```
+medium_phone_api36  36  medium_phone  google_apis  {...}
+pixel_api21         21  pixel         google_apis  {...}
+```
+
+These come from `min.json` and `max.json` in your `devbox.d/` directory, which is the devbox plugin configuration folder. The plugin creates a subdirectory there with a `devices/` folder containing these files (e.g., `devbox.d/<plugin-dir>/devices/min.json`). The filenames (`min`, `max`) are short nicknames you use in commands. The names shown in the listing (`medium_phone_api36`, `pixel_api21`) are the full AVD names defined inside each JSON file.
+
+### 4. Start the Emulator
+
+```sh
+# Start the default device (max)
+devbox run start:emu
+
+# Or start a specific device by nickname
+devbox run start:emu min
+```
+
+### 5. Add Build and Deploy Scripts
+
+The plugin provides emulator and device management. Build and deploy commands are specific to your project, so you define them in your `devbox.json`. Add a `shell.scripts` section:
 
 ```json
 {
@@ -38,48 +94,52 @@ Add the Android plugin to your `devbox.json`:
     "jdk17": "latest",
     "gradle": "latest"
   },
+  "shell": {
+    "scripts": {
+      "build": [
+        "gradle assembleDebug"
+      ],
+      "build:release": [
+        "gradle assembleRelease"
+      ],
+      "start:app": [
+        "android.sh run ${1:-}"
+      ]
+    }
+  }
+}
+```
+
+The `${1:-}` syntax passes an optional argument through to the command. It means "use the first argument if provided, otherwise use nothing." This lets you run both `devbox run start:app` (uses the default device) and `devbox run start:app min` (targets a specific device).
+
+Now you can build and deploy:
+
+```sh
+# Build the APK
+devbox run build
+
+# Build, install, and launch on the default device
+devbox run start:app
+
+# Or target a specific device by nickname
+devbox run start:app min
+```
+
+The `android.sh run` command waits for the emulator to boot, then auto-detects, installs, and launches the APK. The app's package name is extracted from the APK automatically.
+
+**How APK auto-detection works:** The `run` command searches your project for `.apk` files, skipping build caches like `.gradle/`, `build/intermediates/`, `node_modules/`, and `.devbox/`. If your build outputs the APK to a standard location (e.g., `app/build/outputs/apk/`), it will be found automatically.
+
+If auto-detection picks the wrong APK or you want to be explicit, set `ANDROID_APP_APK` in your `devbox.json` env. This accepts a path or glob pattern relative to your project root:
+
+```json
+{
   "env": {
     "ANDROID_APP_APK": "app/build/outputs/apk/debug/app-debug.apk"
   }
 }
 ```
 
-Set `ANDROID_APP_APK` to the path where your build outputs the APK. The app's package name (`ANDROID_APP_ID`) is auto-detected from the APK at install time.
-
-> **Note:** These are custom plugins hosted on GitHub, not built-in devbox plugins. You cannot use `devbox add plugin:android` — add the `include` URL to your `devbox.json` manually.
-
-### 2. Enter the Development Environment
-
-```sh
-devbox shell
-```
-
-This installs the Android SDK, build tools, and emulator without touching your global `~/.android` directory.
-
-### 3. List Available Devices
-
-```sh
-devbox run android.sh devices list
-```
-
-You'll see the default devices: `min` (API 21) and `max` (API 35).
-
-### 4. Build and Run Your App
-
-```sh
-# Build, install, and launch on the default emulator
-devbox run start:app
-
-# Or specify a device
-devbox run start:app max
-```
-
-This command:
-- Starts the emulator
-- Builds your APK
-- Installs and launches the app
-
-### 5. Stop the Emulator
+### 6. Stop the Emulator
 
 ```sh
 devbox run stop:emu
@@ -87,6 +147,7 @@ devbox run stop:emu
 
 ### Next Steps
 
+- Check out the [Android example project](../../examples/android/) for a complete working setup with build scripts and E2E test suites. The example uses a local plugin path for development — if you use it as a template, change the `include` to the GitHub URL shown above.
 - [Android Guide](android-guide.md) - Complete Android development workflow
 - [Device Management](device-management.md) - Create custom device configurations
 - [Troubleshooting](troubleshooting.md) - Common issues and solutions
@@ -95,32 +156,27 @@ devbox run stop:emu
 
 ## iOS Quickstart
 
-**Note:** Requires macOS with Xcode installed.
+Requires macOS with [Xcode](https://apps.apple.com/app/xcode/id497799835) installed.
 
 ### 1. Initialize Your Project
 
+In your existing iOS project directory:
+
 ```sh
-# Initialize devbox in your existing iOS project
 devbox init
 ```
 
-Add the iOS plugin to your `devbox.json`:
+Replace the contents of your `devbox.json` with:
 
 ```json
 {
-  "include": ["github:segment-integrations/devbox-plugins?dir=plugins/ios"],
-  "env": {
-    "IOS_APP_PROJECT": "MyApp.xcodeproj",
-    "IOS_APP_SCHEME": "MyApp",
-    "IOS_APP_BUNDLE_ID": "com.example.myapp",
-    "IOS_APP_ARTIFACT": "DerivedData/Build/Products/Debug-iphonesimulator/MyApp.app"
-  }
+  "include": ["github:segment-integrations/devbox-plugins?dir=plugins/ios"]
 }
 ```
 
-Use `-derivedDataPath DerivedData` in your `xcodebuild` command to keep build output project-local.
+The `include` line adds the iOS plugin from GitHub. The plugin discovers your Xcode installation, manages simulators, and auto-detects your Xcode project, `.app` bundle, and bundle ID when deploying.
 
-> **Note:** These are custom plugins hosted on GitHub, not built-in devbox plugins. Add the `include` URL to your `devbox.json` manually.
+> **Note:** Plugins are included via URL in `devbox.json`, not with `devbox add`.
 
 ### 2. Enter the Development Environment
 
@@ -128,7 +184,9 @@ Use `-derivedDataPath DerivedData` in your `xcodebuild` command to keep build ou
 devbox shell
 ```
 
-The plugin automatically discovers your Xcode installation and configures the iOS development tools.
+The plugin automatically discovers Xcode and configures iOS development tools. Two quick devbox concepts:
+- `devbox shell` enters an interactive shell with all tools on your PATH
+- `devbox run <script>` runs a single command or script from your `devbox.json`
 
 ### 3. List Available Devices
 
@@ -136,24 +194,80 @@ The plugin automatically discovers your Xcode installation and configures the iO
 devbox run ios.sh devices list
 ```
 
-You'll see the default devices: `min` (iOS 15.4) and `max` (iOS 26.2).
+You'll see the two default device definitions:
 
-### 4. Build and Run Your App
-
-```sh
-# Build, install, and launch on the default simulator
-devbox run start:ios
-
-# Or specify a device
-devbox run start:ios max
+```
+iPhone 17   26.2
+iPhone 13   15.4
 ```
 
-This command:
-- Starts the simulator
-- Builds your app
-- Installs and launches it
+These come from `min.json` (iOS 15.4) and `max.json` (iOS 26.2) in your `devbox.d/` directory, which is the devbox plugin configuration folder. The plugin creates a subdirectory there with a `devices/` folder containing these files (e.g., `devbox.d/<plugin-dir>/devices/min.json`). The filenames (`min`, `max`) are short nicknames you use in commands. The names shown (`iPhone 13`, `iPhone 17`) are the simulator display names defined inside each JSON file.
 
-### 5. Stop the Simulator
+### 4. Start the Simulator
+
+```sh
+# Start the default device (max)
+devbox run start:sim
+
+# Or start a specific device by nickname
+devbox run start:sim min
+```
+
+### 5. Add Build and Deploy Scripts
+
+The plugin provides simulator and device management. Build and deploy commands are specific to your Xcode project, so you define them in your `devbox.json`. Add a `shell.scripts` section:
+
+```json
+{
+  "include": ["github:segment-integrations/devbox-plugins?dir=plugins/ios"],
+  "shell": {
+    "scripts": {
+      "build:ios": [
+        "ios.sh xcodebuild -scheme MyApp -configuration Debug -destination 'generic/platform=iOS Simulator' build"
+      ],
+      "build:release": [
+        "ios.sh xcodebuild -scheme MyApp -configuration Release build"
+      ],
+      "start:app": [
+        "ios.sh run ${1:-}"
+      ]
+    }
+  }
+}
+```
+
+As with the Android example, `${1:-}` passes an optional device nickname through (e.g., `devbox run start:app min`). If omitted, the default device is used.
+
+Now you can build and deploy:
+
+```sh
+# Build the app
+devbox run build:ios
+
+# Start simulator, install, and launch
+devbox run start:app
+```
+
+**How app auto-detection works:** The `ios.sh run` command starts the simulator, builds the app (using `build:ios` or `build` from devbox.json), then locates the `.app` bundle. It uses this precedence chain:
+
+1. Query `xcodebuild -showBuildSettings` for the built products path (works when your project has an `.xcodeproj` or `.xcworkspace` in the project root)
+2. Recursive search of the project directory for `.app` bundles, skipping `Pods/`, `.build/`, `node_modules/`, `.devbox/`, and similar directories
+
+The bundle ID is extracted automatically from the `.app`'s `Info.plist`.
+
+If auto-detection picks the wrong `.app` or your project structure is non-standard, set `IOS_APP_ARTIFACT` in your `devbox.json` env. This accepts a path or glob pattern relative to your project root:
+
+```json
+{
+  "env": {
+    "IOS_APP_ARTIFACT": "DerivedData/Build/Products/Debug-iphonesimulator/MyApp.app"
+  }
+}
+```
+
+Use `-derivedDataPath DerivedData` in your xcodebuild command to keep build output project-local.
+
+### 6. Stop the Simulator
 
 ```sh
 devbox run stop:sim
@@ -161,6 +275,7 @@ devbox run stop:sim
 
 ### Next Steps
 
+- Check out the [iOS example project](../../examples/ios/) for a complete working setup with build scripts and E2E test suites. The example uses a local plugin path for development — if you use it as a template, change the `include` to the GitHub URL shown above.
 - [iOS Guide](ios-guide.md) - Complete iOS development workflow
 - [Device Management](device-management.md) - Create custom device configurations
 - [Troubleshooting](troubleshooting.md) - Common issues and solutions
@@ -169,17 +284,45 @@ devbox run stop:sim
 
 ## React Native Quickstart
 
-The React Native plugin combines Android and iOS plugins for cross-platform development.
+The React Native plugin combines the Android and iOS plugins for cross-platform development.
 
 ### 1. Initialize Your Project
 
+In your existing React Native project directory:
+
 ```sh
-# Initialize devbox in your existing React Native project
 devbox init
-npm install  # or yarn
 ```
 
-Add the React Native plugin to your `devbox.json`:
+Replace the contents of your `devbox.json` with:
+
+```json
+{
+  "include": ["github:segment-integrations/devbox-plugins?dir=plugins/react-native"],
+  "packages": [
+    "nodejs@20",
+    "watchman@latest",
+    "jdk17@latest",
+    "gradle@latest"
+  ]
+}
+```
+
+The React Native plugin automatically includes both the Android and iOS plugins. APK and `.app` paths are auto-detected at runtime.
+
+> **Note:** Plugins are included via URL in `devbox.json`, not with `devbox add`.
+
+### 2. Enter the Development Environment
+
+```sh
+devbox shell
+```
+
+This sets up both Android SDK and iOS tools (iOS requires macOS with Xcode).
+
+### 3. Add Build and Run Scripts
+
+The plugin provides emulator/simulator control, device management, and Metro bundler management. Build and deploy scripts are specific to your project. Add them to your `devbox.json`:
 
 ```json
 {
@@ -190,65 +333,70 @@ Add the React Native plugin to your `devbox.json`:
     "jdk17@latest",
     "gradle@latest"
   ],
-  "env": {
-    "ANDROID_APP_APK": "android/app/build/outputs/apk/debug/app-debug.apk",
-    "IOS_APP_PROJECT": "MyApp.xcodeproj",
-    "IOS_APP_SCHEME": "MyApp",
-    "IOS_APP_BUNDLE_ID": "com.example.myapp",
-    "IOS_APP_ARTIFACT": "DerivedData/Build/Products/Debug-iphonesimulator/MyApp.app"
+  "shell": {
+    "scripts": {
+      "build:android": [
+        "npm install",
+        "cd android && ./gradlew assembleDebug"
+      ],
+      "build:ios": [
+        "npm install",
+        "cd ios && pod install --repo-update",
+        "ios.sh xcodebuild -workspace MyApp.xcworkspace -scheme MyApp -configuration Debug -destination 'generic/platform=iOS Simulator' build"
+      ]
+    }
   }
 }
 ```
 
-> **Note:** These are custom plugins hosted on GitHub, not built-in devbox plugins. Add the `include` URL to your `devbox.json` manually.
-
-### 2. Enter the Development Environment
+### 4. Run on Android
 
 ```sh
-devbox shell
-```
+# Start emulator
+devbox run start:emu
 
-This sets up both Android SDK and iOS tools (macOS only).
+# Build and install (using your custom script)
+devbox run build:android
 
-### 3. Run on Android
-
-```sh
-# Start emulator and build/run (uses process-compose)
-devbox run start:android
-
-# When done
+# Stop when done
 devbox run stop:emu
 ```
 
-### 4. Run on iOS (macOS only)
+### 5. Run on iOS (macOS only)
 
 ```sh
-# Start simulator and build/run (uses process-compose)
-devbox run start:ios
+# Start simulator
+devbox run start:sim
 
-# When done
+# Build and install (using your custom script)
+devbox run build:ios
+
+# Stop when done
 devbox run stop:sim
 ```
 
 ### Next Steps
 
+- Check out the [React Native example project](../../examples/react-native/) for a complete working setup with Metro orchestration, process-compose test suites, and multi-platform builds. The example uses a local plugin path for development — if you use it as a template, change the `include` to the GitHub URL shown above.
 - [React Native Guide](react-native-guide.md) - Complete React Native workflow
 - [Device Management](device-management.md) - Configure emulators and simulators
 - [Testing Guide](testing.md) - Set up automated testing
 
 ---
 
-## Common Commands
+## Common Plugin Commands
 
-### Device Management
+The example projects in this repository use local plugin paths (`path:../../plugins/...`) so they always test against the current plugin source. If you copy an example as a starting point for your own project, change the `include` to the GitHub URL format shown in the quickstart guides above.
+
+
+
+These commands are provided by the plugins and available in all projects:
 
 ```sh
-# List devices
-devbox run android.sh devices list  # Android
-devbox run ios.sh devices list      # iOS
-
-# Create a new device
+# Device management
+devbox run android.sh devices list       # List Android devices
 devbox run android.sh devices create pixel_api30 --api 30 --device pixel
+devbox run ios.sh devices list           # List iOS devices
 devbox run ios.sh devices create iphone15 --runtime 17.5
 
 # Regenerate lock file after device changes
@@ -258,11 +406,19 @@ devbox run ios.sh devices eval
 # Sync AVDs/simulators to match device definitions
 devbox run android.sh devices sync
 devbox run ios.sh devices sync
+
+# View configuration
+devbox run android.sh config show
+devbox run ios.sh config show
+
+# Diagnostics
+devbox run doctor
+devbox run verify:setup
 ```
 
 ### Configuration
 
-Configuration is managed via environment variables in `devbox.json`:
+Configure the plugins via environment variables in `devbox.json`:
 
 ```json
 {
@@ -274,35 +430,6 @@ Configuration is managed via environment variables in `devbox.json`:
   }
 }
 ```
-
-View current configuration:
-
-```sh
-devbox run android.sh config show
-devbox run ios.sh config show
-```
-
-### Build Commands
-
-```sh
-# Android
-devbox run build                # Build APK
-devbox run start:app            # Build, install, and launch app
-
-# iOS
-devbox run build                # Build app
-devbox run start:ios            # Build, install, and launch on simulator
-```
-
----
-
-## Why Devbox for Mobile Development?
-
-- **Project-local environments** - No global state pollution (`~/.android`, `~/Library/Developer`)
-- **Reproducible builds** - Lock files ensure consistent SDK versions across team and CI
-- **Version management** - Test against multiple Android API levels and iOS versions
-- **Pure mode testing** - `devbox run --pure` creates isolated test environments
-- **Fast CI** - Cached Nix derivations speed up builds
 
 ---
 

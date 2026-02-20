@@ -128,12 +128,9 @@ if [ -d "$DEVICES_DIR" ]; then
     checksum=""
   fi
 
-  timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date +%Y-%m-%dT%H:%M:%SZ)"
-
   echo "$devices_array" | jq \
     --arg cs "$checksum" \
-    --arg ts "$timestamp" \
-    '{devices: ., checksum: $cs, generated_at: $ts}' \
+    '{devices: ., checksum: $cs}' \
     > "$DEVICES_LOCK" 2>&1 && cp "$DEVICES_LOCK" "$VIRTENV_DEVICES_LOCK" 2>/dev/null || true
 fi
 

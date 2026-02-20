@@ -21,8 +21,8 @@ This significantly speeds up iOS workflows and prevents unnecessary Android SDK 
 
 ## Commands
 
-- Android: `devbox run --pure start-emu`, `devbox run --pure start-android`, `devbox run --pure stop-emu`
-- iOS: `devbox run --pure start-sim`, `devbox run --pure start-ios`, `devbox run --pure stop-sim`
+- Android: `devbox run --pure start:emu`, `devbox run --pure start:android`, `devbox run --pure stop:emu`
+- iOS: `devbox run --pure start:sim`, `devbox run --pure start:ios`, `devbox run --pure stop:sim`
 - Web/Metro: `devbox run --pure start-web`
 
 ## Files

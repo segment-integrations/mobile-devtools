@@ -51,8 +51,15 @@
         then map (device: device.api) lockData.devices
         else [ 36 ]; # Default to latest stable API
 
+      # Include ANDROID_COMPILE_SDK in platform versions if set (for projects
+      # that compile against a different API than the emulator/device targets)
+      compileSdkApis =
+        if builtins.hasAttr "ANDROID_COMPILE_SDK" defaultsData
+        then [ (toString defaultsData.ANDROID_COMPILE_SDK) ]
+        else [];
+
       androidSdkConfig = {
-        platformVersions = unique (map toString deviceApis);
+        platformVersions = unique ((map toString deviceApis) ++ compileSdkApis);
         buildToolsVersion = getVar "ANDROID_BUILD_TOOLS_VERSION";
         cmdLineToolsVersion = getVar "ANDROID_CMDLINE_TOOLS_VERSION";
         systemImageTypes = [ (getVar "ANDROID_SYSTEM_IMAGE_TAG") ];

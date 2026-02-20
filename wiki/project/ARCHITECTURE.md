@@ -694,19 +694,19 @@ The repository has three tiers of tests optimized for speed and coverage.
 
 ### Test Categories
 
-**Fast tests** (~5-10 seconds):
+**Fast tests:**
 - Linting and formatting checks
 - JSON schema validation
 - Shell script syntax checks
 - Repository structure validation
 
-**Plugin tests** (~2-5 minutes per platform):
+**Plugin tests:**
 - Unit tests for individual scripts
 - Device management integration tests
 - Lock file generation and validation
 - Environment setup tests
 
-**E2E tests** (~10-15 minutes per platform):
+**E2E tests:**
 - Full build and deployment workflow
 - Emulator/simulator lifecycle
 - App installation and launch verification
@@ -787,13 +787,11 @@ GitHub Actions workflows run tests in matrix mode:
 - Runs on every PR
 - Fast tests + plugin tests
 - Default devices only
-- ~15-30 minutes total
 
 **e2e-full.yml** (comprehensive coverage):
 - Manual trigger or weekly schedule
 - Full E2E tests with min/max devices
 - Matrix execution (parallel)
-- ~45-60 minutes per platform
 
 See `.github/workflows/README.md` for CI/CD architecture details.
 

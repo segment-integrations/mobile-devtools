@@ -7,11 +7,21 @@ This directory contains **pure unit tests** for plugin scripts. These tests veri
 ```
 plugins/tests/
 ├── android/
-│   ├── test-lib.sh        # Tests for lib.sh utility functions
-│   └── test-devices.sh    # Tests for devices.sh CLI parsing
+│   ├── test-lib.sh              # Tests for lib.sh utility functions
+│   ├── test-devices.sh          # Tests for devices.sh CLI parsing
+│   ├── test-apk-detection.sh    # Tests for APK metadata extraction
+│   ├── test-apk-resolution.sh   # Tests for APK auto-detection
+│   ├── test-emulator-detection.sh  # Emulator detection tests
+│   └── test-emulator-modes.sh   # Emulator mode behavior docs
 ├── ios/
-│   └── test-lib.sh        # Tests for lib.sh utility functions
-└── test-framework.sh      # Shared test utilities
+│   ├── test-lib.sh              # Tests for lib.sh utility functions
+│   ├── test-devices.sh          # Tests for devices.sh CLI parsing
+│   ├── test-app-resolution.sh   # Tests for .app auto-detection
+│   ├── test-simulator-detection.sh  # Simulator detection tests
+│   └── test-simulator-modes.sh  # Simulator mode behavior docs
+├── react-native/
+│   └── test-lib.sh              # Tests for Metro port management
+└── test-framework.sh            # Shared test utilities
 ```
 
 ## Running Tests
@@ -51,45 +61,79 @@ devbox run test:plugin:ios:lib
 - Config directory resolution
 - Requirement validation
 
+### React Native (`test-lib.sh`)
+- Metro port allocation and retrieval
+- Metro environment file management
+- PID tracking
+- Suite isolation
+
 ## Test Framework
 
-All tests use `test-framework.sh` utilities:
+All tests source `test-framework.sh` which provides assertions, fixture helpers, and test summary reporting.
 
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Source test framework
-. "path/to/test-framework.sh"
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+. "$script_dir/../test-framework.sh"
+setup_logging
 
 # Write tests
-assert_equal "expected" "$(my_function)"
-assert_command_success "Test description" my_command arg1 arg2
-assert_file_exists "path/to/file"
+start_test "My feature"
+assert_equal "expected" "$(my_function)" "Description"
+assert_success "some_command" "Should succeed"
+assert_failure "bad_command" "Should fail"
+
+# Use example project fixtures for read-only tests
+devices_dir="$(fixture_android_devices_dir)"
+
+# Use project-local temp dirs for write tests
+temp="$(make_temp_dir "my-test")"
+# ... use temp dir ...
+rm -rf "$temp"
 
 # Show summary
-test_summary
+test_summary "suite-name"
 ```
+
+### Available Assertions
+
+- `assert_equal expected actual message` - Value equality
+- `assert_success "cmd" message` - Command succeeds (eval-based)
+- `assert_failure "cmd" message` - Command fails (eval-based)
+- `assert_not_empty value message` - Value is non-empty
+- `assert_contains haystack needle message` - String contains substring
+- `assert_output "cmd" expected message` - Command output contains string
+- `assert_file_exists path message` - File exists
+- `assert_file_contains path pattern message` - File contains pattern
+- `assert_command_success message cmd args...` - Command succeeds (direct)
+
+### Fixture Helpers
+
+- `fixture_android_devices_dir` - Path to `examples/android/devbox.d/android/devices`
+- `fixture_ios_devices_dir` - Path to `examples/ios/devbox.d/ios/devices`
+- `make_temp_dir label` - Creates dir under `reports/tmp/` (project-local)
 
 ## Adding New Tests
 
 1. Create test file in appropriate directory (`plugins/tests/{platform}/`)
-2. Use `test-framework.sh` utilities
-3. Add command to `devbox.json` if needed
-4. Ensure tests run in isolation (no external dependencies)
+2. Source `test-framework.sh` and call `setup_logging`
+3. Use example project fixtures for read-only tests, `make_temp_dir` for write tests
+4. Call `test_summary "suite-name"` at the end
+5. Add command to `devbox.json` if needed
 
 ## Guidelines
 
 - **Pure unit tests only** - Test individual functions directly
-- **No integration** - Integration tests are in `/tests/integration/`
+- **No /tmp/** - Use `make_temp_dir()` for project-local temp directories
+- **Example fixtures** - Use `fixture_*_devices_dir()` for read-only device config tests
 - **Fast execution** - All tests should run in under 30 seconds total
-- **Isolated** - Tests should not depend on external state or example projects
-- **Self-contained** - Create any needed test data inline or in the test file
+- **Isolated** - Tests clean up after themselves
 
 ## Related Testing
 
-- **Integration tests**: `/tests/integration/` - Test plugin workflows with fixtures
+- **Integration tests**: `/tests/integration/` - Test plugin workflows
 - **E2E tests**: `/tests/e2e/` - Test full application lifecycle
-- **Test fixtures**: `/tests/fixtures/` - Shared test data for integration tests
 
 See `/tests/README.md` for complete testing guide.

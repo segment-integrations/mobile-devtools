@@ -4,7 +4,7 @@ environment:
   - "TEST_SUITE_NAME=shutdown-test"
   - "TEST_TUI=false"
 
-log_location: "test-results/metro-shutdown-logs"
+log_location: "reports/metro-shutdown-logs"
 log_level: info
 is_strict: false
 
@@ -133,7 +133,7 @@ processes:
       echo "  ✓ Metro stopped cleanly"
       echo "  ✓ No processes left running"
       echo ""
-      echo "Logs: test-results/metro-shutdown-logs"
+      echo "Logs: reports/metro-shutdown-logs"
       echo "===================================="
       echo ""
 

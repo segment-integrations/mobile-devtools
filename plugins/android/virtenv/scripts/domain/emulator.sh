@@ -2,7 +2,7 @@
 # Android Plugin - Emulator Lifecycle Management
 # See SCRIPTS.md for detailed documentation
 
-set -eu
+set -e
 
 if ! (return 0 2>/dev/null); then
   echo "ERROR: emulator.sh must be sourced, not executed directly" >&2
@@ -232,6 +232,18 @@ android_start_emulator() {
   ANDROID_EMULATOR_SERIAL="$emulator_serial"
   EMU_PORT="$available_port"
   export ANDROID_EMULATOR_SERIAL EMU_PORT
+
+  # Persist serial so readiness probes can find it (survives foreground blocking)
+  _emu_runtime_dir="${ANDROID_RUNTIME_DIR:-${ANDROID_USER_HOME:-}}"
+  if [ -n "$_emu_runtime_dir" ]; then
+    mkdir -p "$_emu_runtime_dir"
+    echo "$emulator_serial" > "$_emu_runtime_dir/emulator-serial.txt"
+    # Also write to suite-namespaced path if SUITE_NAME is set
+    if [ -n "${SUITE_NAME:-}" ]; then
+      mkdir -p "$_emu_runtime_dir/$SUITE_NAME"
+      echo "$emulator_serial" > "$_emu_runtime_dir/$SUITE_NAME/emulator-serial.txt"
+    fi
+  fi
 
   # ---- Start Emulator ----
 
@@ -467,4 +479,36 @@ android_stop_emulator() {
   else
     echo "✓ Emulators stopped"
   fi
+}
+
+# Check if the emulator is ready (boot completed)
+# Returns 0 if emulator is booted, 1 otherwise
+# Used by android.sh emulator start --wait-ready
+android_emulator_ready() {
+  # Resolve serial from state directory (suite-namespaced)
+  _suite="${SUITE_NAME:-default}"
+  _runtime_dir="${ANDROID_RUNTIME_DIR:-${ANDROID_USER_HOME:-}}"
+  if [ -z "$_runtime_dir" ]; then
+    _runtime_dir="${PWD}/.devbox/virtenv"
+  fi
+  _state_dir="$_runtime_dir/$_suite"
+
+  _serial=""
+  if [ -f "$_state_dir/emulator-serial.txt" ]; then
+    _serial="$(cat "$_state_dir/emulator-serial.txt")"
+  fi
+
+  # Fallback to legacy location
+  if [ -z "$_serial" ] && [ -n "$_runtime_dir" ] && [ -f "$_runtime_dir/emulator-serial.txt" ]; then
+    _serial="$(cat "$_runtime_dir/emulator-serial.txt")"
+  fi
+
+  if [ -z "$_serial" ]; then
+    return 1
+  fi
+
+  if adb -s "$_serial" shell getprop sys.boot_completed 2>/dev/null | grep -q "1"; then
+    return 0
+  fi
+  return 1
 }

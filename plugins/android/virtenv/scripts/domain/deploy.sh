@@ -2,7 +2,7 @@
 # Android Plugin - Application Run
 # See SCRIPTS.md for detailed documentation
 
-set -eu
+set -e
 
 if ! (return 0 2>/dev/null); then
   echo "ERROR: deploy.sh must be sourced, not executed directly" >&2
@@ -35,53 +35,111 @@ android_run_build() {
 
   echo "Building Android project: $project_root"
 
-  # Try platform-specific build command first (for React Native), then fall back to generic build
+  # Try platform-specific build command first, then generic
   if (cd "$project_root" && devbox run --list 2>/dev/null | grep -q "build:android"); then
     (cd "$project_root" && devbox run --pure build:android)
-  else
+  elif (cd "$project_root" && devbox run --list 2>/dev/null | grep -q "build"); then
     (cd "$project_root" && devbox run --pure build)
+  else
+    android_log_error "deploy.sh" "No build:android or build script found in devbox.json."
+    android_log_error "deploy.sh" "Define a build script using native tools (e.g., gradle assembleDebug)."
+    return 1
   fi
 }
 
 # Resolve APK path from glob pattern
-android_resolve_apk_path() {
-  project_root="$1"
-  apk_pattern="$2"
+# Args: project_root, apk_pattern
+# Returns: first matching APK path
+android_resolve_apk_glob() {
+  _arg_root="$1"
+  _arg_pattern="$2"
 
-  if [ -z "$apk_pattern" ]; then
+  if [ -z "$_arg_pattern" ]; then
     return 1
   fi
 
   # Make pattern absolute if it's relative
-  if [ "${apk_pattern#/}" = "$apk_pattern" ]; then
-    apk_pattern="${project_root%/}/$apk_pattern"
+  if [ "${_arg_pattern#/}" = "$_arg_pattern" ]; then
+    _arg_pattern="${_arg_root%/}/$_arg_pattern"
   fi
 
-  # Find matching APK files
-  # Temporarily disable glob failure to check if any files match
   set +f
-  matched_apks=""
-  for apk_candidate in $apk_pattern; do
-    if [ -f "$apk_candidate" ]; then
-      matched_apks="${matched_apks}${matched_apks:+
-}$apk_candidate"
+  _matched=""
+  for _candidate in $_arg_pattern; do
+    if [ -f "$_candidate" ]; then
+      _matched="${_matched}${_matched:+
+}$_candidate"
     fi
   done
   set -f
 
-  if [ -z "$matched_apks" ]; then
+  if [ -z "$_matched" ]; then
     return 1
   fi
 
-  # Count matches
-  match_count="$(printf '%s\n' "$matched_apks" | wc -l | tr -d ' ')"
-  if [ "$match_count" -gt 1 ]; then
-    echo "WARNING: Multiple APKs matched pattern: $apk_pattern" >&2
-    echo "         Using first match" >&2
+  _count="$(printf '%s\n' "$_matched" | wc -l | tr -d ' ')"
+  if [ "$_count" -gt 1 ]; then
+    android_log_warn "deploy.sh" "Multiple APKs matched pattern: $_arg_pattern; using first match"
   fi
 
-  # Return first match
-  printf '%s\n' "$matched_apks" | head -n1
+  printf '%s\n' "$_matched" | head -n1
+}
+
+# Find APK using auto-detect precedence chain
+# Args: project_root
+# Precedence:
+#   1. ANDROID_APP_APK env var (glob resolved relative to project_root)
+#   2. Recursive search of project_root for *.apk
+#   3. Recursive search of $PWD (skipped if PWD == project_root)
+#   4. Error with guidance
+android_find_apk() {
+  _find_root="$1"
+
+  # 1. ANDROID_APP_APK env var
+  if [ -n "${ANDROID_APP_APK:-}" ]; then
+    _apk="$(android_resolve_apk_glob "$_find_root" "$ANDROID_APP_APK" || true)"
+    if [ -n "$_apk" ] && [ -f "$_apk" ]; then
+      android_log_info "deploy.sh" "APK resolved via ANDROID_APP_APK env var: $_apk"
+      printf '%s\n' "$_apk"
+      return 0
+    fi
+  fi
+
+  # 2. Recursive search of project_root
+  _apk="$(find "$_find_root" -name '*.apk' -type f \
+    -not -path '*/.gradle/*' \
+    -not -path '*/build/intermediates/*' \
+    -not -path '*/node_modules/*' \
+    -not -path '*/.devbox/*' \
+    2>/dev/null | head -n1)"
+  if [ -n "$_apk" ] && [ -f "$_apk" ]; then
+    android_log_info "deploy.sh" "APK resolved via project search: $_apk"
+    printf '%s\n' "$_apk"
+    return 0
+  fi
+
+  # 3. Recursive search of $PWD (skip if same as project_root)
+  _cwd="$(cd "$PWD" && pwd -P)"
+  _root_real="$(cd "$_find_root" && pwd -P)"
+  if [ "$_cwd" != "$_root_real" ]; then
+    _apk="$(find "$PWD" -name '*.apk' -type f \
+      -not -path '*/.gradle/*' \
+      -not -path '*/build/intermediates/*' \
+      -not -path '*/node_modules/*' \
+      -not -path '*/.devbox/*' \
+      2>/dev/null | head -n1)"
+    if [ -n "$_apk" ] && [ -f "$_apk" ]; then
+      android_log_info "deploy.sh" "APK resolved via directory search: $_apk"
+      printf '%s\n' "$_apk"
+      return 0
+    fi
+  fi
+
+  # 4. Error
+  android_log_error "deploy.sh" "No APK found. Searched: ANDROID_APP_APK env var, project root, current directory."
+  android_log_error "deploy.sh" "Set ANDROID_APP_APK in devbox.json env, or pass a path: android.sh run /path/to/app.apk"
+  android_log_error "deploy.sh" "See: plugins/android/REFERENCE.md for APK resolution details."
+  return 1
 }
 
 # Find aapt tool from Android SDK (PATH > SDK/build-tools)
@@ -200,7 +258,7 @@ android_install_apk() {
   echo "✓ APK installed"
 }
 
-# Launch app on emulator (tries activity manager, falls back to monkey)
+# Launch app on emulator via activity manager
 android_launch_app() {
   package_name="$1"
   activity_name="$2"
@@ -213,15 +271,14 @@ android_launch_app() {
 
   android_debug_log "Launch component: $component_name"
 
-  # Try launching via activity manager
-  if adb -s "$emulator_serial" shell am start -n "$component_name" >/dev/null 2>&1; then
-    echo "✓ App launched via activity manager"
-  else
-    echo "WARNING: Activity manager launch failed, trying monkey launcher" >&2
-
-    # Fallback: Use monkey to launch via launcher intent
-    adb -s "$emulator_serial" shell monkey -p "$package_name" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 || true
+  # Launch via activity manager
+  if ! adb -s "$emulator_serial" shell am start -n "$component_name" >/dev/null 2>&1; then
+    android_log_error "deploy.sh" "Failed to launch app: $component_name"
+    android_log_error "deploy.sh" "Verify the package name and activity are correct."
+    return 1
   fi
+
+  echo "✓ App launched via activity manager"
 
   # Wait a moment for the app process to start
   sleep 2
@@ -240,29 +297,39 @@ android_launch_app() {
     fi
   done
 
-  echo "WARNING: App process not detected after ${max_attempts} attempts" >&2
-  echo "         App may still have launched successfully" >&2
+  android_log_error "deploy.sh" "App process not detected after ${max_attempts} attempts"
+  android_log_error "deploy.sh" "Check logcat for crash details: adb -s $emulator_serial logcat -d | grep $package_name"
+  return 1
 }
 
 # Run Android app (build, install, launch)
-# Usage: android_run_app [apk_path] [device]
-#   apk_path - Optional path to APK file. If provided, skips build step.
-#   device   - Optional device name. If omitted, uses ANDROID_DEFAULT_DEVICE.
+# Usage: android_run_app [--apk <path>] [--device <name>] [<device>]
+#   --apk <path>    - Path to APK file. If provided, skips build step.
+#   --device <name> - Device name. If omitted, uses ANDROID_DEFAULT_DEVICE.
+#   Bare positional arg is treated as device name for convenience.
 android_run_app() {
-  # Parse arguments - first arg could be APK path or device name
   apk_arg=""
   device_choice=""
 
-  if [ $# -gt 0 ]; then
-    # If first arg looks like a file path (contains / or ends with .apk), treat as APK
-    if printf '%s' "$1" | grep -q -e '/' -e '\.apk$'; then
-      apk_arg="$1"
-      shift
-    fi
-  fi
-
-  # Remaining arg is device choice
-  device_choice="${1:-}"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --apk)
+        apk_arg="${2:-}"
+        shift 2
+        ;;
+      --device)
+        device_choice="${2:-}"
+        shift 2
+        ;;
+      *)
+        # Bare positional arg: treat as device name for convenience
+        if [ -z "$device_choice" ]; then
+          device_choice="$1"
+        fi
+        shift
+        ;;
+    esac
+  done
 
   # ---- Resolve Device Selection ----
 
@@ -323,13 +390,9 @@ android_run_app() {
     echo ""
     echo "Locating APK..."
 
-    apk_pattern="${ANDROID_APP_APK:-app/build/outputs/apk/debug/*.apk}"
-    apk_path="$(android_resolve_apk_path "$project_root" "$apk_pattern" || true)"
+    apk_path="$(android_find_apk "$project_root" || true)"
 
     if [ -z "$apk_path" ] || [ ! -f "$apk_path" ]; then
-      echo "ERROR: Unable to locate APK" >&2
-      echo "       Pattern: $apk_pattern" >&2
-      echo "       Set ANDROID_APP_APK to correct path or pattern" >&2
       exit 1
     fi
 
@@ -364,6 +427,13 @@ android_run_app() {
   echo ""
   echo "Deploying to: $emulator_serial"
   echo ""
+
+  # Stop and uninstall existing app to avoid signature conflicts
+  if adb -s "$emulator_serial" shell pm list packages 2>/dev/null | grep -q "package:${package_name}$"; then
+    echo "Removing existing install: $package_name"
+    adb -s "$emulator_serial" shell am force-stop "$package_name" 2>/dev/null || true
+    adb -s "$emulator_serial" uninstall "$package_name" >/dev/null 2>&1 || true
+  fi
 
   android_install_apk "$apk_path" "$emulator_serial"
   echo ""

@@ -55,15 +55,16 @@ devbox run stop:emu
 
 ## Build and Deploy
 
+Build and deploy scripts are project-specific. Define them in your `devbox.json`.
+
 ```bash
-# Build app
-devbox run build
+# Plugin-provided: run app on emulator (builds, installs, launches)
+devbox run android.sh run
+devbox run android.sh run pixel_api30
 
-# Build, install, and launch app
-devbox run start:app
-
-# Build and run on specific device
-devbox run start:app pixel_api30
+# User-defined scripts (add to your devbox.json shell.scripts):
+# "build": ["gradle assembleDebug --info"]
+# "start:app": ["android.sh run ${1:-}"]   # ${1:-} passes optional device arg
 ```
 
 ## Configuration
@@ -130,12 +131,12 @@ adb emu kill
 
 ## Testing
 
-```bash
-# Run fast tests
-devbox run test:fast
+Test scripts are project-specific. Define them in your `devbox.json`.
 
-# Run E2E tests
-devbox run test:e2e
+```bash
+# User-defined scripts (add to your devbox.json shell.scripts):
+# "test": ["gradle test"]
+# "test:e2e": ["process-compose -f tests/test-suite.yaml --no-server"]
 
 # Run with headless emulator
 EMU_HEADLESS=1 devbox run test:e2e
@@ -145,14 +146,14 @@ EMU_HEADLESS=1 devbox run test:e2e
 
 ```
 devbox.d/android/
-├── devices/           # Device definitions
-│   ├── min.json
-│   ├── max.json
-│   └── devices.lock   # Generated lock file
-└── flake.nix         # Nix SDK configuration
+└── devices/           # Device definitions
+    ├── min.json
+    ├── max.json
+    └── devices.lock   # Generated lock file
 
-.devbox/virtenv/android/  # Runtime directory (auto-regenerated)
-└── scripts/              # Plugin scripts
+.devbox/virtenv/android/  # Runtime directory (auto-regenerated, never edit)
+├── scripts/              # Plugin scripts
+└── flake.nix             # Nix SDK configuration (auto-generated)
 
 reports/
 ├── logs/             # Test logs

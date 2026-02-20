@@ -2,51 +2,64 @@ version: "0.5"
 
 environment:
   - "IOS_DEVICE=${IOS_DEFAULT_DEVICE:-max}"
-  - "TEST_TIMEOUT=300"
-  - "BOOT_TIMEOUT=120"
+  - "SUITE_NAME=rn-ios-e2e"
+  - "IOS_BUILD_CONFIG=Debug"
   - "ANDROID_SKIP_SETUP=1"
   - "TEST_TUI=${TEST_TUI:-false}"
-  - "LANG=en_US.UTF-8"
-  - "LC_ALL=en_US.UTF-8"
   - "REACT_NATIVE_VIRTENV=${REACT_NATIVE_VIRTENV}"
 
 log_location: "reports/react-native-ios-e2e-logs"
 log_level: info
-is_strict: false
+is_strict: true
 
 processes:
-  # Phase 0: Allocate Metro port (runs first, no dependencies)
+  # Phase 0: Allocate Metro port (no running process needed for builds)
   allocate-metro-port:
     command: |
+      set -e
       # Source React Native lib
       . ${REACT_NATIVE_VIRTENV}/scripts/lib/lib.sh
 
       # Allocate port for ios test suite
       metro_port=$(rn_allocate_metro_port "ios")
-      echo "📡 Allocated Metro port: $metro_port"
+      echo "Allocated Metro port: $metro_port"
 
       # Save environment file for other processes
       env_file=$(rn_save_metro_env "ios" "$metro_port")
-      echo "✓ Metro environment saved to: $env_file"
+      echo "Metro environment saved to: $env_file"
     availability:
       restart: "no"
 
   # Phase 1: Build Node dependencies
   build-node:
-    depends_on:
-      allocate-metro-port:
-        condition: process_completed_successfully
-    command: "devbox run --pure build:node"
+    command: |
+      set -e
+      _step="build-node"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
+      npm install
+
+      echo "pass" > "$_step_dir/$_step.status"
     availability:
       restart: "no"
 
   # Phase 2: Install CocoaPods dependencies
   install-pods:
     command: |
+      set -e
+      _step="install-pods"
+      _step_dir="$PWD/reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
       cd ios
       echo "Installing CocoaPods dependencies..."
       pod install --repo-update
-      echo '✓ Pod install complete'
+      echo 'Pod install complete'
+
+      echo "pass" > "$_step_dir/$_step.status"
     depends_on:
       build-node:
         condition: process_completed_successfully
@@ -55,43 +68,29 @@ processes:
 
   # Phase 3: Sync simulators
   sync-simulators:
-    command: "devbox run ios.sh devices sync"
+    command: "ios.sh devices sync"
     availability:
       restart: "no"
 
-  # Phase 4: Start simulator
-  ios-simulator:
+  # Phase 4a: Launch simulator if not running
+  launch-simulator:
     command: |
-      mkdir -p .devbox/virtenv/ios/runtime
+      set -e
 
+      # Check if simulator already running
+      if ios.sh simulator ready 2>/dev/null; then
+        echo "Simulator already running, skipping launch"
+        exit 0
+      fi
+
+      echo "Starting iOS simulator..."
       if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
-        echo "🚀 Starting fresh iOS simulator with clean state (${IOS_DEVICE})..."
-        output=$(ios.sh simulator start --pure ${IOS_DEVICE} 2>&1)
-        echo "$output"
-
-        test_udid=$(echo "$output" | grep -oE '[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}' | tail -1)
-        if [ -n "$test_udid" ]; then
-          echo "$test_udid" > .devbox/virtenv/ios/runtime/simulator-udid.txt
-          echo "✓ Test simulator UDID saved: $test_udid"
-        fi
-
-        echo "✓ Test simulator ready for testing"
-        exit 0
+        # Pure mode: foreground, process-compose manages lifecycle
+        ios.sh simulator start --pure ${IOS_DEVICE}
+        tail -f /dev/null  # Keep alive
       else
-        echo "🚀 Starting iOS simulator (${IOS_DEVICE})..."
-        ios.sh simulator start ${IOS_DEVICE}
-
-        echo "Waiting for simulator to boot..."
-        DEVICE_UDID=$(xcrun simctl list devices | grep "Booted" | grep -oE '[0-9A-F-]{36}' | head -1 || echo "")
-        if [ -z "$DEVICE_UDID" ]; then
-          echo "ERROR: No booted simulator found"
-          exit 1
-        fi
-        xcrun simctl bootstatus "$DEVICE_UDID" >/dev/null 2>&1 || true
-
-        echo "✓ Simulator ready for testing"
-        echo "✓ Simulator will remain running after tests complete"
-        exit 0
+        # Dev mode: start simulator, wait for ready, then detach
+        ios.sh simulator start --wait-ready ${IOS_DEVICE}
       fi
     depends_on:
       sync-simulators:
@@ -100,173 +99,155 @@ processes:
       restart: "no"
     readiness_probe:
       exec:
-        command: |
-          if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
-            DEVICE_UDID=$(xcrun simctl list devices | grep "Test" | grep "Booted" | grep -oE '[0-9A-F-]{36}' | head -1 || echo "")
-          else
-            DEVICE_UDID=$(xcrun simctl list devices | grep "Booted" | grep -oE '[0-9A-F-]{36}' | head -1 || echo "")
-          fi
-          [ -n "$DEVICE_UDID" ] && xcrun simctl bootstatus "$DEVICE_UDID" >/dev/null 2>&1
-      initial_delay_seconds: 10
+        command: "ios.sh simulator ready"
+      initial_delay_seconds: 5
       period_seconds: 5
-      timeout_seconds: 120
+      timeout_seconds: 10
       success_threshold: 1
-      failure_threshold: 3
+      failure_threshold: 36
+
+  # Phase 4b: Verify simulator ready
+  verify-simulator-ready:
+    command: |
+      _step="simulator-boot"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+
+      # Wait a moment for launch to start
+      sleep 3
+
+      echo "Verifying simulator is ready..."
+      max_wait=180
+      elapsed=0
+      while ! ios.sh simulator ready 2>/dev/null; do
+        sleep 2
+        elapsed=$((elapsed + 2))
+        echo "  Waiting for simulator... ${elapsed}s/${max_wait}s"
+        if [ $elapsed -ge $max_wait ]; then
+          printf 'fail\nTimed out after %ds waiting for simulator to boot\n' "$max_wait" > "$_step_dir/$_step.status"
+          exit 1
+        fi
+      done
+      echo "Simulator ready"
+
+      echo "pass" > "$_step_dir/$_step.status"
+    depends_on:
+      sync-simulators:
+        condition: process_completed_successfully
+    availability:
+      restart: "no"
 
   # Phase 5: Start Metro bundler
   metro-bundler:
     command: "metro.sh start ios"
     depends_on:
-      allocate-metro-port:
-        condition: process_completed_successfully
       build-node:
+        condition: process_completed_successfully
+      allocate-metro-port:
         condition: process_completed_successfully
     availability:
       restart: "no"
-    shutdown:
-      command: "metro.sh stop ios || true"
-      signal: 15
-      timeout_seconds: 5
     readiness_probe:
       exec:
         command: "metro.sh health ios ios"
       initial_delay_seconds: 5
       period_seconds: 5
-      timeout_seconds: 60
+      timeout_seconds: 5
       success_threshold: 1
+      failure_threshold: 12
 
-  # Phase 6: Build and deploy app with xcodebuild
-  deploy-ios:
+  # Phase 6a: Build iOS app (depends on port allocation, NOT metro running)
+  build-ios:
     command: |
       set -e
+      _step="build-ios"
+      _step_dir="$PWD/reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
 
-      # Set build configuration (default to Release for E2E tests)
-      BUILD_CONFIG="Release"
-      test -n "${IOS_BUILD_CONFIG:-}" && BUILD_CONFIG="$IOS_BUILD_CONFIG"
-
-      # Get absolute project root path
-      PROJECT_ROOT="${DEVBOX_PROJECT_ROOT:-}"
-      test -z "$PROJECT_ROOT" && PROJECT_ROOT="$(pwd)"
-
-      echo "📲 Building React Native app"
-      echo "Build configuration: $BUILD_CONFIG"
-      echo "Project root: $PROJECT_ROOT"
-
-      # Validate critical variables early
-      test -z "$BUILD_CONFIG" && { echo "ERROR: BUILD_CONFIG is empty!" >&2; exit 1; }
-      test -z "$PROJECT_ROOT" && { echo "ERROR: PROJECT_ROOT is empty!" >&2; exit 1; }
+      BUILD_CONFIG="${IOS_BUILD_CONFIG:-Release}"
+      echo "Building React Native app (${BUILD_CONFIG})"
 
       # Source Metro environment so React Native uses correct port
       . ${REACT_NATIVE_VIRTENV}/metro/env-ios.sh
       echo "Metro port: $METRO_PORT"
 
-      # Get simulator UDID (retry for up to 30 seconds)
-      max_attempts=15
-      attempt=0
-      DEVICE_UDID=""
-
-      while [ $attempt -lt $max_attempts ] && [ -z "$DEVICE_UDID" ]; do
-        if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
-          DEVICE_UDID=$(xcrun simctl list devices | grep "Test" | grep "Booted" | grep -oE '[0-9A-F-]{36}' | head -1 || echo "")
-        else
-          DEVICE_UDID=$(xcrun simctl list devices | grep "Booted" | grep -oE '[0-9A-F-]{36}' | head -1 || echo "")
-        fi
-
-        if [ -z "$DEVICE_UDID" ]; then
-          attempt=$((attempt + 1))
-          echo "Waiting for simulator to boot... (attempt $attempt/$max_attempts)"
-          sleep 2
-        fi
-      done
-
-      if [ -z "$DEVICE_UDID" ]; then
-        echo "ERROR: No booted simulator found after $max_attempts attempts" >&2
-        echo "Available devices:" >&2
-        xcrun simctl list devices >&2
-        exit 1
-      fi
-
-      echo "Building for simulator: $DEVICE_UDID"
+      # Set up DerivedData path
+      DERIVED_DATA="${DEVBOX_PROJECT_ROOT:-.}/.devbox/virtenv/ios/DerivedData"
+      mkdir -p "$DERIVED_DATA"
 
       # Build with xcodebuild
-      # Remove Nix-specific flags that interfere with Apple toolchain
-      # NODE_BINARY is set by React Native plugin init hook
-      # Pass RCT_METRO_PORT so the app connects to the correct Metro instance
-
-      DERIVED_DATA_PATH="$PROJECT_ROOT/.devbox/virtenv/ios/DerivedData"
-      echo "Derived data path: $DERIVED_DATA_PATH"
-
-      # Ensure the derived data directory exists
-      mkdir -p "$DERIVED_DATA_PATH"
-
-      # Build with xcodebuild in a subshell to preserve variables
-      (
-        cd ios
-        env -u LD -u LDFLAGS -u NIX_LDFLAGS -u NIX_CFLAGS_COMPILE -u NIX_CFLAGS_LINK \
-          NODE_BINARY="$NODE_BINARY" \
-          RCT_METRO_PORT="$METRO_PORT" \
-          xcodebuild \
-          -workspace ReactNativeExample.xcworkspace \
-          -scheme ${IOS_APP_SCHEME} \
+      cd ios
+      NODE_BINARY="$NODE_BINARY" RCT_METRO_PORT="$METRO_PORT" \
+        xcodebuild -workspace ReactNativeExample.xcworkspace \
+          -scheme ReactNativeExample \
           -configuration "$BUILD_CONFIG" \
-          -destination "id=$DEVICE_UDID" \
-          -derivedDataPath "$DERIVED_DATA_PATH" \
+          -destination "generic/platform=iOS Simulator" \
+          -derivedDataPath "$DERIVED_DATA" \
           -quiet \
           build
-      )
 
-      # Install the built app
-      echo "Installing app to simulator..."
+      echo "Build complete"
 
-      # Use Release build for E2E tests
-      APP_PATH="${DEVBOX_PROJECT_ROOT}/.devbox/virtenv/ios/DerivedData/Build/Products/Release-iphonesimulator/ReactNativeExample.app"
-
-      if [ ! -d "$APP_PATH" ]; then
-        echo "ERROR: App bundle not found at $APP_PATH" >&2
-        echo "ERROR: Contents of Products directory:" >&2
-        ls -la "${DEVBOX_PROJECT_ROOT}/.devbox/virtenv/ios/DerivedData/Build/Products/" >&2 || true
-        exit 1
-      fi
-
-      xcrun simctl install "$DEVICE_UDID" "$APP_PATH"
-
-      # Launch app with Metro port environment variable
-      echo "Launching app with Metro on port $METRO_PORT..."
-      xcrun simctl launch "$DEVICE_UDID" "${IOS_APP_BUNDLE_ID}" \
-        RCT_METRO_PORT="$METRO_PORT"
-
-      echo "✓ App deployed and launched successfully"
+      echo "pass" > "$_step_dir/$_step.status"
     depends_on:
       install-pods:
         condition: process_completed_successfully
-      ios-simulator:
+      allocate-metro-port:
         condition: process_completed_successfully
+    availability:
+      restart: "no"
+
+  # Phase 6b: Deploy iOS app
+  deploy-ios:
+    command: |
+      set -e
+      _step="deploy"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
+      ios.sh deploy
+      echo "App deployed and launched successfully"
+
+      echo "pass" > "$_step_dir/$_step.status"
+    depends_on:
+      build-ios:
+        condition: process_completed_successfully
+      verify-simulator-ready:
+        condition: process_completed_successfully
+      metro-bundler:
+        condition: process_healthy
     availability:
       restart: "no"
 
   # Phase 7: Verify app is running
   verify-app-running:
     command: |
-      if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
-        DEVICE_UDID=$(xcrun simctl list devices | grep "Test" | grep "Booted" | grep -oE '[0-9A-F-]{36}' | head -1)
-      else
-        DEVICE_UDID=$(xcrun simctl list devices | grep "Booted" | grep -oE '[0-9A-F-]{36}' | head -1)
-      fi
+      _step="verify-app"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
 
       echo "Waiting for app to start..."
-      max_attempts=10
+
+      max_attempts=15
       attempt=0
       while [ $attempt -lt $max_attempts ]; do
-        if xcrun simctl spawn "$DEVICE_UDID" launchctl list | grep -q "${IOS_APP_BUNDLE_ID}"; then
-          echo "✓ App is running: ${IOS_APP_BUNDLE_ID}"
-          exit 0
+        # Check if app process is running using built-in command
+        if ! ios.sh app status; then
+          attempt=$((attempt + 1))
+          echo "  Attempt $attempt/$max_attempts: App not running yet..."
+          sleep 2
+          continue
         fi
-        attempt=$((attempt + 1))
-        echo "  Attempt $attempt/$max_attempts..."
-        sleep 2
+
+        # Success: app is running
+        echo "App is running"
+        echo "pass" > "$_step_dir/$_step.status"
+        exit 0
       done
 
-      echo "ERROR: App did not start within timeout" >&2
+      printf 'fail\nApp did not start within timeout\n' > "$_step_dir/$_step.status"
       exit 1
     depends_on:
       deploy-ios:
@@ -277,50 +258,36 @@ processes:
   # Cleanup - runs after verify completes
   cleanup:
     command: |
-      # Stop Metro bundler explicitly
-      echo "Stopping Metro bundler..."
-      metro.sh stop ios || true
-
-      # Also kill the metro.sh wrapper process
-      pkill -f "metro.sh start ios" || true
-
       if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
-        echo "🧹 Cleaning up (pure mode)..."
-
-        test_sim_udid=$(cat .devbox/virtenv/ios/runtime/simulator-udid.txt 2>/dev/null || echo "")
-
-        if [ -z "$test_sim_udid" ]; then
-          test_sim_udid=$(xcrun simctl list devices | grep "Test" | grep -oE '[0-9A-F-]{36}' | head -1 || echo "")
-        fi
-
-        if [ -n "$test_sim_udid" ]; then
-          xcrun simctl terminate "$test_sim_udid" "${IOS_APP_BUNDLE_ID}" 2>/dev/null || true
-          xcrun simctl shutdown "$test_sim_udid" 2>/dev/null || true
-          xcrun simctl delete "$test_sim_udid" 2>/dev/null || true
-          rm -f .devbox/virtenv/ios/runtime/simulator-udid.txt 2>/dev/null || true
-          echo "✓ App stopped, test simulator deleted"
-        else
-          echo "✓ No test simulator to clean up"
-        fi
+        echo "Cleaning up (pure mode)..."
+        metro.sh stop ios || true
+        ios.sh app stop || true
+        ios.sh simulator stop
+        echo "Metro, app, and test simulator stopped"
       else
-        echo "✓ Test complete - app and simulator still running"
+        echo "Test complete - Metro, app, and simulator still running for iteration"
       fi
     depends_on:
       verify-app-running:
         condition: process_completed
-      metro-bundler:
-        condition: process_healthy
     availability:
       restart: "no"
 
-  # Summary - displays results and optionally stays open
+  # Summary - reports per-step pass/fail
   summary:
-    command: "bash tests/test-summary.sh 'React Native iOS E2E Test Suite' 'reports/react-native-ios-e2e-logs'"
+    command: |
+      set -e
+      export REPO_ROOT="$(cd ../.. && pwd)"
+      . "$REPO_ROOT/plugins/tests/test-framework.sh"
+      log_test "React Native iOS E2E Test Suite"
+      e2e_report_steps || true
+      test_summary "rn-ios-e2e"
     depends_on:
       cleanup:
         condition: process_completed
     availability:
       restart: "no"
+      exit_on_end: true
     shutdown:
       signal: 15
       timeout_seconds: 1

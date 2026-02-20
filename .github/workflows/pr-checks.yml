@@ -36,16 +36,12 @@ jobs:
             reports/
           retention-days: 7
 
-  # Android example E2E tests (min/max devices)
+  # Android example E2E test (max device only on PRs)
   android-e2e:
-    name: Android E2E - ${{ matrix.device }}
+    name: Android E2E - max
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     needs: fast-tests
-    strategy:
-      fail-fast: false
-      matrix:
-        device: [min, max]
     steps:
       - uses: actions/checkout@v4
 
@@ -73,37 +69,28 @@ jobs:
       - name: Run Android E2E test
         working-directory: examples/android
         env:
-          EMU_HEADLESS: 1
           BOOT_TIMEOUT: 180
           TEST_TIMEOUT: 300
-          ANDROID_DEFAULT_DEVICE: ${{ matrix.device }}
+          ANDROID_DEFAULT_DEVICE: max
           TEST_TUI: false
-        run: devbox run --pure test:e2e
+        run: devbox run --pure -e EMU_HEADLESS=1 test:e2e
 
       - name: Upload reports and logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: android-${{ matrix.device }}-reports
+          name: android-max-reports
           path: |
             examples/android/reports/
             examples/android/app/build/outputs/
           retention-days: 7
 
-  # iOS example E2E tests (min/max devices)
+  # iOS example E2E test (max device only on PRs)
   ios-e2e:
-    name: iOS E2E - ${{ matrix.device }}
-    runs-on: ${{ matrix.os }}
+    name: iOS E2E - max
+    runs-on: macos-26
     timeout-minutes: 25
     needs: fast-tests
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - device: min
-            os: macos-14
-          - device: max
-            os: macos-15
     steps:
       - uses: actions/checkout@v4
 
@@ -134,24 +121,23 @@ jobs:
       - name: Run iOS E2E test
         working-directory: examples/ios
         env:
-          SIM_HEADLESS: 1
           BOOT_TIMEOUT: 120
           TEST_TIMEOUT: 300
-          IOS_DEFAULT_DEVICE: ${{ matrix.device }}
+          IOS_DEFAULT_DEVICE: max
           TEST_TUI: false
-        run: devbox run --pure test:e2e
+        run: devbox run --pure -e SIM_HEADLESS=1 test:e2e
 
       - name: Upload reports and logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ios-${{ matrix.device }}-reports
+          name: ios-max-reports
           path: |
             examples/ios/reports/
             ~/Library/Logs/CoreSimulator/
           retention-days: 7
 
-  # React Native E2E tests (Android min/max, iOS min/max, Web)
+  # React Native E2E tests (max device only on PRs, plus web)
   react-native-e2e:
     name: React Native E2E - ${{ matrix.platform }}-${{ matrix.device }}
     runs-on: ${{ matrix.os }}
@@ -161,21 +147,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Android tests
-          - platform: android
-            device: min
-            os: ubuntu-24.04
           - platform: android
             device: max
             os: ubuntu-24.04
-          # iOS tests
-          - platform: ios
-            device: min
-            os: macos-14
           - platform: ios
             device: max
-            os: macos-15
-          # Web test (fast, no device needed)
+            os: macos-26
           - platform: web
             device: none
             os: ubuntu-24.04
@@ -235,23 +212,13 @@ jobs:
 
       - name: Run React Native E2E test
         working-directory: examples/react-native
-        env:
-          EMU_HEADLESS: ${{ matrix.platform == 'android' && '1' || '0' }}
-          SIM_HEADLESS: ${{ matrix.platform == 'ios' && '1' || '0' }}
-          BOOT_TIMEOUT: 240
-          TEST_TIMEOUT: 600
-          ANDROID_DEFAULT_DEVICE: ${{ matrix.device }}
-          IOS_DEFAULT_DEVICE: ${{ matrix.device }}
-          TEST_TUI: false
         run: |
           if [ "${{ matrix.platform }}" = "android" ]; then
-            # Use wrapper script for platform-specific optimization
-            bash tests/run-android-tests.sh
+            devbox run --pure -e IOS_SKIP_SETUP=1 -e EMU_HEADLESS=1 test:e2e:android
           elif [ "${{ matrix.platform }}" = "ios" ]; then
-            # Use wrapper script for platform-specific optimization
-            bash tests/run-ios-tests.sh
+            devbox run --pure -e ANDROID_SKIP_SETUP=1 -e SIM_HEADLESS=1 test:e2e:ios
           elif [ "${{ matrix.platform }}" = "web" ]; then
-            devbox run test:e2e:web
+            devbox run --pure -e ANDROID_SKIP_SETUP=1 -e IOS_SKIP_SETUP=1 test:e2e:web
           fi
 
       - name: Upload reports and logs
@@ -275,7 +242,7 @@ jobs:
     steps:
       - name: Check job results
         run: |
-          echo "📊 PR Check Results:"
+          echo "PR Check Results:"
           echo "  Fast Tests: ${{ needs.fast-tests.result }}"
           echo "  Android E2E: ${{ needs.android-e2e.result }}"
           echo "  iOS E2E: ${{ needs.ios-e2e.result }}"
@@ -289,4 +256,4 @@ jobs:
             echo "::error::One or more PR checks failed"
             exit 1
           fi
-          echo "::notice::✅ All PR checks passed!"
+          echo "::notice::All PR checks passed!"

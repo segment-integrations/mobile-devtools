@@ -21,16 +21,38 @@ This significantly speeds up iOS workflows and prevents unnecessary Android SDK 
 
 ## Commands
 
-- Android: `devbox run --pure start-emu`, `devbox run --pure start-android`, `devbox run --pure stop-emu`
-- iOS: `devbox run --pure start-sim`, `devbox run --pure start-ios`, `devbox run --pure stop-sim`
-- Web/Metro: `devbox run --pure start-web`
+### Plugin-provided commands
+
+These commands are provided by the React Native plugin (and its included Android and iOS plugins):
+
+- `devbox run --pure start:emu [device]` — Start Android emulator
+- `devbox run --pure stop:emu` — Stop Android emulator
+- `devbox run --pure start:sim [device]` — Start iOS simulator
+- `devbox run --pure stop:sim` — Stop iOS simulator
+- `devbox run --pure doctor` — Run environment diagnostics
+- `devbox run --pure verify:setup` — Verify environment is functional
+
+### User-defined commands
+
+These commands are typically defined in your project's `devbox.json` and are not part of the plugin itself:
+
+- Build and run scripts (e.g., `start:app`, `build:android`, `build:ios`)
+- Web/Metro scripts (e.g., `start:web`)
+
+See the example projects for typical script definitions.
 
 ## Files
 
-- Android config and devices: `devbox.d/android/`
-- iOS config and devices: `devbox.d/ios/`
-- React Native config: `devbox.d/react-native/react-native.json`
+- Android config and devices in your devbox.d directory (e.g., `devbox.d/android/`)
+- iOS config and devices in your devbox.d directory (e.g., `devbox.d/ios/`)
 
-## Config keys (`react-native.json`)
+## Configuration (Environment Variables)
 
-- `WEB_BUILD_PATH`
+The React Native plugin sets the following environment variables (configurable in `devbox.json`):
+
+- `REACT_NATIVE_WEB_BUILD_PATH` — Path for web build output (default: `web/build`)
+- `METRO_CACHE_DIR` — Metro bundler cache directory
+- `RN_METRO_PORT_START` — Start of Metro port range (default: `8091`)
+- `RN_METRO_PORT_END` — End of Metro port range (default: `8199`)
+
+It also overrides some Android plugin defaults for React Native compatibility (NDK, CMake, SDK versions). See the Android and iOS plugin references for their respective configuration options.

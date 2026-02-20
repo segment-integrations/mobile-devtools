@@ -2,7 +2,7 @@
 # iOS Plugin - Device and Simulator Management
 # Extracted from device.sh to eliminate circular dependencies
 
-set -eu
+set -e
 
 if ! (return 0 2>/dev/null); then
   echo "ERROR: device_manager.sh must be sourced, not executed directly" >&2
@@ -111,32 +111,6 @@ resolve_runtime_strict() {
   fi
 
   echo "Preferred runtime iOS ${preferred} not found." >&2
-  return 1
-}
-
-# Resolve runtime name only
-# Args: preferred_version
-# Returns: runtime_name
-resolve_runtime_name() {
-  preferred="$1"
-  choice="$(resolve_runtime "$preferred" || true)"
-  if [ -n "$choice" ]; then
-    printf '%s\n' "$choice" | cut -d'|' -f2
-    return 0
-  fi
-  return 1
-}
-
-# Resolve runtime name strictly
-# Args: preferred_version
-# Returns: runtime_name
-resolve_runtime_name_strict() {
-  preferred="$1"
-  choice="$(resolve_runtime_strict "$preferred" || true)"
-  if [ -n "$choice" ]; then
-    printf '%s\n' "$choice" | cut -d'|' -f2
-    return 0
-  fi
   return 1
 }
 

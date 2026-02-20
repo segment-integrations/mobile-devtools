@@ -1,141 +1,88 @@
 version: "0.5"
 
 environment:
-  - "TEST_TIMEOUT=300"
-  - "BOOT_TIMEOUT=90"
+  - "SUITE_NAME=android-e2e"
   - "TEST_TUI=${TEST_TUI:-false}"
   - "ANDROID_DEBUG_SETUP=${ANDROID_DEBUG_SETUP:-}"
 
 log_location: "reports/android-e2e-logs"
 log_level: info
+is_strict: true
 
 processes:
-  # Phase 1: Build - runs first (no dependency)
+  # Phase 1: Build app (runs concurrently with emulator startup)
   build-app:
     command: |
-      echo '[BUILD-APP] Starting build process (PID=$$)...'
-      # Source Android environment to set ANDROID_SDK_ROOT
-      . ${ANDROID_RUNTIME_DIR}/scripts/init/setup.sh
-      echo '📦 Building Android app...'
-      gradle assembleDebug --info
-      echo '✓ Build complete'
+      set -e
+      _step="build-app"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
+      gradle assembleDebug
+
+      echo "pass" > "$_step_dir/$_step.status"
     availability:
       restart: "no"
 
   # Phase 2a: Sync AVDs - ensure all AVDs match device definitions
   sync-avds:
-    command: "echo '[SYNC-AVDS] Starting (PID=$$)...' && echo '[SYNC-AVDS] About to source setup.sh...' && . ${ANDROID_RUNTIME_DIR}/scripts/init/setup.sh && echo '[SYNC-AVDS] setup.sh sourced' && echo '🔄 Syncing AVDs with device definitions...' && android.sh devices sync && echo '✓ Sync complete'"
+    command: "android.sh devices sync"
     availability:
       restart: "no"
 
-  # Phase 2b: Start emulator (depends on sync completing)
-  # Reuses existing emulator if already running
-  # Max boot time: 5 minutes, 1 retry allowed, total timeout: 10 minutes
+  # Phase 2b: Start emulator (runs concurrently with build)
   android-emulator:
     depends_on:
       sync-avds:
         condition: process_completed_successfully
     environment:
-      - "ANDROID_EMULATOR_FOREGROUND=1"  # Run emulator in foreground for process-compose monitoring
+      - "ANDROID_EMULATOR_FOREGROUND=1"
     command: |
-      echo "[ANDROID-EMULATOR] Starting emulator in foreground mode..."
-      # Source Android environment
-      . ${ANDROID_RUNTIME_DIR}/scripts/init/setup.sh
-
-      # Determine which device to start
+      set -e
+      echo "[ANDROID-EMULATOR] Starting emulator..."
       device="${ANDROID_DEFAULT_DEVICE:-max}"
 
-      # In pure mode, always start fresh
-      if [ "${IN_NIX_SHELL:-}" = "pure" ]; then
-        echo "🚀 Starting fresh Android emulator (pure mode): $device"
-        export ANDROID_EMULATOR_PURE=1
-
-        # Write expected serial for readiness probe (emulator always starts on 5554 first)
-        echo "emulator-5554" > ${ANDROID_RUNTIME_DIR}/emulator-serial.txt
-
-        # Start emulator in foreground - this blocks and runs the emulator
-        # Process-compose will monitor it and use readiness probe to check when ready
-        android.sh emulator start "$device"
+      if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
+        echo "Starting fresh Android emulator (pure mode): $device"
+        android.sh emulator start --pure "$device"
       else
-        echo "🚀 Verifying Android emulator is running: $device"
-
-        # Write expected serial for readiness probe
-        serial="emulator-5554"
-        echo "$serial" > ${ANDROID_RUNTIME_DIR}/emulator-serial.txt
-
-        # Check if emulator is already running
-        if adb devices | grep -q "$serial"; then
-          echo "✓ Emulator already running: $serial"
-        else
-          echo "Starting emulator in background: $device"
-          # Start emulator in background (no foreground mode for reuse)
-          unset ANDROID_EMULATOR_FOREGROUND
-          android.sh emulator start "$device" &
-          echo "✓ Emulator starting (PID: $!)"
-        fi
-
-        # Wait for emulator to be fully booted
-        echo "Waiting for emulator to boot..."
-        max_attempts=60
-        attempt=0
-        while [ $attempt -lt $max_attempts ]; do
-          if adb -s $serial shell getprop sys.boot_completed 2>/dev/null | grep -q "1"; then
-            echo "✓ Emulator ready for testing"
-            break
-          fi
-          attempt=$((attempt + 1))
-          sleep 2
-        done
-
-        if [ $attempt -ge $max_attempts ]; then
-          echo "ERROR: Emulator did not boot within timeout"
-          exit 1
-        fi
-
-        # Let process complete - emulator stays running in background
-        echo "✓ Emulator will remain running after tests complete"
-        exit 0
+        echo "Starting Android emulator: $device"
+        unset ANDROID_EMULATOR_FOREGROUND
+        android.sh emulator start "$device"
       fi
+      # Keep process alive for readiness probe (process-compose services pattern)
+      tail -f /dev/null
     availability:
       restart: "no"
     readiness_probe:
       exec:
-        command: |
-          serial=$(cat ${ANDROID_RUNTIME_DIR}/emulator-serial.txt 2>/dev/null || echo "")
-          [ -n "$serial" ] && adb -s $serial shell getprop sys.boot_completed 2>/dev/null | grep -q "1"
+        command: "android.sh emulator ready"
       initial_delay_seconds: 10
-      period_seconds: 10
-      timeout_seconds: 180
+      period_seconds: 5
+      timeout_seconds: 10
       success_threshold: 1
-      failure_threshold: 12
+      failure_threshold: 60
 
-  # Phase 3: Run app - depends on both build and emulator being ready
-  run-app:
+  # Phase 3: Deploy app - depends on both build and emulator being ready
+  deploy-app:
     command: |
-      # Source Android environment
-      . ${ANDROID_RUNTIME_DIR}/scripts/init/setup.sh
+      set -e
+      _step="deploy-app"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
 
-      serial=$(cat ${ANDROID_RUNTIME_DIR}/emulator-serial.txt 2>/dev/null || echo emulator-5554)
-      export ANDROID_EMULATOR_SERIAL="$serial"
-
-      echo "📲 Running app on emulator: $serial"
-      # Use already-built APK from build-app phase
-      android.sh run ${ANDROID_APP_APK:-app/build/outputs/apk/debug/app-debug.apk}
+      android.sh deploy
 
       echo ""
-      # Resolve app ID: env var > auto-detected from APK > fail
-      app_id="${ANDROID_APP_ID:-$(cat ${ANDROID_RUNTIME_DIR}/app-id.txt 2>/dev/null || true)}"
-      if [ -z "$app_id" ]; then
-        echo "ERROR: Cannot determine app ID. Set ANDROID_APP_ID or run deploy first." >&2
-        exit 1
-      fi
-
-      echo "Waiting for app to start ($app_id)..."
+      echo "Waiting for app to start..."
       max_attempts=10
       attempt=0
       while [ $attempt -lt $max_attempts ]; do
-        if adb -s $serial shell pidof "$app_id" >/dev/null 2>&1; then
-          echo "✓ App process running (PID: $(adb -s $serial shell pidof "$app_id"))"
+        if android.sh app status; then
+          echo "App is running"
+          echo "pass" > "$_step_dir/$_step.status"
           exit 0
         fi
         attempt=$((attempt + 1))
@@ -143,55 +90,48 @@ processes:
         sleep 2
       done
 
-      echo "ERROR: App did not start within timeout" >&2
-      echo "Installed packages:" >&2
-      adb -s $serial shell pm list packages | grep -i devbox || true
-      echo "Running processes:" >&2
-      adb -s $serial shell ps | grep -i devbox || true
+      printf 'fail\nApp did not start within timeout\n' > "$_step_dir/$_step.status"
       exit 1
     depends_on:
       build-app:
         condition: process_completed_successfully
       android-emulator:
-        condition: process_completed_successfully
+        condition: process_healthy
     availability:
       restart: "no"
 
   # Cleanup - stop everything in pure mode, keep running in dev mode
   cleanup-app:
     command: |
-      # Source Android environment
-      . ${ANDROID_RUNTIME_DIR}/scripts/init/setup.sh
-
-      serial=$(cat ${ANDROID_RUNTIME_DIR}/emulator-serial.txt 2>/dev/null || echo emulator-5554)
-
-      # In pure mode (CI), stop app and emulator for reproducibility
-      if [ "${IN_NIX_SHELL:-}" = "pure" ]; then
-        echo "🧹 Cleaning up (pure mode): stopping app and emulator..."
-        app_id="${ANDROID_APP_ID:-$(cat ${ANDROID_RUNTIME_DIR}/app-id.txt 2>/dev/null || true)}"
-        [ -n "$app_id" ] && adb -s $serial shell am force-stop "$app_id" 2>/dev/null || true
+      if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
+        echo "Cleaning up (pure mode)..."
+        android.sh app stop || true
         android.sh emulator stop || true
-        echo "✓ App stopped, emulator stopped"
+        echo "App stopped, emulator stopped"
       else
-        # In dev mode, keep app and emulator running for interaction
-        echo "✓ Test complete - app and emulator still running"
+        echo "Test complete - app and emulator still running"
       fi
     depends_on:
-      run-app:
-        condition: process_completed_successfully
+      deploy-app:
+        condition: process_completed
     availability:
       restart: "no"
 
-  # Summary - displays results and optionally stays open
+  # Summary - reports per-step pass/fail
   summary:
     command: |
-      bash tests/test-summary.sh 'Android E2E Test Suite' 'reports/android-e2e-logs'
-      exit 0
+      set -e
+      export REPO_ROOT="$(cd ../.. && pwd)"
+      . "$REPO_ROOT/plugins/tests/test-framework.sh"
+      log_test "Android E2E Test Suite"
+      e2e_report_steps || true
+      test_summary "android-e2e"
     depends_on:
       cleanup-app:
         condition: process_completed
     availability:
       restart: "no"
+      exit_on_end: true
     shutdown:
       signal: 15
       timeout_seconds: 1

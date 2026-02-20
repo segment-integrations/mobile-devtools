@@ -1,6 +1,6 @@
 {
   "name": "ios",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Configures iOS tooling inside Devbox and ensures Xcode toolchain usage.",
   "env": {
     "IOS_CONFIG_DIR": "{{ .DevboxDir }}",
@@ -11,8 +11,15 @@
     "IOS_DEFAULT_RUNTIME": "",
     "IOS_DEVELOPER_DIR": "",
     "IOS_DOWNLOAD_RUNTIME": "1",
+    "IOS_APP_ARTIFACT": "",
+    "IOS_APP_SCHEME": "",
+    "IOS_APP_PROJECT": "",
+    "IOS_BUILD_CONFIG": "Debug",
+    "IOS_DERIVED_DATA_PATH": "{{ .Virtenv }}/DerivedData",
     "IOS_XCODE_ENV_PATH": "",
-    "REPORTS_DIR": "reports"
+    "IOS_RUNTIME_DIR": "{{ .Virtenv }}/runtime",
+    "REPORTS_DIR": "reports",
+    "LANG": "en_US.UTF-8"
   },
   "packages": {
     "bash": "latest",
@@ -32,6 +39,7 @@
     }
   },
   "create_files": {
+    "{{ .Virtenv }}/runtime": "",
     "{{ .Virtenv }}/scripts/lib/lib.sh": "virtenv/scripts/lib/lib.sh",
     "{{ .Virtenv }}/scripts/platform/core.sh": "virtenv/scripts/platform/core.sh",
     "{{ .Virtenv }}/scripts/platform/device_config.sh": "virtenv/scripts/platform/device_config.sh",

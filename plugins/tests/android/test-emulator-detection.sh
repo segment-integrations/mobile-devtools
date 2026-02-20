@@ -4,118 +4,10 @@
 
 set -euo pipefail
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[0;33m'
-NC='\033[0m' # No Color
-
-# Counters
-tests_run=0
-tests_passed=0
-tests_failed=0
-
-# Test result tracking
-test_results=()
-
-# Helper functions
-log_test() {
-  echo ""
-  echo "========================================"
-  echo "TEST: $1"
-  echo "========================================"
-  tests_run=$((tests_run + 1))
-}
-
-assert_success() {
-  local cmd="$1"
-  local description="$2"
-
-  if eval "$cmd" >/dev/null 2>&1; then
-    echo -e "${GREEN}✓${NC} $description"
-    tests_passed=$((tests_passed + 1))
-    test_results+=("PASS: $description")
-    return 0
-  else
-    echo -e "${RED}✗${NC} $description"
-    echo "  Command failed: $cmd"
-    tests_failed=$((tests_failed + 1))
-    test_results+=("FAIL: $description")
-    return 1
-  fi
-}
-
-assert_failure() {
-  local cmd="$1"
-  local description="$2"
-
-  if ! eval "$cmd" >/dev/null 2>&1; then
-    echo -e "${GREEN}✓${NC} $description"
-    tests_passed=$((tests_passed + 1))
-    test_results+=("PASS: $description")
-    return 0
-  else
-    echo -e "${RED}✗${NC} $description"
-    echo "  Command should have failed: $cmd"
-    tests_failed=$((tests_failed + 1))
-    test_results+=("FAIL: $description")
-    return 1
-  fi
-}
-
-assert_output() {
-  local cmd="$1"
-  local expected="$2"
-  local description="$3"
-
-  local output
-  output=$(eval "$cmd" 2>&1 || true)
-
-  if echo "$output" | grep -q "$expected"; then
-    echo -e "${GREEN}✓${NC} $description"
-    tests_passed=$((tests_passed + 1))
-    test_results+=("PASS: $description")
-    return 0
-  else
-    echo -e "${RED}✗${NC} $description"
-    echo "  Expected to contain: $expected"
-    echo "  Got: $output"
-    tests_failed=$((tests_failed + 1))
-    test_results+=("FAIL: $description")
-    return 1
-  fi
-}
-
-print_summary() {
-  echo ""
-  echo "========================================"
-  echo "TEST SUMMARY"
-  echo "========================================"
-  echo "Total tests: $tests_run"
-  echo -e "${GREEN}Passed: $tests_passed${NC}"
-  if [ "$tests_failed" -gt 0 ]; then
-    echo -e "${RED}Failed: $tests_failed${NC}"
-  else
-    echo "Failed: $tests_failed"
-  fi
-  echo ""
-
-  if [ "$tests_failed" -gt 0 ]; then
-    echo "Failed tests:"
-    for result in "${test_results[@]}"; do
-      if [[ "$result" == FAIL:* ]]; then
-        echo -e "  ${RED}✗${NC} ${result#FAIL: }"
-      fi
-    done
-    echo ""
-    return 1
-  fi
-
-  return 0
-}
-
-# Setup: Source the emulator script functions
+# Setup: Source the framework and emulator scripts
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$SCRIPT_DIR/../test-framework.sh"
+
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 
 # Source Android setup
@@ -189,10 +81,10 @@ if [ "$existing_count" -eq 0 ]; then
       adb -s "$emulator_serial" emu kill >/dev/null 2>&1 || true
       sleep 2
     else
-      echo -e "${YELLOW}⚠${NC} Could not start emulator (this is OK if no AVDs exist yet)"
+      echo "Could not start emulator (this is OK if no AVDs exist yet)"
     fi
   else
-    echo -e "${YELLOW}⚠${NC} Could not start emulator (this is OK if no AVDs exist yet)"
+    echo "Could not start emulator (this is OK if no AVDs exist yet)"
   fi
 else
   echo "Using existing emulator(s) for tests..."
@@ -227,5 +119,5 @@ echo "Normal mode reuses existing emulator if AVD matches"
 assert_success "true" "Pure mode logic documented"
 assert_success "true" "Normal mode logic documented"
 
-# Print summary
-print_summary
+# Summary
+test_summary "android-emulator-detection"

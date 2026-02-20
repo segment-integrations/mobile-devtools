@@ -489,8 +489,7 @@ case "$command_name" in
     temp_lock_file="${lock_file_path}.tmp"
     printf '%s\n' "$devices_json" | jq \
       --arg cs "$checksum" \
-      --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date +%Y-%m-%dT%H:%M:%SZ)" \
-      'map(del(.file)) | {devices: ., checksum: $cs, generated_at: $ts}' \
+      'map(del(.file)) | {devices: ., checksum: $cs}' \
       > "$temp_lock_file"
 
     mv "$temp_lock_file" "$lock_file_path"

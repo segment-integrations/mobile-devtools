@@ -169,15 +169,17 @@ log_file="/tmp/test.log"              # WRONG - may be cleaned up by system
 Three main plugins are located in `plugins/`:
 
 1. **android** - Android SDK + emulator management via Nix flake
-   - SDK flake: `devbox.d/android/flake.nix`
-   - Device definitions: `devbox.d/android/devices/*.json`
+   - SDK flake: `devbox.d/<android-plugin-dir>/flake.nix`
+   - Device definitions: `devbox.d/<android-plugin-dir>/devices/*.json`
    - Scripts: `.devbox/virtenv/android/scripts/`
    - Configuration: Environment variables in `plugin.json`
+   - Note: `<android-plugin-dir>` is `android` for local includes, but for GitHub includes it uses the full path (e.g., `segment-integrations.devbox-plugins.android`)
 
 2. **ios** - iOS toolchain + simulator management for macOS
-   - Device definitions: `devbox.d/ios/devices/*.json`
+   - Device definitions: `devbox.d/<ios-plugin-dir>/devices/*.json`
    - Scripts: `.devbox/virtenv/ios/scripts/`
    - Configuration: Environment variables in `plugin.json`
+   - Note: `<ios-plugin-dir>` is `ios` for local includes, but for GitHub includes it uses the full path (e.g., `segment-integrations.devbox-plugins.ios`)
 
 3. **react-native** - Composition layer over Android + iOS plugins
    - Inherits both Android and iOS device management
@@ -185,7 +187,7 @@ Three main plugins are located in `plugins/`:
 
 ### Key Concepts
 
-**Device Definitions**: JSON files defining emulator/simulator configurations
+**Device Definitions**: JSON files defining emulator/simulator configurations stored in `devbox.d/<plugin-dir>/devices/`. The actual directory name for `<plugin-dir>` depends on how the plugin is included: for local includes (e.g., `plugin:../plugins/android`) it matches the plugin name (e.g., `android`), but for GitHub includes it uses the full dotted path (e.g., `segment-integrations.devbox-plugins.android`).
 - Android: `{name, api, device, tag, preferred_abi}`
 - iOS: `{name, runtime}`
 - Default devices: `min.json` and `max.json`
@@ -360,34 +362,34 @@ devbox run --pure ios.sh config show
 ```bash
 cd examples/android
 
-# Build the app
-devbox run --pure build-android
+# Build the app (user-defined in example devbox.json)
+devbox run --pure build:android
 
-# Start emulator
-devbox run --pure start-emu [device]  # Defaults to ANDROID_DEFAULT_DEVICE
+# Start emulator (plugin-provided)
+devbox run --pure start:emu [device]  # Defaults to ANDROID_DEFAULT_DEVICE
 
-# Build, install, and launch app on emulator
-devbox run --pure start-app [device]
+# Build, install, and launch app on emulator (user-defined in example devbox.json)
+devbox run --pure start:app [device]
 
-# Stop emulator
-devbox run --pure stop-emu
+# Stop emulator (plugin-provided)
+devbox run --pure stop:emu
 ```
 
 #### iOS
 ```bash
 cd examples/ios
 
-# Build the app
-devbox run --pure build-ios
+# Build the app (user-defined in example devbox.json)
+devbox run --pure build:ios
 
-# Start simulator
-devbox run --pure start-sim [device]  # Defaults to IOS_DEFAULT_DEVICE
+# Start simulator (plugin-provided)
+devbox run --pure start:sim [device]  # Defaults to IOS_DEFAULT_DEVICE
 
-# Build, install, and launch app on simulator
-devbox run --pure start-ios [device]
+# Build, install, and launch app on simulator (plugin-provided via ios.sh run)
+devbox run --pure start:app [device]
 
-# Stop simulator
-devbox run --pure stop-sim
+# Stop simulator (plugin-provided)
+devbox run --pure stop:sim
 ```
 
 #### React Native
@@ -398,17 +400,17 @@ cd examples/react-native
 npm install
 
 # Android workflow
-devbox run --pure start-emu [device]
-devbox run --pure start-app [device]
-devbox run --pure stop-emu
+devbox run --pure start:emu [device]   # plugin-provided
+devbox run --pure start:app [device]   # user-defined
+devbox run --pure stop:emu             # plugin-provided
 
 # iOS workflow
-devbox run --pure start-sim [device]
-devbox run --pure start-ios [device]
-devbox run --pure stop-sim
+devbox run --pure start:sim [device]   # plugin-provided
+devbox run --pure start:app [device]   # user-defined (calls ios.sh run)
+devbox run --pure stop:sim             # plugin-provided
 
-# Build for all platforms
-devbox run build  # Runs build-android, build-ios, build-web
+# Build for all platforms (user-defined)
+devbox run build  # Runs build:android, build:ios, build:web
 ```
 
 ### Testing
@@ -467,9 +469,13 @@ act -j ios-plugin-tests
 │   ├── e2e-react-native.sh
 │   ├── e2e-sequential.sh
 │   └── e2e-all.sh
+├── wiki/                 # Documentation
+│   ├── guides/           # User guides and cheatsheets
+│   ├── reference/        # CLI, config, and env var references
+│   └── project/          # Architecture and strategy docs
 ├── .github/workflows/
-│   ├── pr-checks.yml     # Fast PR validation (~15-30 min)
-│   └── e2e-full.yml      # Full E2E tests (~45-60 min per platform)
+│   ├── pr-checks.yml     # Fast PR validation
+│   └── e2e-full.yml      # Full E2E tests
 └── devbox.json           # Root devbox config
 ```
 
@@ -513,7 +519,7 @@ See `wiki/project/ARCHITECTURE.md` for complete documentation.
 
 ### Device Management Workflow
 
-1. Device definitions are JSON files in `devbox.d/{platform}/devices/`
+1. Device definitions are JSON files in `devbox.d/<plugin-dir>/devices/` (where `<plugin-dir>` depends on the include method; see Plugin System above)
 2. Modify devices using CLI commands (not manual editing)
 3. After changes, regenerate lock file: `{platform}.sh devices eval`
 4. Lock files should be committed to optimize CI
@@ -588,7 +594,12 @@ Document public APIs exhaustively in REFERENCE.md files, not in code comments.
 
 **Reduce edge cases and unexpected behavior.** Design for the common path. When edge cases arise, validate assumptions early and fail fast rather than adding complex branching logic.
 
-**Scripts fail on error.** All shell scripts use `set -euo pipefail` (or `set -eu` for POSIX sh). Functions return 0 on success, non-zero on failure. Avoid `|| true` except in validation functions where warnings shouldn't block execution.
+**Scripts fail on error.** Shell scripts use different strictness levels depending on context:
+- Sourced scripts (lib.sh, core.sh, setup.sh): `set -e` (no `-u` due to Node.js package compatibility issues with unset variables)
+- User-facing CLIs (android.sh, ios.sh, devices.sh): `set -eu`
+- Test scripts: `set -euo pipefail`
+
+Functions return 0 on success, non-zero on failure. Avoid `|| true` except in validation functions where warnings shouldn't block execution.
 
 **Validation warns but doesn't block.** User-facing validation commands (like lock file checksum mismatches) should warn with actionable fix commands but never prevent the user from continuing. The validation philosophy is "inform, don't obstruct."
 
@@ -702,12 +713,17 @@ plugins/{platform}/
 ```
 examples/{platform}/
 ├── devbox.d/
-│   └── {platform}/
+│   └── <plugin-dir>/    # Directory name depends on include method
 │       └── devices/     # User device definitions
 │           ├── *.json
 │           └── devices.lock
-├── devbox.json          # Includes plugin
+├── devbox.json          # Includes plugin via path: (local development)
 └── README.md            # Usage guide
+# Note: Examples use local path includes (path:../../plugins/{platform}/plugin.json)
+# so PR checks test against the current plugin source. User-facing docs show the
+# GitHub URL format (github:segment-integrations/devbox-plugins?dir=plugins/{platform}).
+# <plugin-dir> is "{platform}" for local/path includes, but for GitHub includes it
+# uses the full dotted path (e.g., "segment-integrations.devbox-plugins.android").
 ```
 
 **Test Directory Layout:**
@@ -725,12 +741,12 @@ plugins/tests/
 
 **File naming:**
 ```
-process-compose-{suite}.yaml
+{suite}.yaml
 
 Examples:
-- process-compose-lint.yaml
-- process-compose-unit-tests.yaml
-- process-compose-e2e.yaml
+- lint.yaml
+- unit-tests.yaml
+- e2e.yaml
 ```
 
 **Process naming:**
@@ -780,17 +796,15 @@ Examples:
 ## CI/CD
 
 ### Fast PR Checks (`pr-checks.yml`)
-- Runs automatically on every PR
-- Plugin validation and quick smoke tests
-- ~15-30 minutes total
-- Tests default devices only
+- Runs automatically on every PR and push to main
+- Fast tests (lint + unit + integration) plus E2E tests with max devices only
+- Tests: Android max, iOS max, React Native (android-max, ios-max, web)
 
 ### Full E2E Tests (`e2e-full.yml`)
-- Manual trigger or weekly schedule
-- Tests min/max platform versions:
+- Weekly schedule (Monday 00:00 UTC) or manual trigger
+- Tests both min and max platform versions:
   - Android: API 21 (min) to API 36 (max)
   - iOS: iOS 15.4 (min) to iOS 26.2 (max)
-- ~45-60 minutes per platform
 - Matrix execution for parallel testing
 
 ### Running CI Locally
@@ -811,7 +825,7 @@ act -W .github/workflows/pr-checks.yml
 
 ## Configuration
 
-Configuration for both Android and iOS plugins is now managed via environment variables defined in `plugin.json`. These env vars are converted to JSON at runtime for internal use.
+Configuration for both Android and iOS plugins is managed via environment variables defined in `plugin.json`. These env vars are converted to JSON at runtime for internal use.
 
 ### Android Plugin Environment Variables
 - `ANDROID_DEFAULT_DEVICE` - Default emulator
@@ -823,22 +837,19 @@ Configuration for both Android and iOS plugins is now managed via environment va
 ### iOS Plugin Environment Variables
 - `IOS_DEFAULT_DEVICE` - Default simulator
 - `IOS_DEVICES` - Devices to evaluate (comma-separated, empty = all)
-- `IOS_APP_PROJECT` - Xcode project path
-- `IOS_APP_SCHEME` - Xcode build scheme
-- `IOS_APP_ARTIFACT` - App bundle path/glob
-- `IOS_DOWNLOAD_RUNTIME` - Auto-download runtimes (0/1)
+- `IOS_APP_ARTIFACT` - Path or glob for .app bundle (empty = auto-detect via xcodebuild + search)
+- `IOS_DOWNLOAD_RUNTIME` - Auto-download runtimes (0/1, default: 1)
 
 ## Important Implementation Notes
 
 ### Android SDK via Nix Flake
-- The Android SDK is composed via Nix flake at `devbox.d/android/flake.nix`
+- The Android SDK is composed via Nix flake at `devbox.d/<android-plugin-dir>/flake.nix` (directory name depends on include method)
 - Flake outputs: `android-sdk`, `android-sdk-full`, `android-sdk-preview`
 - Nix handles flake evaluation caching internally (fast after first evaluation)
 - Lock file limits which API versions are evaluated (optimization for CI)
 
 ### iOS Xcode Discovery
-- Multiple strategies: `IOS_DEVELOPER_DIR` env var → `xcode-select -p` → `/Applications/Xcode*.app`
-- Selects latest Xcode by version number
+- Multiple strategies: `IOS_DEVELOPER_DIR` env var → `/Applications/Xcode*.app` (latest by version) → `xcode-select -p` → `/Applications/Xcode.app` fallback
 - Path cached in `.xcode_dev_dir.cache` (1-hour TTL)
 
 ### Validation Philosophy
@@ -848,7 +859,9 @@ Configuration for both Android and iOS plugins is now managed via environment va
 - Examples: lock file checksum mismatches, missing SDK paths
 
 ### Script Safety
-- All scripts use `set -euo pipefail` (or `set -eu` for POSIX)
+- Sourced scripts: `set -e` (no `-u` due to Node.js package compatibility)
+- User-facing CLIs: `set -eu`
+- Test scripts: `set -euo pipefail`
 - Functions return 0 on success, non-zero on failure
 - Validation functions use `|| true` to avoid blocking
 
@@ -859,4 +872,6 @@ For complete command and configuration references, see:
 - `plugins/ios/REFERENCE.md`
 - `plugins/react-native/REFERENCE.md`
 - `plugins/CONVENTIONS.md`
+- `wiki/project/ARCHITECTURE.md`
+- `wiki/project/ENVIRONMENT-SETUP-STRATEGY.md`
 - `.github/workflows/README.md`

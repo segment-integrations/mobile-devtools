@@ -2,65 +2,50 @@ version: "0.5"
 
 environment:
   - "IOS_DEVICE=${IOS_DEFAULT_DEVICE:-max}"
-  - "TEST_TIMEOUT=300"
-  - "BOOT_TIMEOUT=120"
+  - "SUITE_NAME=ios-e2e"
 
 log_location: "reports/ios-e2e-logs"
 log_level: info
+is_strict: true
 
 processes:
-  # Phase 1: Build app - runs first
+  # Phase 1: Build app (runs concurrently with simulator startup)
   build-app:
-    command: "devbox run --pure build"
+    command: |
+      set -e
+      _step="build-app"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
+      DERIVED_DATA="${DEVBOX_PROJECT_ROOT:-.}/.devbox/virtenv/ios/DerivedData"
+      mkdir -p "$DERIVED_DATA"
+      xcodebuild -project ios.xcodeproj -scheme ios \
+        -configuration Debug \
+        -destination "generic/platform=iOS Simulator" \
+        -derivedDataPath "$DERIVED_DATA" \
+        build
+
+      echo "pass" > "$_step_dir/$_step.status"
     availability:
       restart: "no"
 
   # Phase 2: Sync simulators - ensure all simulators match device definitions
   sync-simulators:
-    command: "devbox run ios.sh devices sync"
+    command: "ios.sh devices sync"
     availability:
       restart: "no"
 
-  # Phase 3: Start simulator - depends on sync completing
+  # Phase 3: Start simulator (runs concurrently with build)
   ios-simulator:
     command: |
-      # Ensure reports/logs directory exists
-      mkdir -p reports/logs
-
-      # In pure mode (IN_NIX_SHELL=pure), start fresh simulator with clean state
-      # Otherwise, reuse existing simulator if available
-      if [ "${IN_NIX_SHELL:-}" = "pure" ]; then
-        echo "🚀 Starting fresh iOS simulator with clean state (${IOS_DEVICE})..."
-        output=$(ios.sh simulator start --pure ${IOS_DEVICE} 2>&1)
-        echo "$output"
-
-        # Extract and save test simulator UDID for cleanup
-        test_udid=$(echo "$output" | grep -oE '[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}' | tail -1)
-        if [ -n "$test_udid" ]; then
-          echo "$test_udid" > reports/logs/ios-test-sim-udid.txt
-          echo "✓ Test simulator UDID saved: $test_udid"
-        fi
+      set -e
+      if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
+        ios.sh simulator start --pure ${IOS_DEVICE}
       else
-        echo "🚀 Starting iOS simulator (${IOS_DEVICE})..."
         ios.sh simulator start ${IOS_DEVICE}
-
-        # Wait for simulator to be fully booted
-        echo "Waiting for simulator to boot..."
-        DEVICE_UDID=$(xcrun simctl list devices | grep "Booted" | grep -oE '[0-9A-F-]{36}' | head -1 || echo "")
-        if [ -z "$DEVICE_UDID" ]; then
-          echo "ERROR: No booted simulator found"
-          exit 1
-        fi
-        xcrun simctl bootstatus "$DEVICE_UDID" >/dev/null 2>&1 || true
-
-        echo "✓ Simulator ready for testing"
-        echo "✓ Simulator will remain running after tests complete"
-
-        # In reuse mode, let process complete - simulator stays running in background
-        exit 0
       fi
-
-      # Pure mode: Keep process alive so cleanup can shut down test simulator
+      # Keep process alive for readiness probe (process-compose services pattern)
       tail -f /dev/null
     depends_on:
       sync-simulators:
@@ -69,50 +54,32 @@ processes:
       restart: "no"
     readiness_probe:
       exec:
-        command: |
-          # Find booted simulator (either test simulator or regular)
-          if [ "${IN_NIX_SHELL:-}" = "pure" ]; then
-            # In pure mode, look for test simulator
-            DEVICE_UDID=$(xcrun simctl list devices | grep "Test" | grep "Booted" | grep -oE '[0-9A-F-]{36}' | head -1 || echo "")
-          else
-            # In normal mode, look for regular simulator by device selection
-            DEVICE_UDID=$(xcrun simctl list devices | grep "Booted" | grep -oE '[0-9A-F-]{36}' | head -1 || echo "")
-          fi
-          [ -n "$DEVICE_UDID" ] && xcrun simctl bootstatus "$DEVICE_UDID" >/dev/null 2>&1
-      initial_delay_seconds: 10
+        command: "ios.sh simulator ready"
+      initial_delay_seconds: 5
       period_seconds: 5
-      timeout_seconds: 120
+      timeout_seconds: 10
       success_threshold: 1
-      failure_threshold: 3
+      failure_threshold: 36
 
   # Phase 4: Deploy app - depends on both build and simulator
   deploy-app:
     command: |
-      # Find the booted simulator (test or regular)
-      if [ "${IN_NIX_SHELL:-}" = "pure" ]; then
-        DEVICE_UDID=$(xcrun simctl list devices | grep "Test" | grep "Booted" | grep -oE '[0-9A-F-]{36}' | head -1)
-      else
-        DEVICE_UDID=$(xcrun simctl list devices | grep "Booted" | grep -oE '[0-9A-F-]{36}' | head -1)
-      fi
+      set -e
+      _step="deploy-app"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
 
-      if [ -z "$DEVICE_UDID" ]; then
-        echo "ERROR: No booted simulator found"
-        exit 1
-      fi
-
-      echo "📲 Installing app on simulator: $DEVICE_UDID"
-      xcrun simctl install "$DEVICE_UDID" "${IOS_APP_ARTIFACT}"
-
-      echo "🚀 Launching app: ${IOS_APP_BUNDLE_ID}"
-      xcrun simctl launch "$DEVICE_UDID" "${IOS_APP_BUNDLE_ID}"
+      ios.sh deploy
 
       echo ""
       echo "Waiting for app to start..."
       max_attempts=10
       attempt=0
       while [ $attempt -lt $max_attempts ]; do
-        if xcrun simctl spawn "$DEVICE_UDID" launchctl list | grep -q "${IOS_APP_BUNDLE_ID}"; then
-          echo "✓ App is running"
+        if ios.sh app status; then
+          echo "App is running"
+          echo "pass" > "$_step_dir/$_step.status"
           exit 0
         fi
         attempt=$((attempt + 1))
@@ -120,34 +87,29 @@ processes:
         sleep 2
       done
 
-      echo "ERROR: App did not start within timeout" >&2
-      echo "Checking app status:" >&2
-      xcrun simctl get_app_container "$DEVICE_UDID" "${IOS_APP_BUNDLE_ID}" 2>&1 || true
+      printf 'fail\nApp did not start within timeout\n' > "$_step_dir/$_step.status"
       exit 1
     depends_on:
       build-app:
         condition: process_completed_successfully
       ios-simulator:
-        condition: process_completed_successfully
+        condition: process_healthy
     availability:
       restart: "no"
 
   # Phase 5: Verify app is running (liveness check)
   verify-app-running:
     command: |
-      # Find the booted simulator
-      if [ "${IN_NIX_SHELL:-}" = "pure" ]; then
-        DEVICE_UDID=$(xcrun simctl list devices | grep "Test" | grep "Booted" | grep -oE '[0-9A-F-]{36}' | head -1)
-      else
-        DEVICE_UDID=$(xcrun simctl list devices | grep "Booted" | grep -oE '[0-9A-F-]{36}' | head -1)
-      fi
+      _step="verify-app"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
 
-      echo "Verifying app is running on simulator: $DEVICE_UDID"
-      if xcrun simctl spawn "$DEVICE_UDID" launchctl list | grep -q "${IOS_APP_BUNDLE_ID}"; then
-        echo "✓ App is running: ${IOS_APP_BUNDLE_ID}"
+      if ios.sh app status; then
+        echo "App is running"
+        echo "pass" > "$_step_dir/$_step.status"
         exit 0
       else
-        echo "ERROR: App not found in running processes"
+        printf 'fail\nApp not found in running processes\n' > "$_step_dir/$_step.status"
         exit 1
       fi
     depends_on:
@@ -159,36 +121,13 @@ processes:
   # Cleanup - stop everything in pure mode, keep running in dev mode
   cleanup:
     command: |
-      # In pure mode (CI), stop app and delete test simulator for reproducibility
-      if [ "${IN_NIX_SHELL:-}" = "pure" ]; then
-        echo "🧹 Cleaning up (pure mode): stopping app and deleting test simulator..."
-
-        # Get test simulator UDID
-        test_sim_udid=$(cat reports/logs/ios-test-sim-udid.txt 2>/dev/null || echo "")
-
-        if [ -z "$test_sim_udid" ]; then
-          # Fallback: find test simulator by name
-          test_sim_udid=$(xcrun simctl list devices | grep "Test" | grep -oE '[0-9A-F-]{36}' | head -1 || true)
-        fi
-
-        if [ -n "$test_sim_udid" ]; then
-          # Stop the app first
-          xcrun simctl terminate "$test_sim_udid" "${IOS_APP_BUNDLE_ID}" 2>/dev/null || true
-
-          # Shutdown and delete the simulator
-          xcrun simctl shutdown "$test_sim_udid" >/dev/null 2>&1 || true
-          xcrun simctl delete "$test_sim_udid" >/dev/null 2>&1 || true
-
-          # Clean up temp file
-          rm -f reports/logs/ios-test-sim-udid.txt
-
-          echo "✓ App stopped, test simulator deleted"
-        else
-          echo "✓ No test simulator to clean up"
-        fi
+      if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
+        echo "Cleaning up (pure mode)..."
+        ios.sh app stop || true
+        ios.sh simulator stop
+        echo "App stopped, test simulator deleted"
       else
-        # In dev mode, keep app and simulator running for interaction
-        echo "✓ Test complete - app and simulator still running"
+        echo "Test complete - app and simulator still running"
       fi
     depends_on:
       verify-app-running:
@@ -196,16 +135,21 @@ processes:
     availability:
       restart: "no"
 
-  # Summary - displays results and optionally stays open
+  # Summary - reports per-step pass/fail
   summary:
     command: |
-      bash tests/test-summary.sh 'iOS E2E Test Suite' 'reports/ios-e2e-logs'
-      exit 0
+      set -e
+      export REPO_ROOT="$(cd ../.. && pwd)"
+      . "$REPO_ROOT/plugins/tests/test-framework.sh"
+      log_test "iOS E2E Test Suite"
+      e2e_report_steps || true
+      test_summary "ios-e2e"
     depends_on:
       cleanup:
         condition: process_completed
     availability:
       restart: "no"
+      exit_on_end: true
     shutdown:
       signal: 15
       timeout_seconds: 1

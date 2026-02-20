@@ -13,7 +13,12 @@ set -eu
 # ============================================================================
 # Initialize Android Environment
 # ============================================================================
-# SDK setup happens in init hook via setup.sh
+# Auto-setup SDK if not already done (e.g., when called from process-compose)
+if [ -z "${ANDROID_SDK_ROOT:-}" ] && [ -n "${ANDROID_SCRIPTS_DIR:-}" ]; then
+  if [ -f "${ANDROID_SCRIPTS_DIR}/init/setup.sh" ]; then
+    . "${ANDROID_SCRIPTS_DIR}/init/setup.sh"
+  fi
+fi
 
 # ============================================================================
 # Usage and Help
@@ -24,27 +29,37 @@ usage() {
 Usage: android.sh <command> [args]
 
 Commands:
+  deploy [apk_path]                Install and launch app on running emulator
   devices <command> [args]         Manage device definitions
   info                             Display resolved SDK information
   config <command>                 Manage configuration
   emulator start [device]          Start Android emulator
   emulator stop                    Stop running emulator
+  emulator ready                   Check if emulator is booted (readiness probe)
   emulator reset                   Reset all emulator AVDs
-  run [apk_path] [device]          Build, install, and launch app on emulator
+  app status                       Check if deployed app is running
+  app stop                         Stop the deployed app
+  run [--apk path] [--device name] Start emulator, install, and launch app
 
 Examples:
+  android.sh deploy
+  android.sh deploy path/to/app.apk
   android.sh devices list
   android.sh devices create pixel_api28 --api 28 --device pixel
   android.sh info
   android.sh config show
   android.sh emulator start max
   android.sh emulator stop
-  android.sh run                             # Build, install, launch
+  android.sh emulator ready
+  android.sh app status
+  android.sh app stop
+  android.sh run                             # Start emulator, install, launch
   android.sh run max                         # Same, but on 'max' device
-  android.sh run path/to/app.apk             # Install provided APK
-  android.sh run path/to/app.apk max         # Install APK on 'max' device
+  android.sh run --apk path/to/app.apk      # Install provided APK
+  android.sh run --apk app.apk --device max  # Install APK on 'max' device
 
 Note: Configuration is managed via environment variables in devbox.json.
+Note: Build your app with gradle directly (e.g., cd android && ./gradlew assembleDebug)
 USAGE
   exit 1
 }
@@ -79,11 +94,102 @@ ensure_lib_loaded() {
   fi
 }
 
+# Derive suite-namespaced state directory
+android_state_dir() {
+  _suite="${SUITE_NAME:-default}"
+  _runtime_dir="${ANDROID_RUNTIME_DIR:-${ANDROID_USER_HOME:-}}"
+  if [ -z "$_runtime_dir" ]; then
+    _runtime_dir="${PWD}/.devbox/virtenv"
+  fi
+  printf '%s/%s' "$_runtime_dir" "$_suite"
+}
+
 # ============================================================================
 # Command Handlers
 # ============================================================================
 
 case "$command_name" in
+  # --------------------------------------------------------------------------
+  # deploy - Install and launch app on running emulator (no build, no emu start)
+  # --------------------------------------------------------------------------
+  deploy)
+    ensure_lib_loaded
+
+    deploy_script="${scripts_dir%/}/domain/deploy.sh"
+    if [ ! -f "$deploy_script" ]; then
+      echo "ERROR: domain/deploy.sh not found: $deploy_script" >&2
+      exit 1
+    fi
+
+    # shellcheck source=/dev/null
+    . "$deploy_script"
+
+    apk_arg="${1:-}"
+    state_dir="$(android_state_dir)"
+
+    # Read serial from state file (suite-namespaced, then legacy, then env var)
+    emulator_serial=""
+    if [ -f "$state_dir/emulator-serial.txt" ]; then
+      emulator_serial="$(cat "$state_dir/emulator-serial.txt")"
+    fi
+    if [ -z "$emulator_serial" ]; then
+      runtime_dir="${ANDROID_RUNTIME_DIR:-${ANDROID_USER_HOME:-}}"
+      if [ -n "$runtime_dir" ] && [ -f "$runtime_dir/emulator-serial.txt" ]; then
+        emulator_serial="$(cat "$runtime_dir/emulator-serial.txt")"
+      fi
+    fi
+    if [ -z "$emulator_serial" ]; then
+      emulator_serial="${ANDROID_EMULATOR_SERIAL:-emulator-${EMU_PORT:-5554}}"
+    fi
+
+    # Resolve APK path
+    if [ -n "$apk_arg" ]; then
+      apk_path="$apk_arg"
+      if [ "${apk_path#/}" = "$apk_path" ]; then
+        apk_path="$PWD/$apk_path"
+      fi
+      if [ ! -f "$apk_path" ]; then
+        echo "ERROR: APK not found: $apk_path" >&2
+        exit 1
+      fi
+    else
+      project_root="${DEVBOX_PROJECT_ROOT:-${DEVBOX_PROJECT_DIR:-${DEVBOX_WD:-$PWD}}}"
+      apk_path="$(android_find_apk "$project_root" || true)"
+      if [ -z "$apk_path" ] || [ ! -f "$apk_path" ]; then
+        echo "ERROR: No APK found. Build first (e.g., gradle assembleDebug) or define a build:android script in devbox.json." >&2
+        exit 1
+      fi
+    fi
+
+    echo "APK: $(basename "$apk_path")"
+
+    # Extract metadata
+    apk_metadata="$(android_extract_apk_metadata "$apk_path")"
+    package_name="$(printf '%s\n' "$apk_metadata" | sed -n '1p')"
+    activity_name="$(printf '%s\n' "$apk_metadata" | sed -n '2p')"
+
+    echo "Package: $package_name"
+    echo "Activity: $activity_name"
+
+    # Uninstall existing app to avoid signature conflicts
+    if adb -s "$emulator_serial" shell pm list packages 2>/dev/null | grep -q "package:${package_name}$"; then
+      echo "Removing existing install: $package_name"
+      adb -s "$emulator_serial" shell am force-stop "$package_name" 2>/dev/null || true
+      adb -s "$emulator_serial" uninstall "$package_name" >/dev/null 2>&1 || true
+    fi
+
+    # Install and launch
+    android_install_apk "$apk_path" "$emulator_serial"
+    android_launch_app "$package_name" "$activity_name" "$emulator_serial"
+
+    # Save state
+    mkdir -p "$state_dir"
+    echo "$package_name" > "$state_dir/app-id.txt"
+    echo "$activity_name" > "$state_dir/app-activity.txt"
+
+    echo "Deploy complete"
+    ;;
+
   # --------------------------------------------------------------------------
   # devices - Delegate to devices.sh
   # --------------------------------------------------------------------------
@@ -204,6 +310,7 @@ case "$command_name" in
       start)
         # Parse flags and device name
         pure_mode=0
+        wait_ready=0
         device_name=""
 
         while [ $# -gt 0 ]; do
@@ -212,12 +319,27 @@ case "$command_name" in
               pure_mode=1
               shift
               ;;
+            --wait-ready)
+              wait_ready=1
+              shift
+              ;;
             *)
               device_name="$1"
               shift
               ;;
           esac
         done
+
+        # Auto-detect pure mode from devbox environment
+        if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
+          pure_mode=1
+        fi
+
+        # Allow overriding pure mode to reuse existing emulator
+        # Usage: devbox run --pure -e REUSE_EMU=1 android.sh emulator start
+        if [ "${REUSE_EMU:-}" = "1" ]; then
+          pure_mode=0
+        fi
 
         # Layer 3 orchestration: setup AVDs first, then start emulator
         if ! command -v android_setup_avds >/dev/null 2>&1; then
@@ -240,6 +362,31 @@ case "$command_name" in
 
         # Step 2: Start emulator (uses ANDROID_RESOLVED_AVD from setup)
         android_start_emulator "$device_name"
+
+        # Step 3: Save serial to suite-namespaced state dir
+        state_dir="$(android_state_dir)"
+        mkdir -p "$state_dir"
+        if [ -n "${ANDROID_EMULATOR_SERIAL:-}" ]; then
+          echo "$ANDROID_EMULATOR_SERIAL" > "$state_dir/emulator-serial.txt"
+        fi
+
+        # Step 4: If --wait-ready, wait for emulator to be ready and exit (detach mode for dev)
+        # Otherwise in pure mode, keep running (process-compose manages lifecycle)
+        if [ "$wait_ready" = "1" ]; then
+          echo "Waiting for emulator to be ready..."
+          max_wait=120
+          elapsed=0
+          while ! android_emulator_ready; do
+            sleep 3
+            elapsed=$((elapsed + 3))
+            if [ $elapsed -ge $max_wait ]; then
+              echo "ERROR: Emulator did not become ready within ${max_wait}s" >&2
+              exit 1
+            fi
+          done
+          echo "✓ Emulator ready and running in background"
+          exit 0
+        fi
         ;;
 
       stop)
@@ -249,6 +396,33 @@ case "$command_name" in
           echo "ERROR: android_stop_emulator function not available" >&2
           exit 1
         fi
+        ;;
+
+      ready)
+        # Silent readiness probe: exit 0 if booted, 1 if not
+        state_dir="$(android_state_dir)"
+        serial=""
+
+        if [ -f "$state_dir/emulator-serial.txt" ]; then
+          serial="$(cat "$state_dir/emulator-serial.txt")"
+        fi
+
+        # Fallback to legacy location
+        if [ -z "$serial" ]; then
+          runtime_dir="${ANDROID_RUNTIME_DIR:-${ANDROID_USER_HOME:-}}"
+          if [ -n "$runtime_dir" ] && [ -f "$runtime_dir/emulator-serial.txt" ]; then
+            serial="$(cat "$runtime_dir/emulator-serial.txt")"
+          fi
+        fi
+
+        if [ -z "$serial" ]; then
+          exit 1
+        fi
+
+        if adb -s "$serial" shell getprop sys.boot_completed 2>/dev/null | grep -q "1"; then
+          exit 0
+        fi
+        exit 1
         ;;
 
       reset)
@@ -271,7 +445,97 @@ case "$command_name" in
 
       *)
         echo "ERROR: Unknown emulator subcommand: $subcommand" >&2
-        echo "Usage: android.sh emulator <start|stop|reset> [device]" >&2
+        echo "Usage: android.sh emulator <start|stop|ready|reset> [device]" >&2
+        exit 1
+        ;;
+    esac
+    ;;
+
+  # --------------------------------------------------------------------------
+  # app - App lifecycle management
+  # --------------------------------------------------------------------------
+  app)
+    subcommand="${1-}"
+    shift || true
+
+    state_dir="$(android_state_dir)"
+
+    case "$subcommand" in
+      status)
+        # Check if deployed app is running (exit 0 if running, 1 if not)
+        app_id=""
+        if [ -f "$state_dir/app-id.txt" ]; then
+          app_id="$(cat "$state_dir/app-id.txt")"
+        fi
+        # Fallback to legacy location
+        if [ -z "$app_id" ]; then
+          runtime_dir="${ANDROID_RUNTIME_DIR:-${ANDROID_USER_HOME:-}}"
+          if [ -n "$runtime_dir" ] && [ -f "$runtime_dir/app-id.txt" ]; then
+            app_id="$(cat "$runtime_dir/app-id.txt")"
+          fi
+        fi
+        if [ -z "$app_id" ]; then
+          exit 1
+        fi
+
+        serial=""
+        if [ -f "$state_dir/emulator-serial.txt" ]; then
+          serial="$(cat "$state_dir/emulator-serial.txt")"
+        fi
+        if [ -z "$serial" ]; then
+          runtime_dir="${ANDROID_RUNTIME_DIR:-${ANDROID_USER_HOME:-}}"
+          if [ -n "$runtime_dir" ] && [ -f "$runtime_dir/emulator-serial.txt" ]; then
+            serial="$(cat "$runtime_dir/emulator-serial.txt")"
+          fi
+        fi
+        if [ -z "$serial" ]; then
+          serial="emulator-${EMU_PORT:-5554}"
+        fi
+
+        if adb -s "$serial" shell pidof "$app_id" >/dev/null 2>&1; then
+          exit 0
+        fi
+        exit 1
+        ;;
+
+      stop)
+        # Stop the deployed app
+        app_id=""
+        if [ -f "$state_dir/app-id.txt" ]; then
+          app_id="$(cat "$state_dir/app-id.txt")"
+        fi
+        if [ -z "$app_id" ]; then
+          runtime_dir="${ANDROID_RUNTIME_DIR:-${ANDROID_USER_HOME:-}}"
+          if [ -n "$runtime_dir" ] && [ -f "$runtime_dir/app-id.txt" ]; then
+            app_id="$(cat "$runtime_dir/app-id.txt")"
+          fi
+        fi
+
+        serial=""
+        if [ -f "$state_dir/emulator-serial.txt" ]; then
+          serial="$(cat "$state_dir/emulator-serial.txt")"
+        fi
+        if [ -z "$serial" ]; then
+          runtime_dir="${ANDROID_RUNTIME_DIR:-${ANDROID_USER_HOME:-}}"
+          if [ -n "$runtime_dir" ] && [ -f "$runtime_dir/emulator-serial.txt" ]; then
+            serial="$(cat "$runtime_dir/emulator-serial.txt")"
+          fi
+        fi
+        if [ -z "$serial" ]; then
+          serial="emulator-${EMU_PORT:-5554}"
+        fi
+
+        if [ -n "$app_id" ]; then
+          adb -s "$serial" shell am force-stop "$app_id" 2>/dev/null || true
+          echo "App stopped: $app_id"
+        else
+          echo "No app to stop"
+        fi
+        ;;
+
+      *)
+        echo "ERROR: Unknown app subcommand: $subcommand" >&2
+        echo "Usage: android.sh app <status|stop>" >&2
         exit 1
         ;;
     esac
@@ -279,23 +543,32 @@ case "$command_name" in
 
   # --------------------------------------------------------------------------
   # run - Build, install, and launch app on emulator
-  # Usage: android.sh run [apk_path] [device]
+  # Usage: android.sh run [--apk <path>] [--device <name>] [device]
   # --------------------------------------------------------------------------
   run)
-    # Parse arguments - first arg could be APK path or device name
+    # Parse arguments
     apk_arg=""
     device_name=""
 
-    if [ $# -gt 0 ]; then
-      # If first arg looks like a file path (contains / or ends with .apk), treat as APK
-      if printf '%s' "$1" | grep -q -e '/' -e '\.apk$'; then
-        apk_arg="$1"
-        shift
-      fi
-    fi
-
-    # Remaining arg is device name
-    device_name="${1:-}"
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --apk)
+          apk_arg="${2:-}"
+          shift 2
+          ;;
+        --device)
+          device_name="${2:-}"
+          shift 2
+          ;;
+        *)
+          # Bare positional arg: treat as device name for convenience
+          if [ -z "$device_name" ]; then
+            device_name="$1"
+          fi
+          shift
+          ;;
+      esac
+    done
 
     # Source layer 3 dependencies
     avd_script="${scripts_dir%/}/domain/avd.sh"
@@ -325,7 +598,7 @@ case "$command_name" in
       fi
     done
 
-    # Layer 4 orchestration: setup → start → run
+    # Layer 4 orchestration: setup -> start -> run
     echo "Setting up Android Virtual Devices..."
     android_setup_avds
 
@@ -334,12 +607,16 @@ case "$command_name" in
     android_start_emulator "$device_name"
 
     echo ""
-    # Pass both APK (if provided) and device name to run
+    # Pass both APK (if provided) and device name to run with explicit flags
+    run_args=""
     if [ -n "$apk_arg" ]; then
-      android_run_app "$apk_arg" "$device_name"
-    else
-      android_run_app "$device_name"
+      run_args="--apk $apk_arg"
     fi
+    if [ -n "$device_name" ]; then
+      run_args="$run_args --device $device_name"
+    fi
+    # shellcheck disable=SC2086
+    android_run_app $run_args
     ;;
 
   # --------------------------------------------------------------------------

@@ -3,26 +3,26 @@ version: "0.5"
 environment:
   - "TEST_TUI=${TEST_TUI:-false}"
   - "WEB_PORT=8081"
-  - "TEST_TIMEOUT=60"
 
 log_location: "reports/react-native-web-e2e-logs"
 log_level: info
-is_strict: false
+is_strict: true
 
 processes:
   # Phase 0: Allocate Metro port
   allocate-metro-port:
     command: |
+      set -e
       # Source React Native lib
       . ${REACT_NATIVE_VIRTENV}/scripts/lib/lib.sh
 
       # Allocate port for web test suite
       metro_port=$(rn_allocate_metro_port "web")
-      echo "📡 Allocated Metro port: $metro_port"
+      echo "Allocated Metro port: $metro_port"
 
       # Save environment file for other processes
       env_file=$(rn_save_metro_env "web" "$metro_port")
-      echo "✓ Metro environment saved to: $env_file"
+      echo "Metro environment saved to: $env_file"
     availability:
       restart: "no"
 
@@ -31,16 +31,33 @@ processes:
     depends_on:
       allocate-metro-port:
         condition: process_completed_successfully
-    command: "devbox run --pure build:node"
+    command: |
+      set -e
+      _step="build-node"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
+      npm install
+
+      echo "pass" > "$_step_dir/$_step.status"
     availability:
       restart: "no"
 
   # Phase 2: Build web bundle directory
   build-web:
     command: |
-      echo '📦 Creating web build directory...'
+      set -e
+      _step="build-web"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
+      echo 'Creating web build directory...'
       mkdir -p web/build
-      echo '✓ Web build directory ready'
+      echo 'Web build directory ready'
+
+      echo "pass" > "$_step_dir/$_step.status"
     depends_on:
       build-node:
         condition: process_completed_successfully
@@ -57,79 +74,94 @@ processes:
         condition: process_completed_successfully
     availability:
       restart: "no"
-    shutdown:
-      command: "metro.sh stop web || true"
-      signal: 15
-      timeout_seconds: 5
     readiness_probe:
       exec:
         command: "metro.sh health web ios"
       initial_delay_seconds: 5
       period_seconds: 5
-      timeout_seconds: 60
+      timeout_seconds: 5
       success_threshold: 1
+      failure_threshold: 12
 
-  # Phase 4: Open browser with web bundle
-  open-browser:
+  # Phase 4: Verify web app is being served
+  verify-web-serving:
     command: |
+      _step="verify-web"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+
       # Source Metro environment to get correct port
       . ${REACT_NATIVE_VIRTENV}/metro/env-web.sh
 
-      echo "🌐 Opening browser to Metro web bundle..."
-      echo "   URL: http://localhost:$METRO_PORT"
+      echo "Verifying web app is being served on port $METRO_PORT..."
 
-      # Open default browser
-      if command -v open >/dev/null 2>&1; then
-        # macOS
-        open "http://localhost:$METRO_PORT"
-      elif command -v xdg-open >/dev/null 2>&1; then
-        # Linux
-        xdg-open "http://localhost:$METRO_PORT"
-      elif command -v start >/dev/null 2>&1; then
-        # Windows (Git Bash/WSL)
-        start "http://localhost:$METRO_PORT"
-      else
-        echo "⚠ Could not detect browser launcher"
-        echo "   Please open: http://localhost:$METRO_PORT"
-      fi
-
-      echo "✓ Browser launched"
-      echo ""
-      echo "Metro is running at: http://localhost:$METRO_PORT"
-      echo "Press Ctrl+C to stop Metro and exit"
+      # Use node to make HTTP request (curl may not be available in --pure)
+      node -e "
+        const http = require('http');
+        const url = 'http://localhost:' + process.env.METRO_PORT;
+        http.get(url, (res) => {
+          let data = '';
+          res.on('data', (chunk) => data += chunk);
+          res.on('end', () => {
+            if (res.statusCode === 200) {
+              console.log('Web app is being served (HTTP ' + res.statusCode + ')');
+              console.log('  Response size: ' + data.length + ' bytes');
+              require('fs').mkdirSync('reports/steps', { recursive: true });
+              require('fs').writeFileSync('reports/steps/verify-web.status', 'pass\n');
+              process.exit(0);
+            } else {
+              console.error('ERROR: Unexpected status code: ' + res.statusCode);
+              require('fs').mkdirSync('reports/steps', { recursive: true });
+              require('fs').writeFileSync('reports/steps/verify-web.status', 'fail\nUnexpected HTTP status: ' + res.statusCode + '\n');
+              process.exit(1);
+            }
+          });
+        }).on('error', (err) => {
+          console.error('ERROR: Could not connect to Metro: ' + err.message);
+          require('fs').mkdirSync('reports/steps', { recursive: true });
+          require('fs').writeFileSync('reports/steps/verify-web.status', 'fail\nCould not connect to Metro: ' + err.message + '\n');
+          process.exit(1);
+        });
+      "
     depends_on:
       metro-bundler:
         condition: process_healthy
+      build-web:
+        condition: process_completed_successfully
     availability:
       restart: "no"
 
   # Cleanup
   cleanup:
     command: |
-      # Stop Metro bundler explicitly
-      echo "Stopping Metro bundler..."
-      metro.sh stop web || true
-
-      # Also kill the metro.sh wrapper process
-      pkill -f "metro.sh start web" || true
-
-      echo "✓ Test complete"
+      if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
+        echo "Cleaning up (pure mode)..."
+        metro.sh stop web || true
+        echo "Metro stopped"
+      else
+        echo "Test complete - Metro still running for iteration"
+      fi
     depends_on:
-      open-browser:
+      verify-web-serving:
         condition: process_completed
-      metro-bundler:
-        condition: process_healthy
     availability:
       restart: "no"
 
-  # Summary - displays results and optionally stays open
+  # Summary - reports per-step pass/fail
   summary:
-    command: "bash tests/test-summary.sh 'React Native Web E2E Test Suite' 'reports/react-native-web-e2e-logs'"
+    command: |
+      set -e
+      export REPO_ROOT="$(cd ../.. && pwd)"
+      . "$REPO_ROOT/plugins/tests/test-framework.sh"
+      log_test "React Native Web E2E Test Suite"
+      e2e_report_steps || true
+      test_summary "rn-web-e2e"
     depends_on:
       cleanup:
         condition: process_completed
     availability:
       restart: "no"
+      exit_on_end: true
     shutdown:
       signal: 15
       timeout_seconds: 1

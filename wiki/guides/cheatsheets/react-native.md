@@ -41,62 +41,61 @@ devbox run ios.sh devices eval
 ## Running Apps
 
 ```bash
-# Android
-devbox run start:emu         # Start emulator
-devbox run start:android     # Build and run app
+# Plugin-provided
+devbox run start:emu         # Start Android emulator
+devbox run stop:emu          # Stop Android emulator
+devbox run start:sim         # Start iOS simulator
+devbox run stop:sim          # Stop iOS simulator
 
-# iOS
-devbox run start:sim         # Start simulator
-devbox run start:ios         # Build and run app
-
-# Web
-devbox run start:web         # Start web dev server
+# User-defined scripts (add to your devbox.json shell.scripts):
+# "start:android": ["process-compose -f tests/dev-android.yaml"]
+# "start:ios": ["process-compose -f tests/dev-ios.yaml"]
+# "start:web": ["process-compose -f tests/dev-web.yaml"]
 ```
 
 ## Metro Bundler
 
 ```bash
-# Start Metro manually
-devbox run start:metro
+# Plugin-provided
+devbox run rn:metro:port android    # Get Metro port for test suite
+devbox run rn:metro:clean android   # Clean Metro for test suite
+
+# User-defined scripts (add to your devbox.json shell.scripts):
+# "start:metro": ["metro.sh start ${1:-default}"]
+# "stop:metro": ["metro.sh stop ${1:-default}"]
 
 # Metro with custom port
 RN_METRO_PORT=8091 devbox run start:metro
-
-# Clean Metro cache
-devbox run clean-metro
-
-# Get Metro port for test suite
-devbox run rn:metro:port android
-
-# Clean Metro for test suite
-devbox run rn:metro:clean android
 ```
 
 ## Building
 
-```bash
-# Build all platforms
-devbox run build
+Build scripts are project-specific. Define them in your `devbox.json`.
 
-# Build specific platform
-devbox run build:android
-devbox run build:ios
-devbox run build:web
+```bash
+# User-defined scripts (add to your devbox.json shell.scripts):
+# "build": ["devbox run build:android", "devbox run build:ios", "devbox run build:web"]
+# "build:android": ["cd android && gradle assembleDebug"]
+# "build:ios": ["cd ios && pod install && xcodebuild ..."]
+# "build:web": ["npx react-native-web build"]
 ```
 
 ## Testing
 
+Test scripts are project-specific. Define them in your `devbox.json`.
+
 ```bash
-# Run all tests
-devbox run test:fast
+# Plugin-provided
+devbox run test:metro           # Test Metro bundler setup
 
-# Platform-specific E2E tests
-devbox run test:e2e:android
-devbox run test:e2e:ios
-devbox run test:e2e:web
+# User-defined scripts (add to your devbox.json shell.scripts):
+# "test": ["npm test"]
+# "test:e2e:android": ["process-compose -f tests/test-suite-android-e2e.yaml --no-server --tui=${TEST_TUI:-false}"]
+# "test:e2e:ios": ["process-compose -f tests/test-suite-ios-e2e.yaml --no-server --tui=${TEST_TUI:-false}"]
 
-# With TUI (terminal UI)
-TEST_TUI=true devbox run test:e2e:android
+# Skip unused platform for faster startup
+devbox run --pure -e IOS_SKIP_SETUP=1 test:e2e:android
+devbox run --pure -e ANDROID_SKIP_SETUP=1 test:e2e:ios
 ```
 
 ## Configuration
@@ -110,12 +109,10 @@ devbox run ios.sh config show
 ## Diagnostics
 
 ```bash
-# Health checks
-devbox run doctor
-devbox run verify:setup
-
-# Check Metro
-devbox run test:metro
+# Plugin-provided
+devbox run doctor              # Health check
+devbox run verify:setup        # Quick verification
+devbox run test:metro          # Test Metro setup
 ```
 
 ## Common Environment Variables
@@ -154,8 +151,8 @@ RN_METRO_PORT_END="8199"
 # Enable debug logging
 ANDROID_DEBUG=1 IOS_DEBUG=1 devbox shell
 
-# Reset Metro
-devbox run clean-metro
+# Reset Metro cache
+devbox run rn:metro:clean android
 rm -rf node_modules/.cache
 npm start -- --reset-cache
 
@@ -178,30 +175,27 @@ rm -rf .devbox/virtenv/ios/DerivedData
 
 ## Development Workflow
 
+The commands below assume you have defined `build:android`, `build:ios`, `start:android`, and `start:ios` in your `devbox.json`.
+
 ```bash
 # Full Android workflow
-devbox run start:emu
+devbox run start:emu              # Plugin-provided
 npm install
-devbox run build:android
-devbox run start:android
+devbox run build:android          # User-defined
+devbox run start:android          # User-defined
 
 # Full iOS workflow
-devbox run start:sim
+devbox run start:sim              # Plugin-provided
 npm install
 cd ios && pod install && cd ..
-devbox run build:ios
-devbox run start:ios
-
-# Development with hot reload
-devbox run start:metro &
-devbox run start:android    # Android
-devbox run start:ios        # iOS
+devbox run build:ios              # User-defined
+devbox run start:ios              # User-defined
 ```
 
 ## Process Isolation
 
 ```bash
-# Run multiple test suites in parallel
+# Run multiple test suites in parallel (user-defined test scripts)
 TEST_SUITE_NAME=android devbox run --pure test:e2e:android &
 TEST_SUITE_NAME=ios devbox run --pure test:e2e:ios &
 
@@ -222,7 +216,7 @@ devbox.d/
     ├── max.json
     └── devices.lock
 
-.devbox/virtenv/
+.devbox/virtenv/               # Runtime directory (auto-regenerated, never edit)
 ├── android/           # Android runtime
 ├── ios/               # iOS runtime
 └── metro/             # Metro state

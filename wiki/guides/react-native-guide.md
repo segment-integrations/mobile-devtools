@@ -19,9 +19,13 @@ The plugin does not modify React Native itself. It provides the native platform 
 
 ### Prerequisites
 
-A React Native project with `package.json` and platform-specific code in `android/` and `ios/` directories.
+A React Native project with `package.json` and platform-specific code in `android/` and `ios/` directories. [Install devbox](https://www.jetify.com/docs/devbox/installing_devbox/) if you have not already -- it handles downloading all required tools (Node.js, Android SDK, build tooling, etc.) automatically.
+
+For iOS development, macOS with Xcode installed is required.
 
 ### Adding the Plugin
+
+Devbox plugins are included via URL in the `"include"` field of `devbox.json`, not through `devbox add`. The plugin URL points to this repository and specifies which plugin directory to use.
 
 Include the React Native plugin in your `devbox.json`:
 
@@ -37,9 +41,6 @@ Include the React Native plugin in your `devbox.json`:
   "env": {
     "ANDROID_APP_ID": "com.example.app",
     "ANDROID_APP_APK": "android/app/build/outputs/apk/debug/app-debug.apk",
-    "IOS_APP_PROJECT": "MyApp.xcodeproj",
-    "IOS_APP_SCHEME": "MyApp",
-    "IOS_APP_BUNDLE_ID": "com.example.app",
     "IOS_APP_ARTIFACT": ".devbox/virtenv/ios/DerivedData/Build/Products/Debug-iphonesimulator/MyApp.app"
   }
 }
@@ -74,10 +75,7 @@ The React Native plugin inherits configuration from both Android and iOS plugins
 **iOS configuration** - See [iOS Guide](ios-guide.md) for details:
 - `IOS_DEFAULT_DEVICE` - Default simulator (e.g., "max", "min", "iphone15")
 - `IOS_DEVICES` - Comma-separated devices to evaluate (empty = all)
-- `IOS_APP_PROJECT` - Xcode project path
-- `IOS_APP_SCHEME` - Xcode build scheme
-- `IOS_APP_BUNDLE_ID` - App bundle identifier
-- `IOS_APP_ARTIFACT` - App path/glob after build
+- `IOS_APP_ARTIFACT` - App path/glob after build (empty = auto-detect)
 - `IOS_DOWNLOAD_RUNTIME` - Auto-download missing runtimes (1=yes, 0=no)
 
 ### Installing Dependencies
@@ -99,6 +97,8 @@ React Native development with Devbox supports two primary workflows: interactive
 ### Development Mode (Interactive)
 
 Development mode prioritizes fast iteration with hot reload enabled. It uses Debug builds for faster compilation and reuses existing emulators/simulators to avoid startup overhead.
+
+The commands below (`start:android`, `start:ios`, `start:web`) are user-defined scripts from the example project. See the [example project's devbox.json](../../examples/react-native/devbox.json) for how they are defined. You will need to add similar scripts to your own `devbox.json`.
 
 **Start development for Android:**
 
@@ -148,7 +148,7 @@ TUI mode provides a terminal interface to monitor all processes (build, emulator
 
 ### Building Apps
 
-Build platform-specific artifacts without running them:
+Build platform-specific artifacts without running them. These build commands are user-defined scripts from the example project -- you will need to define your own build scripts in your `devbox.json` that match your project's build process.
 
 ```bash
 # Build for Android (Debug)
@@ -200,8 +200,7 @@ devbox run --pure ios.sh devices eval
 
 **Device definitions:**
 
-Android devices: `devbox.d/android/devices/*.json`
-iOS devices: `devbox.d/ios/devices/*.json`
+Device JSON files are stored in the devices directory within your `devbox.d` folder. The exact path depends on how the plugin is included (local vs GitHub URL). Use the `devices list` command to see the configured path.
 
 **Default devices:**
 
@@ -236,16 +235,18 @@ devbox run start:ios      # Starts Metro automatically
 
 **Manual Metro control (advanced):**
 
+The `start:metro` and `stop:metro` scripts below are user-defined wrappers from the example project. The plugin provides the `metro.sh` CLI directly.
+
 ```bash
-# Start Metro for specific suite
+# Start Metro for specific suite (user-defined wrapper)
 devbox run start:metro android
 devbox run start:metro ios
 
-# Stop Metro for specific suite
+# Stop Metro for specific suite (user-defined wrapper)
 devbox run stop:metro android
 devbox run stop:metro ios
 
-# Check Metro status
+# Plugin-provided CLI commands
 metro.sh status android
 metro.sh status ios
 
@@ -283,7 +284,7 @@ Deploy scripts source `env-{suite}.sh` to ensure React Native uses the correct M
 
 ## Testing
 
-The plugin provides automated E2E testing with Release builds and cleanup.
+The example project demonstrates automated E2E testing with Release builds and cleanup. The test commands shown below are user-defined scripts from the example project. You will need to define your own test scripts in your `devbox.json`.
 
 ### Running E2E Tests
 
@@ -513,8 +514,7 @@ devbox run start:sim
 
 ```bash
 # Clean build
-cd android && gradle clean
-devbox run build:android
+cd android && ./gradlew clean assembleDebug
 ```
 
 **iOS Xcode errors:**
@@ -589,36 +589,57 @@ ls -la reports/react-native-ios-e2e-logs/
 **iOS settings** (see [iOS Reference](../reference/ios.md)):
 - `IOS_DEFAULT_DEVICE` - Default simulator
 - `IOS_DEVICES` - Devices to evaluate (comma-separated, empty = all)
-- `IOS_APP_PROJECT` - Xcode project path
-- `IOS_APP_SCHEME` - Xcode build scheme
-- `IOS_APP_BUNDLE_ID` - App bundle identifier
-- `IOS_APP_ARTIFACT` - App bundle path/glob
+- `IOS_APP_ARTIFACT` - App bundle path/glob (empty = auto-detect)
 - `IOS_DOWNLOAD_RUNTIME` - Auto-download runtimes (1=yes, 0=no)
 - `IOS_SKIP_SETUP` - Skip iOS setup (1=skip, 0=setup)
 
 ### Commands
 
-**Development:**
+#### Plugin-Provided Commands
+
+These commands are provided by the Android, iOS, and React Native plugins and are available automatically when the plugin is included.
+
+**Emulator/Simulator management (from Android and iOS plugins):**
+- `devbox run start:emu [device]` - Start Android emulator
+- `devbox run stop:emu` - Stop Android emulator
+- `devbox run start:sim [device]` - Start iOS simulator
+- `devbox run stop:sim` - Stop iOS simulator
+
+**Device management CLI (from Android and iOS plugins):**
+- `android.sh devices list` - List Android devices
+- `android.sh devices create` - Create Android device
+- `android.sh devices sync` - Sync AVDs with definitions
+- `ios.sh devices list` - List iOS devices
+- `ios.sh devices create` - Create iOS device
+- `ios.sh devices sync` - Sync simulators with definitions
+
+**Metro CLI (from React Native plugin):**
+- `metro.sh start [suite]` - Start Metro bundler
+- `metro.sh stop [suite]` - Stop Metro bundler
+- `metro.sh status [suite]` - Check Metro status
+- `metro.sh health [suite] [platform]` - Health check (exit code)
+- `metro.sh clean [suite]` - Clean Metro state files
+
+**Diagnostics (from all plugins):**
+- `devbox run doctor` - Check environment health
+- `devbox run verify:setup` - Verify environment is correctly configured
+
+#### User-Defined Commands (Example Project)
+
+These commands are **not** provided by the plugins. They are defined in the example project's `devbox.json` and serve as a reference for how to build your own workflow scripts. You must add similar scripts to your own `devbox.json` to use them.
+
+**Development workflow:**
 - `devbox run start:android` - Start Android development with hot reload
 - `devbox run start:ios` - Start iOS development with hot reload
 - `devbox run start:web` - Start web development with browser
-- `devbox run start:emu [device]` - Start Android emulator
-- `devbox run start:sim [device]` - Start iOS simulator
-- `devbox run stop:emu` - Stop Android emulator
-- `devbox run stop:sim` - Stop iOS simulator
+- `devbox run start:metro [suite]` - Start Metro bundler (wraps `metro.sh start`)
+- `devbox run stop:metro [suite]` - Stop Metro bundler (wraps `metro.sh stop`)
 
 **Building:**
 - `devbox run build:android` - Build Android APK (Debug)
 - `devbox run build:ios` - Build iOS app (Debug)
 - `devbox run build:web` - Build web bundle
 - `devbox run build` - Build all platforms
-
-**Metro:**
-- `devbox run start:metro [suite]` - Start Metro bundler
-- `devbox run stop:metro [suite]` - Stop Metro bundler
-- `metro.sh status [suite]` - Check Metro status
-- `metro.sh health [suite] [platform]` - Health check (exit code)
-- `metro.sh clean [suite]` - Clean Metro state files
 
 **Testing:**
 - `devbox run test:e2e:android` - Android E2E tests (--pure)
@@ -627,21 +648,11 @@ ls -la reports/react-native-ios-e2e-logs/
 - `devbox run test:e2e:web` - Web bundle tests
 - `devbox run test` - Run Jest tests
 
-**Device management:**
-- `android.sh devices list` - List Android devices
-- `android.sh devices create` - Create Android device
-- `android.sh devices sync` - Sync AVDs with definitions
-- `ios.sh devices list` - List iOS devices
-- `ios.sh devices create` - Create iOS device
-- `ios.sh devices sync` - Sync simulators with definitions
-
 ### Files and Directories
 
 **Configuration:**
 - `devbox.json` - Project configuration
-- `devbox.d/android/devices/*.json` - Android device definitions
-- `devbox.d/ios/devices/*.json` - iOS device definitions
-- `devbox.d/react-native/react-native.json` - React Native config
+- `devbox.d/` - Plugin configuration directory containing device definitions for Android and iOS (exact subdirectory structure depends on how plugins are included)
 
 **Generated files:**
 - `.devbox/virtenv/react-native/metro/` - Metro state files

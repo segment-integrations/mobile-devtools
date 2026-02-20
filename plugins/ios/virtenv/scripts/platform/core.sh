@@ -2,7 +2,7 @@
 # iOS Plugin - Core Xcode and Environment Setup
 # Extracted from env.sh to eliminate circular dependencies
 
-set -eu
+set -e
 
 if ! (return 0 2>/dev/null); then
   echo "ERROR: core.sh must be sourced, not executed directly" >&2
@@ -136,44 +136,16 @@ ios_resolve_devbox_bin() {
 # Environment Setup
 # ============================================================================
 
-# Setup omit-nix-env for iOS (use system Xcode/tools instead of Nix)
-devbox_omit_nix_env() {
-  if [ "${DEVBOX_OMIT_NIX_ENV_APPLIED:-}" = "1" ]; then
+# Setup Darwin environment for iOS (use system Xcode/tools instead of Nix)
+ios_setup_native_toolchain() {
+  if [ "${IOS_NATIVE_TOOLCHAIN_APPLIED:-}" = "1" ]; then
     return 0
-  fi
-
-  export DEVBOX_OMIT_NIX_ENV_APPLIED=1
-  devbox_bin="$(ios_resolve_devbox_bin 2>/dev/null || true)"
-  if [ -z "$devbox_bin" ]; then
-    ios_log_debug "devbox not found; skipping omit-nix-env setup."
-    return 0
-  fi
-
-  devbox_init_path="${DEVBOX_INIT_PATH:-}"
-  devbox_bin_dir="$(dirname "$devbox_bin")"
-  devbox_project_bin=""
-  if [ -n "${DEVBOX_PROJECT_ROOT:-}" ] && [ -d "${DEVBOX_PROJECT_ROOT}/.devbox/bin" ]; then
-    devbox_project_bin="${DEVBOX_PROJECT_ROOT}/.devbox/bin"
-  elif [ -n "${DEVBOX_WD:-}" ] && [ -d "${DEVBOX_WD}/.devbox/bin" ]; then
-    devbox_project_bin="${DEVBOX_WD}/.devbox/bin"
-  fi
-
-  devbox_config_path=""
-  if [ -n "${DEVBOX_CONFIG:-}" ] && [ -f "$DEVBOX_CONFIG" ]; then
-    devbox_config_path="$DEVBOX_CONFIG"
-  elif [ -n "${DEVBOX_CONFIG_PATH:-}" ] && [ -f "$DEVBOX_CONFIG_PATH" ]; then
-    devbox_config_path="$DEVBOX_CONFIG_PATH"
-  elif [ -n "${DEVBOX_CONFIG_DIR:-}" ] && [ -f "${DEVBOX_CONFIG_DIR%/}/devbox.json" ]; then
-    devbox_config_path="${DEVBOX_CONFIG_DIR%/}/devbox.json"
-  fi
-
-  if [ -n "$devbox_config_path" ]; then
-    eval "$("$devbox_bin" --config "$devbox_config_path" shellenv --install --no-refresh-alias --omit-nix-env=true)"
-  else
-    eval "$("$devbox_bin" shellenv --install --no-refresh-alias --omit-nix-env=true)"
   fi
 
   if [ "$(uname -s)" = "Darwin" ]; then
+    # Unset standard build variables that Xcode tools read
+    unset LD LDFLAGS CFLAGS
+
     if [ -x /usr/bin/clang ]; then
       CC=/usr/bin/clang
       CXX=/usr/bin/clang++
@@ -192,16 +164,7 @@ devbox_omit_nix_env() {
     unset SDKROOT
   fi
 
-  if [ -n "$devbox_init_path" ]; then
-    PATH="${devbox_init_path}:${PATH}"
-  fi
-  if [ -n "$devbox_project_bin" ]; then
-    PATH="${devbox_project_bin}:${PATH}"
-  fi
-  if [ -n "$devbox_bin_dir" ]; then
-    PATH="${devbox_bin_dir}:${PATH}"
-  fi
-  export PATH
+  export IOS_NATIVE_TOOLCHAIN_APPLIED=1
 }
 
 # Setup macOS system PATH and DEVELOPER_DIR
@@ -214,7 +177,7 @@ ios_setup_environment() {
   fi
 
   # Setup omit-nix-env
-  devbox_omit_nix_env
+  ios_setup_native_toolchain
 
   # Ensure DEVELOPER_DIR is set
   if [ "$(uname -s)" = "Darwin" ]; then
@@ -277,38 +240,6 @@ ios_show_summary() {
   echo "  XCODE_VERSION: ${xcode_version:-unknown}"
   echo "  IOS_RUNTIME: ${ios_runtime:-not set}"
   echo "  IOS_SIM_TARGET: device=${ios_target_device:-unknown} runtime=${ios_target_runtime:-not set}"
-}
-
-# ============================================================================
-# Requirement Functions
-# ============================================================================
-
-ios_require_tool() {
-  tool="$1"
-  message="${2:-Missing required tool: $tool. Ensure the Devbox shell is active and required packages are installed.}"
-  if ! command -v "$tool" >/dev/null 2>&1; then
-    echo "$message" >&2
-    exit 1
-  fi
-}
-
-ios_require_dir() {
-  path="$1"
-  message="${2:-Missing required directory: $path.}"
-  if [ ! -d "$path" ]; then
-    echo "$message" >&2
-    exit 1
-  fi
-}
-
-ios_require_dir_contains() {
-  base="$1"
-  subpath="$2"
-  message="${3:-Missing required path: $base/$subpath.}"
-  if [ ! -e "$base/$subpath" ]; then
-    echo "$message" >&2
-    exit 1
-  fi
 }
 
 ios_debug_log_script "core.sh"

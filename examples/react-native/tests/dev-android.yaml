@@ -7,41 +7,28 @@ version: "0.5"
 # - TUI enabled for interactive development
 
 environment:
-  - "ANDROID_SERIAL=emulator-5554"
-  - "BOOT_TIMEOUT=180"
+  - "SUITE_NAME=rn-android-dev"
 
 log_location: "reports/react-native-android-dev-logs"
 log_level: info
 is_strict: false  # Allow graceful exit
 
 processes:
-  # Phase 0: Allocate Metro port
-  allocate-metro-port:
-    command: |
-      . ${REACT_NATIVE_VIRTENV}/scripts/lib/lib.sh
-      metro_port=$(rn_allocate_metro_port "android")
-      echo "📡 Allocated Metro port: $metro_port"
-      env_file=$(rn_save_metro_env "android" "$metro_port")
-      echo "✓ Metro environment saved to: $env_file"
-    availability:
-      restart: "no"
-
   # Phase 1: Build Node dependencies
   build-node:
-    depends_on:
-      allocate-metro-port:
-        condition: process_completed_successfully
-    command: "devbox run --pure build:node"
+    command: "npm install"
     availability:
       restart: "no"
 
   # Phase 2: Build Android app (Debug)
   build-android:
     command: |
-      . ${ANDROID_RUNTIME_DIR}/scripts/init/setup.sh
-      echo '📦 Building Android app (Debug)...'
-      cd android && gradle assembleDebug
-      echo '✓ Build complete'
+      set -e
+      BUILD_CONFIG="${ANDROID_BUILD_CONFIG:-Debug}"
+      echo "Building Android app (${BUILD_CONFIG})..."
+      TASK="assemble${BUILD_CONFIG}"
+      cd android && ./gradlew "$TASK"
+      echo 'Build complete'
     depends_on:
       build-node:
         condition: process_completed_successfully
@@ -50,11 +37,7 @@ processes:
 
   # Phase 3: Sync AVDs
   sync-avds:
-    command: |
-      . ${ANDROID_RUNTIME_DIR}/scripts/init/setup.sh
-      echo '🔄 Syncing AVDs with device definitions...'
-      android.sh devices sync
-      echo '✓ Sync complete'
+    command: "android.sh devices sync"
     availability:
       restart: "no"
 
@@ -64,58 +47,27 @@ processes:
       sync-avds:
         condition: process_completed_successfully
     command: |
-      . ${ANDROID_RUNTIME_DIR}/scripts/init/setup.sh
+      set -e
       device="${ANDROID_DEFAULT_DEVICE:-max}"
-      serial="emulator-5554"
-      echo "$serial" > ${ANDROID_RUNTIME_DIR}/emulator-serial.txt
-
-      if adb devices | grep -q "$serial"; then
-        echo "✓ Emulator already running: $serial"
-      else
-        echo "🚀 Starting emulator: $device"
-        android.sh emulator start "$device" &
-        echo "✓ Emulator starting (PID: $!)"
-
-        echo "Waiting for emulator to boot..."
-        max_attempts=60
-        attempt=0
-        while [ $attempt -lt $max_attempts ]; do
-          if adb -s $serial shell getprop sys.boot_completed 2>/dev/null | grep -q "1"; then
-            echo "✓ Emulator ready for development"
-            break
-          fi
-          attempt=$((attempt + 1))
-          sleep 2
-        done
-
-        if [ $attempt -ge $max_attempts ]; then
-          echo "ERROR: Emulator did not boot within timeout"
-          exit 1
-        fi
-      fi
-
-      echo "✓ Emulator will remain running for hot reload"
-      exit 0
+      echo "Starting emulator: $device"
+      android.sh emulator start "$device"
+      # Keep process alive for readiness probe (process-compose services pattern)
+      tail -f /dev/null
     availability:
       restart: "no"
     readiness_probe:
       exec:
-        command: |
-          . ${ANDROID_RUNTIME_DIR}/scripts/init/setup.sh
-          serial=$(cat ${ANDROID_RUNTIME_DIR}/emulator-serial.txt 2>/dev/null || echo "")
-          [ -n "$serial" ] && adb -s $serial shell getprop sys.boot_completed 2>/dev/null | grep -q "1"
+        command: "android.sh emulator ready"
       initial_delay_seconds: 10
-      period_seconds: 10
-      timeout_seconds: 180
+      period_seconds: 5
+      timeout_seconds: 10
       success_threshold: 1
-      failure_threshold: 12
+      failure_threshold: 24
 
   # Phase 5: Start Metro bundler with hot reload
   metro-bundler:
     command: "metro.sh start android"
     depends_on:
-      allocate-metro-port:
-        condition: process_completed_successfully
       build-node:
         condition: process_completed_successfully
     availability:
@@ -130,24 +82,29 @@ processes:
         command: "metro.sh health android android"
       initial_delay_seconds: 5
       period_seconds: 5
-      timeout_seconds: 60
+      timeout_seconds: 5
       success_threshold: 1
+      failure_threshold: 12
 
   # Phase 6: Deploy app (Debug build for fast iteration)
   deploy-android:
     command: |
+      set -e
       . ${REACT_NATIVE_VIRTENV}/metro/env-android.sh
-      echo "📲 Deploying React Native app (Debug, Metro port: $METRO_PORT)..."
-      npx react-native run-android --no-packager
+      echo "Deploying React Native app (Debug, Metro port: $METRO_PORT)..."
+
+      # Deploy using android.sh (APK already built by build-android)
+      android.sh deploy
+
       echo ""
-      echo "✓ App deployed!"
+      echo "App deployed!"
       echo "  Metro: http://localhost:$METRO_PORT"
       echo "  Hot reload enabled - edit code and save to see changes"
     depends_on:
       build-android:
         condition: process_completed_successfully
       android-emulator:
-        condition: process_completed_successfully
+        condition: process_healthy
       metro-bundler:
         condition: process_healthy
     availability:

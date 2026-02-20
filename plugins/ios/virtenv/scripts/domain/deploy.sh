@@ -2,7 +2,7 @@
 # iOS Plugin - App Building and Deployment
 # See REFERENCE.md for detailed documentation
 
-set -eu
+set -e
 
 if ! (return 0 2>/dev/null); then
   echo "ERROR: deploy.sh must be sourced" >&2
@@ -23,81 +23,15 @@ if [ -n "${IOS_SCRIPTS_DIR:-}" ]; then
   if [ -f "${IOS_SCRIPTS_DIR}/platform/core.sh" ]; then
     . "${IOS_SCRIPTS_DIR}/platform/core.sh"
   fi
-  if [ -f "${IOS_SCRIPTS_DIR}/domain/simulator.sh" ]; then
-    . "${IOS_SCRIPTS_DIR}/domain/simulator.sh"
-  fi
 fi
 
 ios_log_debug "deploy.sh loaded"
 
 # ============================================================================
-# Project and Path Resolution Functions
+# Project Resolution
 # ============================================================================
 
-# Resolve Xcode project path
-# Returns: project path
-ios_resolve_app_project() {
-  if [ -n "${IOS_APP_PROJECT:-}" ]; then
-    printf '%s\n' "$IOS_APP_PROJECT"
-    return 0
-  fi
-  for proj in *.xcodeproj; do
-    [ -d "$proj" ] || continue
-    printf '%s\n' "$proj"
-    return 0
-  done
-  return 1
-}
-
-# Resolve Xcode scheme name
-# Returns: scheme name
-ios_resolve_app_scheme() {
-  if [ -n "${IOS_APP_SCHEME:-}" ]; then
-    printf '%s\n' "$IOS_APP_SCHEME"
-    return 0
-  fi
-  project="$(ios_resolve_app_project 2>/dev/null || true)"
-  if [ -n "$project" ]; then
-    printf '%s\n' "$(basename "$project" .xcodeproj)"
-    return 0
-  fi
-  return 1
-}
-
-# Resolve app bundle identifier
-# Returns: bundle ID
-ios_resolve_app_bundle_id() {
-  if [ -n "${IOS_APP_BUNDLE_ID:-}" ]; then
-    printf '%s\n' "$IOS_APP_BUNDLE_ID"
-    return 0
-  fi
-  return 1
-}
-
-# Resolve derived data directory
-# Returns: derived data path
-ios_resolve_derived_data() {
-  if [ -n "${IOS_APP_DERIVED_DATA:-}" ]; then
-    printf '%s\n' "$IOS_APP_DERIVED_DATA"
-    return 0
-  fi
-  if [ -n "${DEVBOX_PROJECT_ROOT:-}" ]; then
-    printf '%s\n' "${DEVBOX_PROJECT_ROOT%/}/.devbox/virtenv/ios/DerivedData"
-    return 0
-  fi
-  if [ -n "${DEVBOX_PROJECT_DIR:-}" ]; then
-    printf '%s\n' "${DEVBOX_PROJECT_DIR%/}/.devbox/virtenv/ios/DerivedData"
-    return 0
-  fi
-  if [ -n "${DEVBOX_WD:-}" ]; then
-    printf '%s\n' "${DEVBOX_WD%/}/.devbox/virtenv/ios/DerivedData"
-    return 0
-  fi
-  printf '%s\n' "./.devbox/virtenv/ios/DerivedData"
-}
-
 # Resolve project root directory
-# Returns: project root path
 ios_resolve_project_root() {
   if [ -n "${DEVBOX_PROJECT_ROOT:-}" ]; then
     printf '%s\n' "${DEVBOX_PROJECT_ROOT%/}"
@@ -114,35 +48,249 @@ ios_resolve_project_root() {
   printf '%s\n' "$PWD"
 }
 
-# Resolve devbox binary path
-# Returns: devbox binary path
-ios_resolve_devbox_bin() {
-  if [ -n "${DEVBOX_BIN:-}" ] && [ -x "$DEVBOX_BIN" ]; then
-    printf '%s\n' "$DEVBOX_BIN"
-    return 0
+# ============================================================================
+# App Resolution
+# ============================================================================
+
+# Resolve .app path from glob pattern
+# Args: project_root, app_pattern
+# Returns: first matching .app directory
+ios_resolve_app_glob() {
+  _arg_root="$1"
+  _arg_pattern="$2"
+
+  if [ -z "$_arg_pattern" ]; then
+    return 1
   fi
-  if command -v devbox >/dev/null 2>&1; then
-    command -v devbox
-    return 0
+
+  # Make pattern absolute if it's relative
+  if [ "${_arg_pattern#/}" = "$_arg_pattern" ]; then
+    _arg_pattern="${_arg_root%/}/$_arg_pattern"
   fi
-  if [ -n "${DEVBOX_INIT_PATH:-}" ]; then
-    devbox_bin="$(PATH="$DEVBOX_INIT_PATH:$PATH" command -v devbox 2>/dev/null || true)"
-    if [ -n "$devbox_bin" ]; then
-      DEVBOX_BIN="$devbox_bin"
-      export DEVBOX_BIN
-      printf '%s\n' "$devbox_bin"
-      return 0
-    fi
-  fi
-  for candidate in "$HOME/.nix-profile/bin/devbox" "/usr/local/bin/devbox" "/opt/homebrew/bin/devbox"; do
-    if [ -x "$candidate" ]; then
-      DEVBOX_BIN="$candidate"
-      export DEVBOX_BIN
-      printf '%s\n' "$candidate"
-      return 0
+
+  set +f
+  _matched=""
+  for _candidate in $_arg_pattern; do
+    if [ -d "$_candidate" ]; then
+      _matched="${_matched}${_matched:+
+}$_candidate"
     fi
   done
+  set -f
+
+  if [ -z "$_matched" ]; then
+    return 1
+  fi
+
+  _count="$(printf '%s\n' "$_matched" | wc -l | tr -d ' ')"
+  if [ "$_count" -gt 1 ]; then
+    ios_log_warn "deploy.sh" "Multiple app bundles matched pattern: $_arg_pattern; using first match"
+  fi
+
+  printf '%s\n' "$_matched" | head -n1
+}
+
+# Query xcodebuild for .app path
+# Args: project_root
+# Returns: .app path (sets IOS_XCODEBUILD_BUNDLE_ID as side effect)
+ios_resolve_app_via_xcodebuild() {
+  _xc_root="$1"
+
+  # Find Xcode project or workspace
+  _xc_proj=""
+  for _f in "$_xc_root"/*.xcworkspace; do
+    if [ -d "$_f" ]; then
+      # Skip Pods workspace
+      case "$(basename "$_f")" in
+        Pods.xcworkspace) continue ;;
+      esac
+      _xc_proj="$_f"
+      break
+    fi
+  done
+  if [ -z "$_xc_proj" ]; then
+    for _f in "$_xc_root"/*.xcodeproj; do
+      if [ -d "$_f" ]; then
+        _xc_proj="$_f"
+        break
+      fi
+    done
+  fi
+
+  if [ -z "$_xc_proj" ]; then
+    return 1
+  fi
+
+  # Determine flag type
+  case "$_xc_proj" in
+    *.xcworkspace) _xc_flag="-workspace" ;;
+    *.xcodeproj)   _xc_flag="-project" ;;
+    *)             return 1 ;;
+  esac
+
+  # Derive scheme from project name
+  _xc_scheme="$(basename "$_xc_proj" | sed 's/\.\(xcworkspace\|xcodeproj\)$//')"
+
+  # Resolve DerivedData path (must match ios_build defaults)
+  _xc_derived_data="${IOS_DERIVED_DATA_PATH:-}"
+  if [ -z "$_xc_derived_data" ]; then
+    if [ -n "${DEVBOX_PROJECT_ROOT:-}" ]; then
+      _xc_derived_data="${DEVBOX_PROJECT_ROOT}/.devbox/virtenv/ios/DerivedData"
+    else
+      _xc_derived_data="$PWD/.devbox/virtenv/ios/DerivedData"
+    fi
+  fi
+
+  # Query build settings with matching DerivedData path
+  _settings="$(xcodebuild "$_xc_flag" "$_xc_proj" -scheme "$_xc_scheme" \
+    -configuration Debug -destination 'generic/platform=iOS Simulator' \
+    -derivedDataPath "$_xc_derived_data" \
+    -showBuildSettings 2>/dev/null || true)"
+
+  if [ -z "$_settings" ]; then
+    return 1
+  fi
+
+  _built_dir="$(printf '%s\n' "$_settings" | awk '/^\s*BUILT_PRODUCTS_DIR = /{print $3; exit}')"
+  _product_name="$(printf '%s\n' "$_settings" | awk '/^\s*FULL_PRODUCT_NAME = /{print $3; exit}')"
+  _bundle_id="$(printf '%s\n' "$_settings" | awk '/^\s*PRODUCT_BUNDLE_IDENTIFIER = /{print $3; exit}')"
+
+  if [ -z "$_built_dir" ] || [ -z "$_product_name" ]; then
+    return 1
+  fi
+
+  _app_path="${_built_dir%/}/$_product_name"
+
+  if [ ! -d "$_app_path" ]; then
+    return 1
+  fi
+
+  # Export bundle ID as side effect for caller
+  if [ -n "$_bundle_id" ]; then
+    IOS_XCODEBUILD_BUNDLE_ID="$_bundle_id"
+    export IOS_XCODEBUILD_BUNDLE_ID
+  fi
+
+  printf '%s\n' "$_app_path"
+}
+
+# Find .app bundle using auto-detect precedence chain
+# Args: project_root
+# Precedence:
+#   1. IOS_APP_ARTIFACT env var (glob resolved relative to project_root)
+#   2. xcodebuild -showBuildSettings query
+#   3. DerivedData search (matches ios_build default output location)
+#   4. Recursive search of project_root for *.app directories
+#   5. Recursive search of $PWD (skipped if PWD == project_root)
+#   6. Error with guidance
+ios_find_app() {
+  _find_root="$1"
+
+  # 1. IOS_APP_ARTIFACT env var
+  if [ -n "${IOS_APP_ARTIFACT:-}" ]; then
+    _app="$(ios_resolve_app_glob "$_find_root" "$IOS_APP_ARTIFACT" || true)"
+    if [ -n "$_app" ] && [ -d "$_app" ]; then
+      ios_log_info "deploy.sh" "App resolved via IOS_APP_ARTIFACT env var: $_app"
+      printf '%s\n' "$_app"
+      return 0
+    fi
+  fi
+
+  # 2. xcodebuild query
+  if command -v xcodebuild >/dev/null 2>&1; then
+    _app="$(ios_resolve_app_via_xcodebuild "$_find_root" || true)"
+    if [ -n "$_app" ] && [ -d "$_app" ]; then
+      ios_log_info "deploy.sh" "App resolved via xcodebuild: $_app"
+      printf '%s\n' "$_app"
+      return 0
+    fi
+  fi
+
+  # 3. DerivedData search (matches ios_build default output location)
+  _dd_path="${IOS_DERIVED_DATA_PATH:-}"
+  if [ -z "$_dd_path" ]; then
+    if [ -n "${DEVBOX_PROJECT_ROOT:-}" ]; then
+      _dd_path="${DEVBOX_PROJECT_ROOT}/.devbox/virtenv/ios/DerivedData"
+    else
+      _dd_path="${_find_root}/.devbox/virtenv/ios/DerivedData"
+    fi
+  fi
+  if [ -d "$_dd_path" ]; then
+    _app="$(find "$_dd_path" -name '*.app' -type d \
+      -not -path '*/ModuleCache/*' \
+      2>/dev/null | head -n1)"
+    if [ -n "$_app" ] && [ -d "$_app" ]; then
+      ios_log_info "deploy.sh" "App resolved via DerivedData: $_app"
+      printf '%s\n' "$_app"
+      return 0
+    fi
+  fi
+
+  # 4. Recursive search of project_root
+  _app="$(find "$_find_root" -name '*.app' -type d \
+    -not -path '*/Pods/*' \
+    -not -path '*/.build/*' \
+    -not -path '*/SourcePackages/*' \
+    -not -path '*/node_modules/*' \
+    -not -path '*/.devbox/*' \
+    -not -path '*/DerivedData/ModuleCache/*' \
+    2>/dev/null | head -n1)"
+  if [ -n "$_app" ] && [ -d "$_app" ]; then
+    ios_log_info "deploy.sh" "App resolved via project search: $_app"
+    printf '%s\n' "$_app"
+    return 0
+  fi
+
+  # 5. Recursive search of $PWD (skip if same as project_root)
+  _cwd="$(cd "$PWD" && pwd -P)"
+  _root_real="$(cd "$_find_root" && pwd -P)"
+  if [ "$_cwd" != "$_root_real" ]; then
+    _app="$(find "$PWD" -name '*.app' -type d \
+      -not -path '*/Pods/*' \
+      -not -path '*/.build/*' \
+      -not -path '*/SourcePackages/*' \
+      -not -path '*/node_modules/*' \
+      -not -path '*/.devbox/*' \
+      -not -path '*/DerivedData/ModuleCache/*' \
+      2>/dev/null | head -n1)"
+    if [ -n "$_app" ] && [ -d "$_app" ]; then
+      ios_log_info "deploy.sh" "App resolved via directory search: $_app"
+      printf '%s\n' "$_app"
+      return 0
+    fi
+  fi
+
+  # 6. Error
+  ios_log_error "deploy.sh" "No .app bundle found. Searched: IOS_APP_ARTIFACT env var, xcodebuild settings, project root, current directory."
+  ios_log_error "deploy.sh" "Set IOS_APP_ARTIFACT in devbox.json env, or pass a path: ios.sh run /path/to/MyApp.app"
+  ios_log_error "deploy.sh" "See: plugins/ios/REFERENCE.md for app resolution details."
   return 1
+}
+
+# ============================================================================
+# Bundle ID Extraction
+# ============================================================================
+
+# Extract CFBundleIdentifier from .app bundle
+# Args: app_path
+# Returns: bundle identifier
+ios_extract_bundle_id() {
+  _app_path="$1"
+
+  _plist="${_app_path%/}/Info.plist"
+  if [ ! -f "$_plist" ]; then
+    ios_log_error "deploy.sh" "Info.plist not found in: $_app_path"
+    return 1
+  fi
+
+  _bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$_plist" 2>/dev/null || true)"
+  if [ -z "$_bundle_id" ]; then
+    ios_log_error "deploy.sh" "Unable to read CFBundleIdentifier from: $_plist"
+    return 1
+  fi
+
+  ios_log_info "deploy.sh" "Bundle ID: $_bundle_id"
+  printf '%s\n' "$_bundle_id"
 }
 
 # ============================================================================
@@ -150,114 +298,28 @@ ios_resolve_devbox_bin() {
 # ============================================================================
 
 # Run iOS build using devbox
-# Returns: 0 on success
+# Args: project_root
 ios_run_build() {
-  project_root="$(ios_resolve_project_root)"
-  if [ -z "$project_root" ] || [ ! -d "$project_root" ]; then
-    echo "Unable to resolve project root for iOS build." >&2
+  _build_root="$1"
+
+  _devbox_bin="$(ios_resolve_devbox_bin 2>/dev/null || true)"
+  if [ -z "$_devbox_bin" ]; then
+    ios_log_debug "deploy.sh" "devbox not found; skipping build step"
+    return 0
+  fi
+
+  # Try platform-specific build command first, then fall back to generic
+  if (cd "$_build_root" && "$_devbox_bin" run --list 2>/dev/null | grep -q "build:ios"); then
+    ios_log_info "deploy.sh" "Running build:ios"
+    (cd "$_build_root" && "$_devbox_bin" run --pure build:ios)
+  elif (cd "$_build_root" && "$_devbox_bin" run --list 2>/dev/null | grep -q "build"); then
+    ios_log_info "deploy.sh" "Running build"
+    (cd "$_build_root" && "$_devbox_bin" run --pure build)
+  else
+    ios_log_error "deploy.sh" "No build:ios or build script found in devbox.json."
+    ios_log_error "deploy.sh" "Define a build script using native tools (e.g., xcodebuild)."
     return 1
   fi
-  devbox_bin="$(ios_resolve_devbox_bin 2>/dev/null || true)"
-  if [ -z "$devbox_bin" ]; then
-    echo "devbox is required to run the project build." >&2
-    return 1
-  fi
-  (cd "$project_root" && "$devbox_bin" run --pure build-ios)
-}
-
-# Resolve app bundle path using glob pattern
-# Returns: app bundle path
-ios_resolve_app_path() {
-  project_root="$(ios_resolve_project_root)"
-  pattern="${IOS_APP_ARTIFACT:-}"
-  if [ -z "$pattern" ]; then
-    return 1
-  fi
-  if [ "${pattern#/}" = "$pattern" ]; then
-    pattern="${project_root%/}/$pattern"
-  fi
-  set +f
-  matches=""
-  for candidate in $pattern; do
-    if [ -d "$candidate" ]; then
-      matches="${matches}${matches:+
-}$candidate"
-    fi
-  done
-  set -f
-  if [ -z "$matches" ]; then
-    return 1
-  fi
-  count="$(printf '%s\n' "$matches" | wc -l | tr -d ' ')"
-  if [ "$count" -gt 1 ]; then
-    echo "Multiple app bundles matched ${pattern}; using the first match." >&2
-  fi
-  printf '%s\n' "$matches" | head -n1
-}
-
-# ============================================================================
-# Setup Orchestration
-# ============================================================================
-
-# Setup iOS environment for deployment
-# Returns: 0 on success
-ios_setup() {
-  if [ -n "${IOS_XCODE_ENV_PATH:-}" ]; then
-    node_binary="${IOS_NODE_BINARY:-${NODE_BINARY:-}}"
-    if [ -z "$node_binary" ]; then
-      echo "IOS_XCODE_ENV_PATH is set but IOS_NODE_BINARY/NODE_BINARY is empty." >&2
-      return 1
-    fi
-    env_dir="$(dirname "$IOS_XCODE_ENV_PATH")"
-    if [ ! -d "$env_dir" ]; then
-      echo "IOS_XCODE_ENV_PATH directory does not exist: ${env_dir}" >&2
-      return 1
-    fi
-    printf 'export NODE_BINARY=%s\n' "$node_binary" >"$IOS_XCODE_ENV_PATH"
-  fi
-  ensure_developer_dir
-  ios_require_tool xcrun "Missing required tool: xcrun. Install Xcode CLI tools before running (xcode-select --install or Xcode.app + xcode-select -s)."
-  ios_require_tool jq
-  ensure_simctl
-
-  if ! ensure_core_sim_service; then
-    return 1
-  fi
-
-  devices_dir="$(ios_devices_dir 2>/dev/null || true)"
-  if [ -z "$devices_dir" ]; then
-    echo "iOS devices directory not found. Expected devbox.d/ios/devices or IOS_DEVICES_DIR." >&2
-    return 1
-  fi
-
-  device_files="$(ios_device_files "$devices_dir")"
-  if [ -z "$device_files" ]; then
-    echo "No iOS device definitions found in ${devices_dir}." >&2
-    return 1
-  fi
-
-  device_files="$(ios_selected_device_files "$devices_dir")" || return 1
-  for device_file in $device_files; do
-    device_name="$(jq -r '.name // empty' "$device_file")"
-    runtime="$(jq -r '.runtime // empty' "$device_file")"
-    if [ -z "$device_name" ]; then
-      echo "iOS device definition missing name in ${device_file}." >&2
-      return 1
-    fi
-    if [ -z "$runtime" ]; then
-      runtime="${IOS_DEFAULT_RUNTIME:-}"
-      if [ -z "$runtime" ] && command -v xcrun >/dev/null 2>&1; then
-        runtime="$(xcrun --sdk iphonesimulator --show-sdk-version 2>/dev/null || true)"
-      fi
-    fi
-    if [ -z "$runtime" ]; then
-      echo "IOS_DEFAULT_RUNTIME must be set (or install a simulator runtime in Xcode)." >&2
-      return 1
-    fi
-    ensure_device "$device_name" "$runtime"
-  done
-
-  echo "Done. Launch via Xcode > Devices or 'xcrun simctl boot \"<name>\"' then 'open -a Simulator'."
 }
 
 # ============================================================================
@@ -265,36 +327,143 @@ ios_setup() {
 # ============================================================================
 
 # Build, install, and launch app on simulator
-# Args: device_name (optional)
-# Returns: 0 on success
+# Usage: ios_run_app [--app <path>] [--device <name>] [<device>]
+#   --app <path>    - Path to .app bundle. If provided, skips build step.
+#   --device <name> - Device name. If omitted, uses IOS_DEFAULT_DEVICE.
+#   Bare positional arg is treated as device name for convenience.
 ios_run_app() {
-  device_name="${1-}"
-  ios_start "$device_name"
+  app_arg=""
+  device_choice=""
 
-  ios_run_build
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --app)
+        app_arg="${2:-}"
+        shift 2
+        ;;
+      --device)
+        device_choice="${2:-}"
+        shift 2
+        ;;
+      *)
+        # Bare positional arg: treat as device name for convenience
+        if [ -z "$device_choice" ]; then
+          device_choice="$1"
+        fi
+        shift
+        ;;
+    esac
+  done
 
-  app_path="$(ios_resolve_app_path || true)"
-  if [ -z "$app_path" ] || [ ! -d "$app_path" ]; then
-    echo "Unable to locate app bundle using IOS_APP_ARTIFACT=${IOS_APP_ARTIFACT:-}." >&2
-    return 1
+  # ---- Start Deployment ----
+
+  echo "================================================"
+  echo "iOS App Deployment"
+  echo "================================================"
+  echo ""
+
+  # ---- Start Simulator ----
+
+  # Source simulator if not already loaded
+  if [ -n "${IOS_SCRIPTS_DIR:-}" ] && [ -f "${IOS_SCRIPTS_DIR}/domain/simulator.sh" ]; then
+    . "${IOS_SCRIPTS_DIR}/domain/simulator.sh"
   fi
-  bundle_id="$(ios_resolve_app_bundle_id || true)"
-  if [ -z "$bundle_id" ]; then
-    plist="${app_path%/}/Info.plist"
-    if [ -f "$plist" ]; then
-      bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$plist" 2>/dev/null || true)"
+
+  ios_start "$device_choice"
+
+  # ---- Resolve App Path ----
+
+  if [ -n "$app_arg" ]; then
+    # App provided as argument - use directly
+    app_path="$app_arg"
+
+    # Make absolute if relative
+    if [ "${app_path#/}" = "$app_path" ]; then
+      app_path="$PWD/$app_path"
     fi
+
+    if [ ! -d "$app_path" ]; then
+      ios_log_error "deploy.sh" "App bundle not found: $app_path"
+      exit 1
+    fi
+
+    echo "Using provided app: $(basename "$app_path")"
+  else
+    # No app provided - build and locate
+
+    project_root="$(ios_resolve_project_root)"
+    if [ -z "$project_root" ] || [ ! -d "$project_root" ]; then
+      ios_log_error "deploy.sh" "Unable to resolve project root for iOS build"
+      exit 1
+    fi
+
+    echo "Project root: $project_root"
+    echo ""
+
+    # ---- Build App ----
+
+    ios_run_build "$project_root"
+
+    # ---- Find App ----
+
+    echo ""
+    echo "Locating .app bundle..."
+
+    app_path="$(ios_find_app "$project_root" || true)"
+
+    if [ -z "$app_path" ] || [ ! -d "$app_path" ]; then
+      exit 1
+    fi
+
+    echo "Found app: $(basename "$app_path")"
   fi
+
+  # ---- Extract Bundle ID ----
+
+  echo ""
+  # Try xcodebuild-provided bundle ID first (set as side effect of ios_find_app)
+  bundle_id="${IOS_XCODEBUILD_BUNDLE_ID:-}"
   if [ -z "$bundle_id" ]; then
-    echo "Unable to resolve bundle identifier for ${app_path}." >&2
-    return 1
+    bundle_id="$(ios_extract_bundle_id "$app_path")"
+  else
+    ios_log_info "deploy.sh" "Bundle ID (from xcodebuild): $bundle_id"
   fi
+
+  if [ -z "$bundle_id" ]; then
+    ios_log_error "deploy.sh" "Unable to resolve bundle identifier for: $app_path"
+    exit 1
+  fi
+
+  # ---- Deploy to Simulator ----
+
   udid="${IOS_SIM_UDID:-}"
   if [ -z "$udid" ]; then
-    echo "iOS simulator UDID not available; ensure the simulator is booted." >&2
-    return 1
+    ios_log_error "deploy.sh" "iOS simulator UDID not available; ensure the simulator is booted"
+    exit 1
   fi
 
+  echo ""
+  echo "Deploying to: ${IOS_SIM_NAME:-$udid}"
+  echo ""
+
+  # Terminate and uninstall existing app for a clean deploy
+  xcrun simctl terminate "$udid" "$bundle_id" 2>/dev/null || true
+  if xcrun simctl get_app_container "$udid" "$bundle_id" >/dev/null 2>&1; then
+    echo "Removing existing install: $bundle_id"
+    xcrun simctl uninstall "$udid" "$bundle_id" 2>/dev/null || true
+  fi
+
+  echo "Installing app: $(basename "$app_path")"
   xcrun simctl install "$udid" "$app_path"
+  echo "✓ App installed"
+
+  echo ""
+  echo "Launching app: $bundle_id"
   xcrun simctl launch "$udid" "$bundle_id"
+  echo "✓ App launched"
+
+  echo ""
+  echo "================================================"
+  echo "✓ Deployment complete!"
+  echo "================================================"
 }

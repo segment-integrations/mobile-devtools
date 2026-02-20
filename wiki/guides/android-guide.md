@@ -6,11 +6,12 @@ A complete guide to Android development using the Devbox Android plugin. This gu
 
 The Android plugin enables reproducible Android development without touching global system state. It provides:
 
-- **Project-local Android environment**: All Android user data (AVDs, emulator configs, adb keys) is stored in `.devbox/virtenv/android`, never in `~/.android`
+- **Project-local Android environment**: All Android user data (AVDs, emulator configs, adb keys) is stored in `.devbox/virtenv/`, never in `~/.android`
 - **Reproducible SDK management**: Android SDK composed via Nix flake, ensuring consistent tooling across machines
 - **Device management**: JSON-based device definitions with CLI commands for creating, updating, and managing AVDs
-- **Development scripts**: Runtime scripts for building, running, and debugging Android apps
-- **Testing infrastructure**: E2E test suites with process-compose for automated testing
+- **Emulator control**: Scripts for starting, stopping, and resetting emulators
+
+The plugin does **not** provide build or deploy commands. Every project has different build tooling (Gradle, Bazel, custom scripts), so you define those in your own `devbox.json`. See [Adding Build Scripts](#adding-build-and-deploy-scripts) for patterns.
 
 Pure shells with `devbox run --pure` guarantee isolated, reproducible execution without side effects.
 
@@ -19,8 +20,8 @@ Pure shells with `devbox run --pure` guarantee isolated, reproducible execution 
 ### Prerequisites
 
 - [Devbox](https://www.jetify.com/devbox/docs/installing_devbox/) installed
-- Java Development Kit (JDK) - typically JDK 17 or later
-- Gradle (for building Android projects)
+
+Devbox handles downloading JDK, Gradle, and all other tools — you don't need to install them separately.
 
 ### Adding the Plugin to Your Project
 
@@ -32,12 +33,11 @@ Create or modify your `devbox.json` to include the Android plugin:
   "packages": {
     "jdk17": "latest",
     "gradle": "latest"
-  },
-  "env": {
-    "ANDROID_APP_APK": "app/build/outputs/apk/debug/app-debug.apk"
   }
 }
 ```
+
+The `include` line adds the plugin. The `packages` section adds your build tooling. APK paths are auto-detected at runtime when you deploy.
 
 ### Initial Setup
 
@@ -49,8 +49,8 @@ devbox shell
 
 This command:
 1. Downloads and installs the Android SDK via Nix
-2. Creates device definitions in `devbox.d/android/devices/`
-3. Sets up runtime scripts in `.devbox/virtenv/android/scripts/`
+2. Creates device definitions in your devbox.d directory
+3. Sets up runtime scripts
 4. Configures environment variables for Android development
 
 Verify the installation:
@@ -63,14 +63,16 @@ This displays resolved SDK information including SDK root, build tools version, 
 
 ## Device Management
 
-Device definitions are JSON files stored in `devbox.d/android/devices/`. Each device specifies an Android Virtual Device (AVD) configuration.
+Device definitions are JSON files that describe AVD configurations. Each plugin install creates a `devices/` directory inside your `devbox.d/` folder with default device files.
 
 ### Default Devices
 
 The plugin includes two default devices:
 
-- `min.json` - Minimum supported Android version (API 21)
-- `max.json` - Latest Android version (currently API 36)
+- `min.json` - Minimum supported Android version (API 21, named `pixel_api21`)
+- `max.json` - Latest Android version (API 36, named `medium_phone_api36`)
+
+These files live in your `devbox.d/` directory, which is the devbox plugin configuration folder. The plugin creates a subdirectory there with a `devices/` folder containing them (e.g., `devbox.d/<plugin-dir>/devices/min.json`). The filenames (`min`, `max`) are short nicknames you use in commands. The `name` field inside each JSON file is the full AVD name that appears in device listings.
 
 ### Listing Devices
 
@@ -91,14 +93,14 @@ devbox run android.sh devices create pixel_api28 \
   --api 28 \
   --device pixel \
   --tag google_apis \
-  --preferred_abi x86_64
+  --abi x86_64
 ```
 
 Parameters:
 - `--api` (required): Android API level
 - `--device` (required): AVD device profile (e.g., `pixel`, `pixel_xl`, `Nexus 5`)
 - `--tag`: System image tag (`google_apis`, `google_apis_playstore`, `play_store`, `aosp_atd`, `google_atd`)
-- `--preferred_abi`: Preferred ABI architecture (`x86_64`, `arm64-v8a`, `x86`)
+- `--abi`: Preferred ABI architecture (`x86_64`, `arm64-v8a`, `x86`)
 
 ### Viewing Device Details
 
@@ -153,7 +155,7 @@ After creating, updating, or deleting devices, regenerate the lock file:
 devbox run android.sh devices eval
 ```
 
-The lock file (`devbox.d/android/devices.lock`) optimizes CI builds by limiting which SDK versions are downloaded. Commit this file to version control.
+The lock file (in your devices directory) optimizes CI builds by limiting which SDK versions are downloaded. Commit this file to version control.
 
 ### Syncing AVDs
 
@@ -167,29 +169,6 @@ This creates or updates AVDs to match your JSON device definitions. Run this aft
 
 ## Development Workflow
 
-### Building Your App
-
-Build the Android app using Gradle:
-
-```bash
-# Standard build with info logging
-devbox run build
-
-# Build with full debug output
-gradle assembleDebug --debug
-
-# Clean build artifacts
-gradle clean
-```
-
-Or use Gradle directly:
-
-```bash
-devbox run gradle assembleDebug --info
-```
-
-The plugin sources the Android environment automatically, setting `ANDROID_SDK_ROOT` and adding SDK tools to PATH.
-
 ### Starting an Emulator
 
 Start an Android emulator for testing:
@@ -198,7 +177,7 @@ Start an Android emulator for testing:
 # Start default device
 devbox run start:emu
 
-# Start specific device
+# Start specific device by nickname
 devbox run start:emu pixel_api28
 
 # Start with clean state (wipe data)
@@ -217,39 +196,12 @@ Set the default device in `devbox.json`:
 }
 ```
 
-### Running Your App
-
-Build, install, and launch your app on the emulator:
-
-```bash
-# Build and run on default device
-devbox run start:app
-
-# Build and run on specific device
-devbox run start:app pixel_api28
-
-# Install pre-built APK without building
-devbox run start:app path/to/app.apk
-```
-
-The `run` command:
-1. Builds the app (if no APK path provided)
-2. Waits for emulator to be fully booted
-3. Installs the APK via adb
-4. Launches the app
-
 ### Stopping the Emulator
 
 Stop all running emulators:
 
 ```bash
 devbox run stop:emu
-```
-
-Or stop the emulator for a specific device:
-
-```bash
-devbox run android.sh emulator stop
 ```
 
 ### Resetting Emulator State
@@ -262,6 +214,68 @@ devbox run android.sh emulator reset
 
 This is useful after Nix package updates or when you need a clean slate.
 
+### Adding Build and Deploy Scripts
+
+The plugin provides emulator and device management. Build and deploy commands are project-specific, so you define them in your `devbox.json`. Here's a typical setup:
+
+```json
+{
+  "include": ["github:segment-integrations/devbox-plugins?dir=plugins/android"],
+  "packages": {
+    "jdk17": "latest",
+    "gradle": "latest"
+  },
+  "shell": {
+    "scripts": {
+      "build:android": [
+        "gradle assembleDebug"
+      ],
+      "build:release": [
+        "gradle assembleRelease"
+      ],
+      "start:app": [
+        "android.sh run ${1:-}"
+      ]
+    }
+  }
+}
+```
+
+The `${1:-}` syntax passes an optional argument through to the command — it means "use the first argument if provided, otherwise use nothing." This lets you run `devbox run start:app` (default device) or `devbox run start:app min` (specific device).
+
+With these scripts defined, you can:
+
+```bash
+# Build the APK
+devbox run build:android
+
+# Build, install, and launch on the emulator
+devbox run start:app
+
+# Run on a specific device
+devbox run start:app min
+```
+
+**How APK auto-detection works:** The `android.sh run` command waits for the emulator to boot, then auto-detects the APK using this precedence chain:
+
+1. `ANDROID_APP_APK` env var — if set, resolves the path/glob relative to project root
+2. Recursive search of the project directory for `.apk` files, skipping `.gradle/`, `build/intermediates/`, `node_modules/`, and `.devbox/`
+3. Recursive search of the current working directory (if different from project root)
+
+The app's package name and launch activity are extracted from the APK automatically.
+
+In most projects, step 2 finds the right APK with no configuration. If auto-detection picks the wrong APK (e.g., multiple build variants), set `ANDROID_APP_APK` explicitly:
+
+```json
+{
+  "env": {
+    "ANDROID_APP_APK": "app/build/outputs/apk/debug/app-debug.apk"
+  }
+}
+```
+
+See the [Android example project](../../examples/android/) for a complete working setup. The example project uses a local plugin path for development. If you use it as a template, change the `include` to the GitHub URL shown above.
+
 ### Complete Development Workflow Example
 
 Typical development session:
@@ -273,7 +287,7 @@ devbox shell
 # 2. Start emulator
 devbox run start:emu max
 
-# 3. Build and run app
+# 3. Build and run app (using your custom scripts)
 devbox run build
 devbox run start:app max
 
@@ -285,33 +299,30 @@ devbox run start:app max
 devbox run stop:emu
 ```
 
-For a streamlined workflow, use the combined command:
-
-```bash
-# Build, install, and launch in one command
-devbox run start:app
-```
-
-This starts the emulator, builds the app, and deploys it automatically.
-
 ## Testing
 
 ### Running E2E Tests
 
-The plugin includes E2E test infrastructure using process-compose. Example projects include test suites that:
+The [Android example project](../../examples/android/) includes E2E test infrastructure using process-compose. You can use it as a template for your own project.
 
-1. Build the app
-2. Sync AVDs with device definitions
-3. Start the emulator
-4. Deploy and launch the app
-5. Verify the app is running
-6. Clean up (stop app and emulator in pure mode)
-
-Run the complete E2E test:
+Copy the example test suite:
 
 ```bash
-cd examples/android
-devbox run test:e2e
+cp -r examples/android/tests/ your-project/tests/
+```
+
+Add a test script to your `devbox.json`:
+
+```json
+{
+  "shell": {
+    "scripts": {
+      "test:e2e": [
+        "process-compose -f tests/test-suite.yaml --no-server --tui=${TEST_TUI:-false}"
+      ]
+    }
+  }
+}
 ```
 
 ### Deterministic Testing
@@ -336,32 +347,6 @@ TEST_TUI=true devbox run test:e2e
 ```
 
 The TUI shows process status, logs, and resource usage during test execution.
-
-### Adding Tests to Your Project
-
-Copy the example test suite:
-
-```bash
-cp -r examples/android/tests/ your-project/tests/
-```
-
-Configure for your app in `devbox.json`:
-
-```json
-{
-  "env": {
-    "ANDROID_APP_APK": "app/build/outputs/apk/debug/app-debug.apk",
-    "ANDROID_APP_ID": "com.mycompany.myapp"
-  },
-  "shell": {
-    "scripts": {
-      "test:e2e": [
-        "process-compose -f tests/test-suite.yaml --no-server --tui=${TEST_TUI:-false}"
-      ]
-    }
-  }
-}
-```
 
 ### Test Configuration
 
@@ -388,8 +373,6 @@ Configure the plugin by setting environment variables in `devbox.json`:
 {
   "env": {
     "ANDROID_DEFAULT_DEVICE": "max",
-    "ANDROID_APP_APK": "app/build/outputs/apk/debug/app-debug.apk",
-    "ANDROID_APP_ID": "com.example.myapp",
     "ANDROID_BUILD_TOOLS_VERSION": "36.1.0",
     "ANDROID_COMPILE_SDK": "36",
     "ANDROID_TARGET_SDK": "36"
@@ -399,8 +382,7 @@ Configure the plugin by setting environment variables in `devbox.json`:
 
 Key variables:
 - `ANDROID_DEFAULT_DEVICE` - Default device when none specified
-- `ANDROID_APP_APK` - Path or glob pattern for APK
-- `ANDROID_APP_ID` - Android package name
+- `ANDROID_APP_APK` - Path or glob pattern for APK (empty = auto-detect)
 - `ANDROID_BUILD_TOOLS_VERSION` - Build tools version
 - `ANDROID_COMPILE_SDK` - Compile SDK version
 - `ANDROID_TARGET_SDK` - Target SDK version
@@ -439,12 +421,6 @@ Set `ANDROID_SDK_ROOT` to your local SDK path.
 
 Limit which devices are evaluated to reduce initialization time:
 
-```bash
-devbox run android.sh devices select min max
-```
-
-Or set in `devbox.json`:
-
 ```json
 {
   "env": {
@@ -482,17 +458,6 @@ Display all configuration settings:
 devbox run android.sh config show
 ```
 
-Update configuration by editing your `devbox.json` env section:
-
-```json
-{
-  "env": {
-    "ANDROID_DEFAULT_DEVICE": "pixel_api28",
-    "ANDROID_DEVICES": "min,max"
-  }
-}
-```
-
 Run `devbox shell` after changing `devbox.json` to apply the new values. To reset to defaults, remove the overrides from your `devbox.json`.
 
 ## Troubleshooting
@@ -515,7 +480,7 @@ Run `devbox shell` after changing `devbox.json` to apply the new values. To rese
 
 3. Reset emulator state:
    ```bash
-   devbox run android.sh emulator reset-device max
+   devbox run android.sh emulator reset
    ```
 
 4. Increase boot timeout:
@@ -529,10 +494,9 @@ Run `devbox shell` after changing `devbox.json` to apply the new values. To rese
 
 **Solutions**:
 
-1. Verify APK path is correct:
+1. Verify the APK exists (check your build output directory):
    ```bash
-   echo $ANDROID_APP_APK
-   ls -l $ANDROID_APP_APK
+   find . -name '*.apk' -not -path '*/.gradle/*' -not -path '*/intermediates/*'
    ```
 
 2. Check if app is already installed:
@@ -556,19 +520,15 @@ Run `devbox shell` after changing `devbox.json` to apply the new values. To rese
 
 **Solutions**:
 
-1. Source the Android environment:
+1. Re-enter devbox shell to reload the environment:
    ```bash
-   . ${ANDROID_RUNTIME_DIR}/scripts/init/setup.sh
+   exit
+   devbox shell
    ```
 
 2. Verify SDK installation:
    ```bash
    devbox run android.sh info
-   ```
-
-3. Regenerate the environment:
-   ```bash
-   devbox run devbox_sync
    ```
 
 ### Lock File Checksum Mismatch
@@ -582,7 +542,7 @@ Regenerate the lock file:
 devbox run android.sh devices eval
 ```
 
-Commit the updated `devices.lock` file.
+Commit the updated lock file.
 
 ### Multiple Emulators Conflict
 
@@ -599,11 +559,6 @@ Commit the updated `devices.lock` file.
    ```bash
    EMU_PORT=5554 devbox run start:emu device1
    EMU_PORT=5556 devbox run start:emu device2
-   ```
-
-3. Use device serials explicitly:
-   ```bash
-   ANDROID_SERIAL=emulator-5554 devbox run start:app
    ```
 
 ### Build Fails with SDK Version Errors
@@ -645,9 +600,6 @@ ANDROID_DEBUG=1 devbox shell
 
 # Global debug
 DEBUG=1 devbox shell
-
-# Debug during tests
-ANDROID_DEBUG=1 devbox run test:e2e
 ```
 
 Debug logs show:
@@ -677,9 +629,13 @@ Test your app across multiple Android versions:
 
 3. Test on each device:
    ```bash
-   devbox run start:app api21
-   devbox run start:app api28
-   devbox run start:app api36
+   devbox run start:emu api21
+   # run your tests...
+   devbox run stop:emu
+
+   devbox run start:emu api36
+   # run your tests...
+   devbox run stop:emu
    ```
 
 ### CI/CD Integration
@@ -744,11 +700,11 @@ devbox run android.sh devices create minimal --api 34 --device pixel --tag defau
 - **[Device Management Guide](device-management.md)**: Deep dive into device definitions and management
 - **[Testing Guide](testing.md)**: Comprehensive testing strategies and best practices
 - **[Troubleshooting Guide](troubleshooting.md)**: Extended troubleshooting scenarios
-- **[Quick Start](quick-start.md)**: Get up and running in 5 minutes
+- **[Quick Start](quick-start.md)**: Get up and running quickly
 
 ### Example Projects
 
-- **[Android Example](../../examples/android/)**: Minimal Android app demonstrating plugin usage
+- **[Android Example](../../examples/android/)**: Complete Android app with build scripts, deploy commands, and E2E test suites
 - **[React Native Example](../../examples/react-native/)**: Cross-platform app using both Android and iOS plugins
 
 ### Community and Support

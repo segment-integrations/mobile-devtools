@@ -1,7 +1,8 @@
 #!/usr/bin/env sh
 # iOS Plugin - Shell Initialization
 # Sets up environment when user runs 'devbox shell'
-# This is NOT meant to make all functions available - use ios.sh for that
+# NOTE: This file is sourced (not executed) by devbox init_hook,
+# so it must be POSIX sh compatible (no bash-isms).
 
 # Skip all iOS setup if IOS_SKIP_SETUP=1
 # Useful for Android-only contexts in React Native plugin
@@ -9,8 +10,12 @@ if [ "${IOS_SKIP_SETUP:-0}" = "1" ]; then
   return 0 2>/dev/null || exit 0
 fi
 
+if [ "$(uname -s)" != "Darwin" ]; then
+  return 0 2>/dev/null || exit 0
+fi
+
 if ! (return 0 2>/dev/null); then
-  echo "templates/devbox/plugins/ios/scripts/env.sh must be sourced." >&2
+  echo "ERROR: setup.sh must be sourced, not executed directly" >&2
   exit 1
 fi
 
@@ -72,7 +77,7 @@ fi
 
 # Optional debug output
 if ios_debug_enabled; then
-  ios_debug_log_script "templates/devbox/plugins/ios/scripts/env.sh"
+  ios_debug_log_script "setup.sh"
   ios_debug_dump_vars \
     IOS_DEVICES \
     IOS_DEFAULT_DEVICE \

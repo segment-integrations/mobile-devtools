@@ -8,6 +8,7 @@ processes:
     environment:
       - "ANDROID_EMULATOR_FOREGROUND=1"
     command: |
+      set -e
       echo "[EMULATOR-ONLY] Starting emulator..."
       . ${ANDROID_RUNTIME_DIR}/scripts/init/setup.sh
 
@@ -25,7 +26,7 @@ processes:
           serial=$(cat ${ANDROID_RUNTIME_DIR}/emulator-serial.txt 2>/dev/null || echo "")
           [ -n "$serial" ] && adb -s $serial shell getprop sys.boot_completed 2>/dev/null | grep -q "1"
       initial_delay_seconds: 10
-      period_seconds: 10
-      timeout_seconds: 180
+      period_seconds: 5
+      timeout_seconds: 10
       success_threshold: 1
-      failure_threshold: 10
+      failure_threshold: 24

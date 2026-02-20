@@ -2,7 +2,7 @@
 # Android Plugin - Core SDK and Environment Setup
 # Extracted from env.sh to eliminate circular dependencies
 
-set -eu
+set -e
 
 if ! (return 0 2>/dev/null); then
   echo "ERROR: core.sh must be sourced, not executed directly" >&2
@@ -104,7 +104,7 @@ resolve_flake_sdk_root() {
   [ -n "${ANDROID_DEBUG_SETUP:-}" ] && echo "[CORE-$$] Building SDK: path:${root}#${output}" >&2
   sdk_out=$(
     nix --extra-experimental-features 'nix-command flakes' \
-      build "path:${root}#${output}" --no-link --print-out-paths 2>&1 || true
+      build "path:${root}#${output}" --no-link --print-out-paths 2>/dev/null || true
   )
   [ -n "${ANDROID_DEBUG_SETUP:-}" ] && echo "[CORE-$$] nix build returned: ${sdk_out:-(empty)}" >&2
 

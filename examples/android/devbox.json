@@ -1,5 +1,5 @@
 {
-  "include": ["github:segment-integrations/devbox-plugins/main?dir=plugins/android"],
+  "include": ["path:../../plugins/android/plugin.json"],
   "packages": {
     "jdk17": "latest",
     "gradle": "latest"
@@ -11,14 +11,10 @@
   "shell": {
     "scripts": {
       "build": [
-        "echo 'Building Android app...'",
-        "gradle assembleDebug --info"
+        "gradle assembleDebug"
       ],
-      "start:emu": [
-        "android.sh emulator start ${1:-${ANDROID_DEFAULT_DEVICE:-max}}"
-      ],
-      "stop:emu": [
-        "android.sh emulator stop"
+      "build:release": [
+        "gradle assembleRelease"
       ],
       "start:app": [
         "android.sh run ${1:-${ANDROID_DEFAULT_DEVICE:-max}}"
@@ -28,9 +24,6 @@
       ],
       "test:e2e": [
         "process-compose -f tests/test-suite.yaml --no-server --tui=${TEST_TUI:-false}"
-      ],
-      "test:e2e:debug": [
-        "ANDROID_DEBUG_SETUP=1 process-compose -f tests/test-suite.yaml --no-server --tui=false --log-level=debug"
       ]
     }
   }

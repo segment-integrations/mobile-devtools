@@ -28,6 +28,8 @@ Configure the plugin by setting environment variables in `plugin.json`. These ar
 - `ANDROID_DEFAULT_DEVICE` — Default device name when none specified
 - `ANDROID_SYSTEM_IMAGE_TAG` — System image tag (e.g., "google_apis", "google_apis_playstore")
 - `ANDROID_APP_APK` — Path or glob pattern for APK (relative to project root)
+- `ANDROID_BUILD_CONFIG` — Build configuration: Debug or Release (default: "Debug")
+- `ANDROID_BUILD_TASK` — Gradle task override (empty = auto-derive from config, e.g., assembleDebug)
 - `ANDROID_BUILD_TOOLS_VERSION` — Build tools version (e.g., "36.1.0")
 - `ANDROID_INCLUDE_NDK` — Include Android NDK in SDK (true/false, default: false)
 - `ANDROID_NDK_VERSION` — NDK version when enabled (e.g., "27.0.12077973")
@@ -48,23 +50,64 @@ Configure the plugin by setting environment variables in `plugin.json`. These ar
 - `devbox run --pure android.sh emulator start [--pure] [device]`
   - `--pure`: Start fresh emulator with wiped data (clean Android OS state for deterministic tests)
   - Without `--pure`: Reuses existing emulator if running (faster for development, preserves data)
+  - Auto-detects pure mode when `DEVBOX_PURE_SHELL=1` (set by `devbox run --pure`)
+  - `REUSE_EMU=1`: Override pure mode to reuse existing emulator (e.g., `devbox run --pure -e REUSE_EMU=1`)
 - `devbox run --pure android.sh emulator stop`
+- `devbox run --pure android.sh emulator ready`
+  - Silent readiness probe: exit 0 if emulator is booted, exit 1 if not
+  - Reads emulator serial from suite-namespaced state file
+  - Checks `adb -s $serial shell getprop sys.boot_completed`
 - `devbox run --pure android.sh emulator reset [device]`
 
 **Convenience aliases:**
-- `devbox run --pure start-emu [device]` (equivalent to `android.sh emulator start` without `--pure`)
-- `devbox run --pure stop-emu` (equivalent to `android.sh emulator stop`)
+- `devbox run --pure start:emu [device]` (equivalent to `android.sh emulator start` without `--pure`)
+- `devbox run --pure stop:emu` (equivalent to `android.sh emulator stop`)
 
 **Behavior:**
 - Without `--pure`: Checks if an emulator with the same AVD is already running and reuses it
 - With `--pure`: Always starts a new emulator instance with `-wipe-data` flag (fresh Android OS)
+- Emulator serial is saved to `$ANDROID_RUNTIME_DIR/${SUITE_NAME:-default}/emulator-serial.txt`
+
+### Deploy
+
+```bash
+android.sh deploy [apk_path]
+```
+- Installs and launches an app on an already-running emulator (no build, no emulator start)
+- If `apk_path` is provided, installs the specified APK
+- If no arguments, auto-detects APK using the same resolution as `run`
+- Reads emulator serial from suite-namespaced state file
+- Saves app ID and activity to state files for use by `app status` and `app stop`
+
+### App Lifecycle
+
+```bash
+android.sh app status
+```
+- Checks if the deployed app is running on the emulator
+- Exit 0 if running, exit 1 if not
+- Reads app ID and emulator serial from suite-namespaced state files
+
+```bash
+android.sh app stop
+```
+- Stops the deployed app via `adb shell am force-stop`
+- Reads app ID and emulator serial from suite-namespaced state files
 
 ### Run app
 
 - `devbox run start:app [apk_path] [device]`
   - Builds, installs, and launches the app on the emulator
   - If `apk_path` is provided, skips build step and installs provided APK
-  - If no arguments, builds project and installs APK matched by `ANDROID_APP_APK`
+  - If no arguments, builds project and auto-detects APK
+
+**APK resolution precedence (when no explicit path):**
+
+1. `ANDROID_APP_APK` env var — glob resolved relative to project root
+2. Recursive search of project root for `*.apk` files (excludes .gradle/, build/intermediates/, node_modules/, .devbox/)
+3. Recursive search of `$PWD` if different from project root (same exclusions)
+
+**Build script detection:** Tries `build:android` first, then falls back to `build`. Define a build script in `devbox.json` using native tools (e.g., `gradle assembleDebug`).
 
 ### Device management
 
@@ -93,7 +136,7 @@ Configure the plugin by setting environment variables in `plugin.json`. These ar
 ### Device selection
 - `ANDROID_DEFAULT_DEVICE` - Default device name when none specified (set in devbox.json)
 - `ANDROID_DEVICES` - Device names to evaluate in flake (comma-separated, empty = all; set in devbox.json)
-- `ANDROID_DEVICE_NAME` - Override device selection at runtime (e.g., `ANDROID_DEVICE_NAME=min devbox run start-emu`)
+- `ANDROID_DEVICE_NAME` - Override device selection at runtime (e.g., `ANDROID_DEVICE_NAME=min devbox run start:emu`)
 - `TARGET_DEVICE` - Alias for ANDROID_DEVICE_NAME (legacy, prefer ANDROID_DEVICE_NAME)
 
 ### Emulator configuration
@@ -110,5 +153,12 @@ Configure the plugin by setting environment variables in `plugin.json`. These ar
   - Or set in test suite environment sections (process-compose spawns new shells)
   - Cannot be set within script definitions (too late, init hook already ran)
 
+### Runtime state
+- `ANDROID_RUNTIME_DIR` - Directory for runtime state files (default: `.devbox/virtenv/android`)
+- `SUITE_NAME` - Test suite name for state isolation (default: "default")
+  - Each suite gets its own subdirectory under `$ANDROID_RUNTIME_DIR/$SUITE_NAME/`
+  - State files: `emulator-serial.txt`, `app-id.txt`, `app-activity.txt`
+  - Set in process-compose environment blocks for parallel test execution
+
 ### App configuration
-- `ANDROID_APP_APK` - Path or glob pattern for APK (relative to project root)
+- `ANDROID_APP_APK` - Path or glob pattern for APK (relative to project root; empty = auto-detect)

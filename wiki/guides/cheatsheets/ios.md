@@ -56,14 +56,25 @@ devbox run stop:sim
 ## Build and Deploy
 
 ```bash
-# Build app
-devbox run build
+# Build (define build:ios in devbox.json using xcodebuild)
+devbox run build:ios
 
-# Build, install, and launch app
-devbox run start:ios
+# Run app (starts simulator, builds, installs, launches)
+ios.sh run
 
-# Build and run on specific device
-devbox run start:ios iphone15
+# Run on specific device
+ios.sh run max
+
+# Run pre-built app
+ios.sh run /path/to/MyApp.app
+```
+
+Build scripts in `devbox.json`:
+
+```bash
+# "build:ios": ["ios.sh xcodebuild -scheme MyApp -configuration Debug -destination 'generic/platform=iOS Simulator' build"]
+# "build:release": ["ios.sh xcodebuild -scheme MyApp -configuration Release build"]
+# "start:app": ["ios.sh run ${1:-}"]
 ```
 
 ## Configuration
@@ -95,9 +106,10 @@ IOS_DEFAULT_RUNTIME=""                # Default runtime (empty = latest)
 IOS_DEVELOPER_DIR=""                  # Xcode path (empty = auto-detect)
 IOS_DOWNLOAD_RUNTIME="1"              # Auto-download runtimes (1=yes, 0=no)
 IOS_SKIP_SETUP="0"                    # Skip setup during init (1=yes, 0=no)
-IOS_APP_PROJECT="ios.xcodeproj"       # Xcode project path
-IOS_APP_SCHEME="ios"                  # Build scheme
-IOS_APP_BUNDLE_ID="com.example.ios"   # App bundle ID
+IOS_APP_ARTIFACT=""                   # .app path/glob (empty = auto-detect)
+IOS_APP_SCHEME=""                     # Xcode scheme (empty = auto-detect)
+IOS_BUILD_CONFIG="Debug"              # Build configuration (Debug/Release)
+IOS_DERIVED_DATA_PATH=""              # DerivedData path (default: .devbox/virtenv/ios/DerivedData)
 ```
 
 ## Device Definition Format
@@ -134,12 +146,12 @@ launchctl kickstart -k gui/$UID/com.apple.CoreSimulatorService
 
 ## Testing
 
-```bash
-# Run fast tests
-devbox run test:fast
+Test scripts are project-specific. Define them in your `devbox.json`.
 
-# Run E2E tests
-devbox run test:e2e
+```bash
+# User-defined scripts (add to your devbox.json shell.scripts):
+# "test": ["xcodebuild ... test"]
+# "test:e2e": ["process-compose -f tests/test-suite.yaml --no-server"]
 ```
 
 ## Files and Directories
@@ -151,9 +163,9 @@ devbox.d/ios/
     ├── max.json
     └── devices.lock   # Generated lock file
 
-.devbox/virtenv/ios/   # Runtime directory (auto-regenerated)
+.devbox/virtenv/ios/   # Runtime directory (auto-regenerated, never edit)
 ├── scripts/           # Plugin scripts
-└── DerivedData/       # Build output
+└── DerivedData/       # Build output (if configured)
 
 reports/
 ├── logs/             # Test logs
@@ -163,9 +175,12 @@ reports/
 ## Common Xcode Commands
 
 ```bash
-# Build project
+# Build project (xcodebuild works natively, Nix vars stripped at init)
 xcodebuild -project ios.xcodeproj -scheme ios -configuration Debug \
   -destination 'generic/platform=iOS Simulator' build
+
+# Or use ios.sh xcodebuild wrapper if Nix vars cause issues
+ios.sh xcodebuild -project ios.xcodeproj -scheme ios build
 
 # Install app to simulator
 xcrun simctl install booted path/to/app.app

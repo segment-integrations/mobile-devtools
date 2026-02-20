@@ -1,37 +1,21 @@
 {
-  "include": ["github:segment-integrations/devbox-plugins/main?dir=plugins/ios"],
+  "include": ["path:../../plugins/ios/plugin.json"],
   "packages": {
     "process-compose": "latest"
-  },
-  "env": {
-    "IOS_APP_PROJECT": "ios.xcodeproj",
-    "IOS_APP_SCHEME": "ios",
-    "IOS_APP_BUNDLE_ID": "com.example.ios",
-    "IOS_APP_ARTIFACT": ".devbox/virtenv/ios/DerivedData/Build/Products/Debug-iphonesimulator/ios.app"
   },
   "shell": {
     "scripts": {
       "build": [
-        "echo 'Building iOS app...'",
-        "env -u LD -u LDFLAGS -u NIX_LDFLAGS -u NIX_CFLAGS_COMPILE -u NIX_CFLAGS_LINK xcodebuild -project ${IOS_APP_PROJECT} -scheme ${IOS_APP_SCHEME} -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath .devbox/virtenv/ios/DerivedData build"
+        "ios.sh xcodebuild -project ios.xcodeproj -scheme ios -configuration Debug -destination 'generic/platform=iOS Simulator' build"
       ],
-      "start:sim": [
-        "ios.sh simulator start ${1:-${IOS_DEFAULT_DEVICE:-max}}"
-      ],
-      "stop:sim": [
-        "ios.sh simulator stop"
+      "build:release": [
+        "ios.sh xcodebuild -project ios.xcodeproj -scheme ios -configuration Release build"
       ],
       "start:app": [
-        "ios.sh simulator start ${1:-${IOS_DEFAULT_DEVICE:-max}}",
-        "xcrun simctl install booted ${IOS_APP_ARTIFACT}",
-        "xcrun simctl launch booted ${IOS_APP_BUNDLE_ID}"
-      ],
-      "deploy": [
-        "devbox run build",
-        "devbox run start:app"
+        "ios.sh run ${1:-}"
       ],
       "test": [
-        "env -u LD -u LDFLAGS -u NIX_LDFLAGS -u NIX_CFLAGS_COMPILE -u NIX_CFLAGS_LINK xcodebuild -project ${IOS_APP_PROJECT} -scheme ${IOS_APP_SCHEME} -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath .devbox/virtenv/ios/DerivedData test"
+        "ios.sh xcodebuild -project ios.xcodeproj -scheme ios -destination 'platform=iOS Simulator,name=iPhone 17' test"
       ],
       "test:e2e": [
         "process-compose -f tests/test-suite.yaml --no-server --tui=${TEST_TUI:-false}"
