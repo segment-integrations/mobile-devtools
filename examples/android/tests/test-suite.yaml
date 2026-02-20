@@ -12,15 +12,7 @@ is_strict: true
 processes:
   # Phase 1: Build - runs first (no dependency)
   build-app:
-    command: |
-      set -e
-      # Ensure Android SDK is set up (needed when calling gradle directly)
-      if [ -z "${ANDROID_SDK_ROOT:-}" ] && [ -n "${ANDROID_SCRIPTS_DIR:-}" ]; then
-        if [ -f "${ANDROID_SCRIPTS_DIR}/init/setup.sh" ]; then
-          . "${ANDROID_SCRIPTS_DIR}/init/setup.sh"
-        fi
-      fi
-      gradle assembleDebug
+    command: "gradle assembleDebug"
     availability:
       restart: "no"
 
