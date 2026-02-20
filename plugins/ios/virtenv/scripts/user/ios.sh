@@ -98,14 +98,19 @@ case "$command_name" in
 
     case "$sub" in
       start)
-        # Parse arguments for device name and --pure flag
+        # Parse arguments for device name and flags
         pure_mode=0
+        wait_ready=0
         device_name=""
 
         while [ $# -gt 0 ]; do
           case "$1" in
             --pure)
               pure_mode=1
+              shift
+              ;;
+            --wait-ready)
+              wait_ready=1
               shift
               ;;
             *)
@@ -233,6 +238,24 @@ case "$command_name" in
           if [ -n "${IOS_SIM_UDID:-}" ]; then
             echo "$IOS_SIM_UDID" > "$state_dir/simulator-udid.txt"
           fi
+        fi
+
+        # If --wait-ready, wait for simulator to be ready and exit (detach mode for dev)
+        # Otherwise in pure mode, keep running (process-compose manages lifecycle)
+        if [ "$wait_ready" = "1" ]; then
+          echo "Waiting for simulator to be ready..."
+          max_wait=60
+          elapsed=0
+          while ! ios_simulator_ready; do
+            sleep 2
+            elapsed=$((elapsed + 2))
+            if [ $elapsed -ge $max_wait ]; then
+              echo "ERROR: Simulator did not become ready within ${max_wait}s" >&2
+              exit 1
+            fi
+          done
+          echo "✓ Simulator ready and running in background"
+          exit 0
         fi
         ;;
       stop)

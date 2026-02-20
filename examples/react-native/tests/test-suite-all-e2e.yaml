@@ -77,21 +77,7 @@ processes:
         # Dev mode: start, wait for ready, then detach
         echo "Starting Android emulator: $device"
         unset ANDROID_EMULATOR_FOREGROUND
-        android.sh emulator start "$device"
-
-        echo "Waiting for emulator to be ready..."
-        max_wait=120
-        elapsed=0
-        while ! android.sh emulator ready; do
-          sleep 3
-          elapsed=$((elapsed + 3))
-          if [ $elapsed -ge $max_wait ]; then
-            echo "ERROR: Emulator did not become ready within ${max_wait}s" >&2
-            exit 1
-          fi
-        done
-        echo "✓ Emulator ready and running in background (dev mode)"
-        exit 0
+        android.sh emulator start --wait-ready "$device"
       fi
     availability:
       restart: "no"
@@ -114,21 +100,7 @@ processes:
         tail -f /dev/null
       else
         # Dev mode: start, wait for ready, then detach
-        ios.sh simulator start ${IOS_DEVICE}
-
-        echo "Waiting for simulator to be ready..."
-        max_wait=60
-        elapsed=0
-        while ! ios.sh simulator ready; do
-          sleep 2
-          elapsed=$((elapsed + 2))
-          if [ $elapsed -ge $max_wait ]; then
-            echo "ERROR: Simulator did not become ready within ${max_wait}s" >&2
-            exit 1
-          fi
-        done
-        echo "✓ Simulator ready and running in background (dev mode)"
-        exit 0
+        ios.sh simulator start --wait-ready ${IOS_DEVICE}
       fi
     depends_on:
       sync-simulators:
