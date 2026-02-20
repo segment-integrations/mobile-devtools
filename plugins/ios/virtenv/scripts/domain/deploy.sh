@@ -327,24 +327,33 @@ ios_run_build() {
 # ============================================================================
 
 # Build, install, and launch app on simulator
-# Usage: ios_run_app [app_path] [device]
-#   app_path - Optional path to .app bundle. If provided, skips build step.
-#   device   - Optional device name. If omitted, uses IOS_DEFAULT_DEVICE.
+# Usage: ios_run_app [--app <path>] [--device <name>] [<device>]
+#   --app <path>    - Path to .app bundle. If provided, skips build step.
+#   --device <name> - Device name. If omitted, uses IOS_DEFAULT_DEVICE.
+#   Bare positional arg is treated as device name for convenience.
 ios_run_app() {
-  # Parse arguments - first arg could be .app path or device name
   app_arg=""
   device_choice=""
 
-  if [ $# -gt 0 ]; then
-    # If first arg looks like a path (contains / or ends with .app), treat as app path
-    if printf '%s' "$1" | grep -q -e '/' -e '\.app$'; then
-      app_arg="$1"
-      shift
-    fi
-  fi
-
-  # Remaining arg is device choice
-  device_choice="${1:-}"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --app)
+        app_arg="${2:-}"
+        shift 2
+        ;;
+      --device)
+        device_choice="${2:-}"
+        shift 2
+        ;;
+      *)
+        # Bare positional arg: treat as device name for convenience
+        if [ -z "$device_choice" ]; then
+          device_choice="$1"
+        fi
+        shift
+        ;;
+    esac
+  done
 
   # ---- Start Deployment ----
 

@@ -14,7 +14,7 @@ Commands:
   simulator reset
   app status                 Check if deployed app is running
   app stop                   Stop the deployed app
-  run [app_path] [device]    Start simulator, install, and launch app
+  run [--app path] [--device name]  Start simulator, install, and launch app
   xcodebuild [args...]
   config show
   info
@@ -486,7 +486,40 @@ case "$command_name" in
   run)
     # shellcheck disable=SC1090
     . "${script_dir}/domain/deploy.sh"
-    ios_run_app "$@"
+
+    # Parse arguments
+    _run_app_arg=""
+    _run_device=""
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --app)
+          _run_app_arg="${2:-}"
+          shift 2
+          ;;
+        --device)
+          _run_device="${2:-}"
+          shift 2
+          ;;
+        *)
+          # Bare positional arg: treat as device name for convenience
+          if [ -z "$_run_device" ]; then
+            _run_device="$1"
+          fi
+          shift
+          ;;
+      esac
+    done
+
+    # Forward with explicit flags
+    _run_args=""
+    if [ -n "$_run_app_arg" ]; then
+      _run_args="--app $_run_app_arg"
+    fi
+    if [ -n "$_run_device" ]; then
+      _run_args="$_run_args --device $_run_device"
+    fi
+    # shellcheck disable=SC2086
+    ios_run_app $_run_args
     ;;
   config)
     sub="${1-}"

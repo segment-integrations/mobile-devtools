@@ -303,24 +303,33 @@ android_launch_app() {
 }
 
 # Run Android app (build, install, launch)
-# Usage: android_run_app [apk_path] [device]
-#   apk_path - Optional path to APK file. If provided, skips build step.
-#   device   - Optional device name. If omitted, uses ANDROID_DEFAULT_DEVICE.
+# Usage: android_run_app [--apk <path>] [--device <name>] [<device>]
+#   --apk <path>    - Path to APK file. If provided, skips build step.
+#   --device <name> - Device name. If omitted, uses ANDROID_DEFAULT_DEVICE.
+#   Bare positional arg is treated as device name for convenience.
 android_run_app() {
-  # Parse arguments - first arg could be APK path or device name
   apk_arg=""
   device_choice=""
 
-  if [ $# -gt 0 ]; then
-    # If first arg looks like a file path (contains / or ends with .apk), treat as APK
-    if printf '%s' "$1" | grep -q -e '/' -e '\.apk$'; then
-      apk_arg="$1"
-      shift
-    fi
-  fi
-
-  # Remaining arg is device choice
-  device_choice="${1:-}"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --apk)
+        apk_arg="${2:-}"
+        shift 2
+        ;;
+      --device)
+        device_choice="${2:-}"
+        shift 2
+        ;;
+      *)
+        # Bare positional arg: treat as device name for convenience
+        if [ -z "$device_choice" ]; then
+          device_choice="$1"
+        fi
+        shift
+        ;;
+    esac
+  done
 
   # ---- Resolve Device Selection ----
 

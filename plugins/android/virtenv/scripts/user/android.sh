@@ -39,7 +39,7 @@ Commands:
   emulator reset                   Reset all emulator AVDs
   app status                       Check if deployed app is running
   app stop                         Stop the deployed app
-  run [apk_path] [device]          Start emulator, install, and launch app
+  run [--apk path] [--device name] Start emulator, install, and launch app
 
 Examples:
   android.sh deploy
@@ -55,8 +55,8 @@ Examples:
   android.sh app stop
   android.sh run                             # Start emulator, install, launch
   android.sh run max                         # Same, but on 'max' device
-  android.sh run path/to/app.apk             # Install provided APK
-  android.sh run path/to/app.apk max         # Install APK on 'max' device
+  android.sh run --apk path/to/app.apk      # Install provided APK
+  android.sh run --apk app.apk --device max  # Install APK on 'max' device
 
 Note: Configuration is managed via environment variables in devbox.json.
 Note: Build your app with gradle directly (e.g., cd android && ./gradlew assembleDebug)
@@ -536,23 +536,32 @@ case "$command_name" in
 
   # --------------------------------------------------------------------------
   # run - Build, install, and launch app on emulator
-  # Usage: android.sh run [apk_path] [device]
+  # Usage: android.sh run [--apk <path>] [--device <name>] [device]
   # --------------------------------------------------------------------------
   run)
-    # Parse arguments - first arg could be APK path or device name
+    # Parse arguments
     apk_arg=""
     device_name=""
 
-    if [ $# -gt 0 ]; then
-      # If first arg looks like a file path (contains / or ends with .apk), treat as APK
-      if printf '%s' "$1" | grep -q -e '/' -e '\.apk$'; then
-        apk_arg="$1"
-        shift
-      fi
-    fi
-
-    # Remaining arg is device name
-    device_name="${1:-}"
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        --apk)
+          apk_arg="${2:-}"
+          shift 2
+          ;;
+        --device)
+          device_name="${2:-}"
+          shift 2
+          ;;
+        *)
+          # Bare positional arg: treat as device name for convenience
+          if [ -z "$device_name" ]; then
+            device_name="$1"
+          fi
+          shift
+          ;;
+      esac
+    done
 
     # Source layer 3 dependencies
     avd_script="${scripts_dir%/}/domain/avd.sh"
@@ -591,12 +600,16 @@ case "$command_name" in
     android_start_emulator "$device_name"
 
     echo ""
-    # Pass both APK (if provided) and device name to run
+    # Pass both APK (if provided) and device name to run with explicit flags
+    run_args=""
     if [ -n "$apk_arg" ]; then
-      android_run_app "$apk_arg" "$device_name"
-    else
-      android_run_app "$device_name"
+      run_args="--apk $apk_arg"
     fi
+    if [ -n "$device_name" ]; then
+      run_args="$run_args --device $device_name"
+    fi
+    # shellcheck disable=SC2086
+    android_run_app $run_args
     ;;
 
   # --------------------------------------------------------------------------
