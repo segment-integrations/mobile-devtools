@@ -136,7 +136,16 @@ processes:
       fi
 
       echo "Setting up Metro port forwarding: 8081 -> $METRO_PORT (serial: $serial)"
+
+      # Remove any existing reverse on port 8081
+      adb -s "$serial" reverse --remove tcp:8081 2>/dev/null || true
+
+      # Set up new reverse
       adb -s "$serial" reverse tcp:8081 tcp:$METRO_PORT
+
+      # Verify reverse is active
+      echo "Verifying port forwarding..."
+      adb -s "$serial" reverse --list
 
       # Deploy using android.sh (APK already built by build-android)
       android.sh deploy
