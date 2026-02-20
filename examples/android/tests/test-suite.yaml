@@ -12,7 +12,7 @@ is_strict: true
 processes:
   # Phase 1: Build - runs first (no dependency)
   build-app:
-    command: "./gradlew assembleDebug"
+    command: "gradle assembleDebug"
     availability:
       restart: "no"
 
