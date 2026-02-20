@@ -141,6 +141,20 @@ processes:
       . ${REACT_NATIVE_VIRTENV}/metro/env-all.sh
       echo "Metro port: $METRO_PORT"
 
+      # Setup ADB reverse port forwarding so app can reach Metro
+      # React Native apps connect to localhost:8081 by default, forward to actual Metro port
+      serial=""
+      state_dir="${ANDROID_RUNTIME_DIR:-.devbox/virtenv}/${SUITE_NAME:-default}"
+      if [ -f "$state_dir/emulator-serial.txt" ]; then
+        serial="$(cat "$state_dir/emulator-serial.txt")"
+      fi
+      if [ -z "$serial" ]; then
+        serial="emulator-${EMU_PORT:-5554}"
+      fi
+
+      echo "Setting up Metro port forwarding: 8081 -> $METRO_PORT (serial: $serial)"
+      adb -s "$serial" reverse tcp:8081 tcp:$METRO_PORT
+
       # Deploy using android.sh (APK already built by build-android)
       android.sh deploy
     depends_on:
