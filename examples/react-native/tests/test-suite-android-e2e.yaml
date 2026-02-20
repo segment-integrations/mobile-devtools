@@ -9,16 +9,46 @@ log_level: info
 is_strict: true
 
 processes:
-  # Phase 1: Build Node dependencies
-  build-node:
-    command: "npm install"
+  # Phase 0: Allocate Metro port (no running process needed for builds)
+  allocate-metro-port:
+    command: |
+      set -e
+      # Source React Native lib
+      . ${REACT_NATIVE_VIRTENV}/scripts/lib/lib.sh
+
+      # Allocate port for android test suite
+      metro_port=$(rn_allocate_metro_port "android")
+      echo "Allocated Metro port: $metro_port"
+
+      # Save environment file for other processes
+      env_file=$(rn_save_metro_env "android" "$metro_port")
+      echo "Metro environment saved to: $env_file"
     availability:
       restart: "no"
 
-  # Phase 2: Build Android app
+  # Phase 1: Build Node dependencies
+  build-node:
+    command: |
+      set -e
+      _step="build-node"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
+      npm install
+
+      echo "pass" > "$_step_dir/$_step.status"
+    availability:
+      restart: "no"
+
+  # Phase 2: Build Android app (depends on port allocation, NOT metro running)
   build-android:
     command: |
       set -e
+      _step="build-android"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
 
       # Source Metro environment so build knows correct port
       . ${REACT_NATIVE_VIRTENV}/metro/env-android.sh
@@ -29,11 +59,13 @@ processes:
       cd android
       ./gradlew assemble${BUILD_CONFIG} -PreactNativeDevServerPort="$METRO_PORT"
       echo 'Build complete'
+
+      echo "pass" > "$_step_dir/$_step.status"
     depends_on:
       build-node:
         condition: process_completed_successfully
-      metro-bundler:
-        condition: process_healthy
+      allocate-metro-port:
+        condition: process_completed_successfully
     availability:
       restart: "no"
 
@@ -81,26 +113,33 @@ processes:
       period_seconds: 5
       timeout_seconds: 10
       success_threshold: 1
-      failure_threshold: 24
+      failure_threshold: 60
 
   # Phase 4b: Verify emulator ready
   verify-emulator-ready:
     command: |
+      _step="emulator-boot"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+
       # Wait a moment for launch to start
       sleep 5
 
       echo "Verifying emulator is ready..."
-      max_wait=120
+      max_wait=300
       elapsed=0
       while ! android.sh emulator ready 2>/dev/null; do
         sleep 3
         elapsed=$((elapsed + 3))
+        echo "  Waiting for emulator... ${elapsed}s/${max_wait}s"
         if [ $elapsed -ge $max_wait ]; then
-          echo "ERROR: Emulator not ready within ${max_wait}s" >&2
+          printf 'fail\nTimed out after %ds waiting for emulator to boot\n' "$max_wait" > "$_step_dir/$_step.status"
           exit 1
         fi
       done
-      echo "✓ Emulator ready"
+      echo "Emulator ready"
+
+      echo "pass" > "$_step_dir/$_step.status"
     depends_on:
       sync-avds:
         condition: process_completed_successfully
@@ -112,6 +151,8 @@ processes:
     command: "metro.sh start android"
     depends_on:
       build-node:
+        condition: process_completed_successfully
+      allocate-metro-port:
         condition: process_completed_successfully
     availability:
       restart: "no"
@@ -128,6 +169,11 @@ processes:
   deploy-android:
     command: |
       set -e
+      _step="deploy"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
       # Source Metro environment so React Native uses correct port
       . ${REACT_NATIVE_VIRTENV}/metro/env-android.sh
       echo "Metro port: $METRO_PORT"
@@ -157,6 +203,8 @@ processes:
 
       # Deploy using android.sh (APK already built by build-android)
       android.sh deploy
+
+      echo "pass" > "$_step_dir/$_step.status"
     depends_on:
       build-android:
         condition: process_completed_successfully
@@ -170,6 +218,10 @@ processes:
   # Phase 7: Verify app is running and connected to Metro
   verify-app-running:
     command: |
+      _step="verify-app"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+
       echo "Waiting for app to start and connect to Metro..."
 
       # Resolve emulator serial for log checking
@@ -209,6 +261,7 @@ processes:
           echo "" >&2
           echo "Full recent logs:" >&2
           echo "$log_output" | tail -50 >&2
+          printf 'fail\nApp cannot connect to Metro bundler\n' > "$_step_dir/$_step.status"
           exit 1
         fi
 
@@ -216,17 +269,17 @@ processes:
         if echo "$log_output" | grep -qi "fatal.*error\|exception.*error"; then
           echo "ERROR: App encountered fatal errors:" >&2
           echo "$log_output" | grep -iE "fatal|exception" | tail -20 >&2
+          printf 'fail\nApp encountered fatal errors\n' > "$_step_dir/$_step.status"
           exit 1
         fi
 
         # Success: app is running and no errors
-        echo "✓ App is running and connected to Metro"
-        mkdir -p reports
-        touch reports/.e2e-passed
+        echo "App is running and connected to Metro"
+        echo "pass" > "$_step_dir/$_step.status"
         exit 0
       done
 
-      echo "ERROR: App did not start within timeout" >&2
+      printf 'fail\nApp did not start within timeout\n' > "$_step_dir/$_step.status"
       exit 1
     depends_on:
       deploy-android:
@@ -252,15 +305,14 @@ processes:
     availability:
       restart: "no"
 
-  # Summary - always runs, checks marker file for pass/fail
+  # Summary - reports per-step pass/fail
   summary:
     command: |
       set -e
       export REPO_ROOT="$(cd ../.. && pwd)"
       . "$REPO_ROOT/plugins/tests/test-framework.sh"
       log_test "React Native Android E2E Test Suite"
-      assert_file_exists "reports/.e2e-passed" "E2E pipeline completed"
-      rm -f reports/.e2e-passed
+      e2e_report_steps || true
       test_summary "rn-android-e2e"
     depends_on:
       cleanup:

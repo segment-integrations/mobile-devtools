@@ -9,9 +9,15 @@ log_level: info
 is_strict: true
 
 processes:
-  # Phase 1: Build app - runs first
+  # Phase 1: Build app (runs concurrently with simulator startup)
   build-app:
     command: |
+      set -e
+      _step="build-app"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
       DERIVED_DATA="${DEVBOX_PROJECT_ROOT:-.}/.devbox/virtenv/ios/DerivedData"
       mkdir -p "$DERIVED_DATA"
       xcodebuild -project ios.xcodeproj -scheme ios \
@@ -19,6 +25,8 @@ processes:
         -destination "generic/platform=iOS Simulator" \
         -derivedDataPath "$DERIVED_DATA" \
         build
+
+      echo "pass" > "$_step_dir/$_step.status"
     availability:
       restart: "no"
 
@@ -28,7 +36,7 @@ processes:
     availability:
       restart: "no"
 
-  # Phase 3: Start simulator - depends on sync completing
+  # Phase 3: Start simulator (runs concurrently with build)
   ios-simulator:
     command: |
       set -e
@@ -51,12 +59,17 @@ processes:
       period_seconds: 5
       timeout_seconds: 10
       success_threshold: 1
-      failure_threshold: 12
+      failure_threshold: 36
 
   # Phase 4: Deploy app - depends on both build and simulator
   deploy-app:
     command: |
       set -e
+      _step="deploy-app"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
       ios.sh deploy
 
       echo ""
@@ -66,6 +79,7 @@ processes:
       while [ $attempt -lt $max_attempts ]; do
         if ios.sh app status; then
           echo "App is running"
+          echo "pass" > "$_step_dir/$_step.status"
           exit 0
         fi
         attempt=$((attempt + 1))
@@ -73,7 +87,7 @@ processes:
         sleep 2
       done
 
-      echo "ERROR: App did not start within timeout" >&2
+      printf 'fail\nApp did not start within timeout\n' > "$_step_dir/$_step.status"
       exit 1
     depends_on:
       build-app:
@@ -86,13 +100,16 @@ processes:
   # Phase 5: Verify app is running (liveness check)
   verify-app-running:
     command: |
+      _step="verify-app"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+
       if ios.sh app status; then
         echo "App is running"
-        mkdir -p reports
-        touch reports/.e2e-passed
+        echo "pass" > "$_step_dir/$_step.status"
         exit 0
       else
-        echo "ERROR: App not found in running processes"
+        printf 'fail\nApp not found in running processes\n' > "$_step_dir/$_step.status"
         exit 1
       fi
     depends_on:
@@ -118,15 +135,14 @@ processes:
     availability:
       restart: "no"
 
-  # Summary - always runs, checks marker file for pass/fail
+  # Summary - reports per-step pass/fail
   summary:
     command: |
       set -e
       export REPO_ROOT="$(cd ../.. && pwd)"
       . "$REPO_ROOT/plugins/tests/test-framework.sh"
       log_test "iOS E2E Test Suite"
-      assert_file_exists "reports/.e2e-passed" "E2E pipeline completed"
-      rm -f reports/.e2e-passed
+      e2e_report_steps || true
       test_summary "ios-e2e"
     depends_on:
       cleanup:

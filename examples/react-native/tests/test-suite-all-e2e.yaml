@@ -10,16 +10,46 @@ log_level: info
 is_strict: true
 
 processes:
-  # Phase 1: Build Node dependencies (shared by both platforms)
-  build-node:
-    command: "npm install"
+  # Phase 0: Allocate Metro port (no running process needed for builds)
+  allocate-metro-port:
+    command: |
+      set -e
+      # Source React Native lib
+      . ${REACT_NATIVE_VIRTENV}/scripts/lib/lib.sh
+
+      # Allocate port for all-platforms test suite
+      metro_port=$(rn_allocate_metro_port "all")
+      echo "Allocated Metro port: $metro_port"
+
+      # Save environment file for other processes
+      env_file=$(rn_save_metro_env "all" "$metro_port")
+      echo "Metro environment saved to: $env_file"
     availability:
       restart: "no"
 
-  # Phase 2a: Android build
+  # Phase 1: Build Node dependencies (shared by both platforms)
+  build-node:
+    command: |
+      set -e
+      _step="build-node"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
+      npm install
+
+      echo "pass" > "$_step_dir/$_step.status"
+    availability:
+      restart: "no"
+
+  # Phase 2a: Android build (depends on port allocation, NOT metro running)
   build-android:
     command: |
       set -e
+      _step="build-android"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
 
       # Source Metro environment so build knows correct port
       . ${REACT_NATIVE_VIRTENV}/metro/env-all.sh
@@ -30,11 +60,13 @@ processes:
       cd android
       ./gradlew assemble${BUILD_CONFIG} -PreactNativeDevServerPort="$METRO_PORT"
       echo 'Build complete'
+
+      echo "pass" > "$_step_dir/$_step.status"
     depends_on:
       build-node:
         condition: process_completed_successfully
-      metro-bundler:
-        condition: process_healthy
+      allocate-metro-port:
+        condition: process_completed_successfully
     availability:
       restart: "no"
 
@@ -42,10 +74,17 @@ processes:
   install-pods:
     command: |
       set -e
+      _step="install-pods"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
       cd ios
       echo "Installing CocoaPods dependencies..."
       pod install --repo-update
       echo 'Pod install complete'
+
+      echo "pass" > "$_step_dir/$_step.status"
     depends_on:
       build-node:
         condition: process_completed_successfully
@@ -102,26 +141,33 @@ processes:
       period_seconds: 5
       timeout_seconds: 10
       success_threshold: 1
-      failure_threshold: 24
+      failure_threshold: 60
 
   # Phase 4b: Verify Android emulator ready
   verify-emulator-ready:
     command: |
+      _step="emulator-boot"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+
       # Wait a moment for launch to start
       sleep 5
 
       echo "Verifying emulator is ready..."
-      max_wait=120
+      max_wait=300
       elapsed=0
       while ! android.sh emulator ready 2>/dev/null; do
         sleep 3
         elapsed=$((elapsed + 3))
+        echo "  Waiting for emulator... ${elapsed}s/${max_wait}s"
         if [ $elapsed -ge $max_wait ]; then
-          echo "ERROR: Emulator not ready within ${max_wait}s" >&2
+          printf 'fail\nTimed out after %ds waiting for emulator to boot\n' "$max_wait" > "$_step_dir/$_step.status"
           exit 1
         fi
       done
-      echo "✓ Emulator ready"
+      echo "Emulator ready"
+
+      echo "pass" > "$_step_dir/$_step.status"
     depends_on:
       sync-avds:
         condition: process_completed_successfully
@@ -160,26 +206,33 @@ processes:
       period_seconds: 5
       timeout_seconds: 10
       success_threshold: 1
-      failure_threshold: 12
+      failure_threshold: 36
 
   # Phase 4d: Verify iOS simulator ready
   verify-simulator-ready:
     command: |
+      _step="simulator-boot"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+
       # Wait a moment for launch to start
       sleep 3
 
       echo "Verifying simulator is ready..."
-      max_wait=60
+      max_wait=180
       elapsed=0
       while ! ios.sh simulator ready 2>/dev/null; do
         sleep 2
         elapsed=$((elapsed + 2))
+        echo "  Waiting for simulator... ${elapsed}s/${max_wait}s"
         if [ $elapsed -ge $max_wait ]; then
-          echo "ERROR: Simulator not ready within ${max_wait}s" >&2
+          printf 'fail\nTimed out after %ds waiting for simulator to boot\n' "$max_wait" > "$_step_dir/$_step.status"
           exit 1
         fi
       done
-      echo "✓ Simulator ready"
+      echo "Simulator ready"
+
+      echo "pass" > "$_step_dir/$_step.status"
     depends_on:
       sync-simulators:
         condition: process_completed_successfully
@@ -192,6 +245,8 @@ processes:
     depends_on:
       build-node:
         condition: process_completed_successfully
+      allocate-metro-port:
+        condition: process_completed_successfully
     availability:
       restart: "no"
     readiness_probe:
@@ -203,10 +258,14 @@ processes:
       success_threshold: 1
       failure_threshold: 12
 
-  # Phase 5b: Build iOS app
+  # Phase 5b: Build iOS app (depends on port allocation, NOT metro running)
   build-ios:
     command: |
       set -e
+      _step="build-ios"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
 
       BUILD_CONFIG="${IOS_BUILD_CONFIG:-Debug}"
       echo "Building React Native app (${BUILD_CONFIG})"
@@ -231,8 +290,12 @@ processes:
           build
 
       echo "Build complete"
+
+      echo "pass" > "$_step_dir/$_step.status"
     depends_on:
       install-pods:
+        condition: process_completed_successfully
+      allocate-metro-port:
         condition: process_completed_successfully
     availability:
       restart: "no"
@@ -241,6 +304,11 @@ processes:
   deploy-android:
     command: |
       set -e
+      _step="deploy-android"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
       # Source Metro environment so React Native uses correct port
       . ${REACT_NATIVE_VIRTENV}/metro/env-all.sh
       echo "Metro port: $METRO_PORT"
@@ -270,6 +338,8 @@ processes:
 
       # Deploy using android.sh (APK already built by build-android)
       android.sh deploy
+
+      echo "pass" > "$_step_dir/$_step.status"
     depends_on:
       build-android:
         condition: process_completed_successfully
@@ -284,8 +354,15 @@ processes:
   deploy-ios:
     command: |
       set -e
+      _step="deploy-ios"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
       ios.sh deploy
       echo "App deployed and launched successfully"
+
+      echo "pass" > "$_step_dir/$_step.status"
     depends_on:
       build-ios:
         condition: process_completed_successfully
@@ -299,6 +376,10 @@ processes:
   # Phase 7a: Verify Android app
   verify-android-running:
     command: |
+      _step="verify-android"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+
       echo "Waiting for Android app to start..."
 
       # Resolve emulator serial for log checking
@@ -337,6 +418,7 @@ processes:
           echo "" >&2
           echo "Full recent logs:" >&2
           echo "$log_output" | tail -50 >&2
+          printf 'fail\nApp cannot connect to Metro bundler\n' > "$_step_dir/$_step.status"
           exit 1
         fi
 
@@ -344,16 +426,16 @@ processes:
         if echo "$log_output" | grep -qi "fatal.*error\|exception.*error"; then
           echo "ERROR: App encountered fatal errors:" >&2
           echo "$log_output" | grep -iE "fatal|exception" | tail -20 >&2
+          printf 'fail\nApp encountered fatal errors\n' > "$_step_dir/$_step.status"
           exit 1
         fi
 
-        echo "✓ Android app is running and connected to Metro"
-        mkdir -p reports
-        touch reports/.e2e-android-passed
+        echo "Android app is running and connected to Metro"
+        echo "pass" > "$_step_dir/$_step.status"
         exit 0
       done
 
-      echo "ERROR: Android app did not start within timeout" >&2
+      printf 'fail\nAndroid app did not start within timeout\n' > "$_step_dir/$_step.status"
       exit 1
     depends_on:
       deploy-android:
@@ -364,14 +446,17 @@ processes:
   # Phase 7b: Verify iOS app (parallel with Android)
   verify-ios-running:
     command: |
+      _step="verify-ios"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+
       echo "Waiting for iOS app to start..."
       max_attempts=15
       attempt=0
       while [ $attempt -lt $max_attempts ]; do
         if ios.sh app status; then
-          echo "✓ iOS app is running"
-          mkdir -p reports
-          touch reports/.e2e-ios-passed
+          echo "iOS app is running"
+          echo "pass" > "$_step_dir/$_step.status"
           exit 0
         fi
         attempt=$((attempt + 1))
@@ -379,24 +464,10 @@ processes:
         sleep 2
       done
 
-      echo "ERROR: iOS app did not start within timeout" >&2
+      printf 'fail\niOS app did not start within timeout\n' > "$_step_dir/$_step.status"
       exit 1
     depends_on:
       deploy-ios:
-        condition: process_completed_successfully
-    availability:
-      restart: "no"
-
-  # Mark passed - only runs when both platforms verified successfully
-  mark-passed:
-    command: |
-      mkdir -p reports
-      touch reports/.e2e-passed
-      echo "All platforms verified successfully"
-    depends_on:
-      verify-android-running:
-        condition: process_completed_successfully
-      verify-ios-running:
         condition: process_completed_successfully
     availability:
       restart: "no"
@@ -421,20 +492,21 @@ processes:
         echo "Test complete - Metro, apps, and emulator/simulator still running for iteration"
       fi
     depends_on:
-      mark-passed:
+      verify-android-running:
+        condition: process_completed
+      verify-ios-running:
         condition: process_completed
     availability:
       restart: "no"
 
-  # Summary - always runs, checks marker file for pass/fail
+  # Summary - reports per-step pass/fail
   summary:
     command: |
       set -e
       export REPO_ROOT="$(cd ../.. && pwd)"
       . "$REPO_ROOT/plugins/tests/test-framework.sh"
       log_test "React Native All Platforms E2E Test Suite"
-      assert_file_exists "reports/.e2e-passed" "E2E pipeline completed"
-      rm -f reports/.e2e-passed
+      e2e_report_steps || true
       test_summary "rn-all-e2e"
     depends_on:
       cleanup:

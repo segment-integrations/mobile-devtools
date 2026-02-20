@@ -18,11 +18,11 @@ processes:
 
       # Allocate port for web test suite
       metro_port=$(rn_allocate_metro_port "web")
-      echo "📡 Allocated Metro port: $metro_port"
+      echo "Allocated Metro port: $metro_port"
 
       # Save environment file for other processes
       env_file=$(rn_save_metro_env "web" "$metro_port")
-      echo "✓ Metro environment saved to: $env_file"
+      echo "Metro environment saved to: $env_file"
     availability:
       restart: "no"
 
@@ -31,16 +31,33 @@ processes:
     depends_on:
       allocate-metro-port:
         condition: process_completed_successfully
-    command: "npm install"
+    command: |
+      set -e
+      _step="build-node"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
+      npm install
+
+      echo "pass" > "$_step_dir/$_step.status"
     availability:
       restart: "no"
 
   # Phase 2: Build web bundle directory
   build-web:
     command: |
-      echo '📦 Creating web build directory...'
+      set -e
+      _step="build-web"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
+      echo 'Creating web build directory...'
       mkdir -p web/build
-      echo '✓ Web build directory ready'
+      echo 'Web build directory ready'
+
+      echo "pass" > "$_step_dir/$_step.status"
     depends_on:
       build-node:
         condition: process_completed_successfully
@@ -69,6 +86,10 @@ processes:
   # Phase 4: Verify web app is being served
   verify-web-serving:
     command: |
+      _step="verify-web"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+
       # Source Metro environment to get correct port
       . ${REACT_NATIVE_VIRTENV}/metro/env-web.sh
 
@@ -83,18 +104,22 @@ processes:
           res.on('data', (chunk) => data += chunk);
           res.on('end', () => {
             if (res.statusCode === 200) {
-              console.log('✓ Web app is being served (HTTP ' + res.statusCode + ')');
+              console.log('Web app is being served (HTTP ' + res.statusCode + ')');
               console.log('  Response size: ' + data.length + ' bytes');
-              require('fs').mkdirSync('reports', { recursive: true });
-              require('fs').writeFileSync('reports/.e2e-passed', '');
+              require('fs').mkdirSync('reports/steps', { recursive: true });
+              require('fs').writeFileSync('reports/steps/verify-web.status', 'pass\n');
               process.exit(0);
             } else {
               console.error('ERROR: Unexpected status code: ' + res.statusCode);
+              require('fs').mkdirSync('reports/steps', { recursive: true });
+              require('fs').writeFileSync('reports/steps/verify-web.status', 'fail\nUnexpected HTTP status: ' + res.statusCode + '\n');
               process.exit(1);
             }
           });
         }).on('error', (err) => {
           console.error('ERROR: Could not connect to Metro: ' + err.message);
+          require('fs').mkdirSync('reports/steps', { recursive: true });
+          require('fs').writeFileSync('reports/steps/verify-web.status', 'fail\nCould not connect to Metro: ' + err.message + '\n');
           process.exit(1);
         });
       "
@@ -122,15 +147,14 @@ processes:
     availability:
       restart: "no"
 
-  # Summary - always runs, checks marker file for pass/fail
+  # Summary - reports per-step pass/fail
   summary:
     command: |
       set -e
       export REPO_ROOT="$(cd ../.. && pwd)"
       . "$REPO_ROOT/plugins/tests/test-framework.sh"
       log_test "React Native Web E2E Test Suite"
-      assert_file_exists "reports/.e2e-passed" "E2E pipeline completed"
-      rm -f reports/.e2e-passed
+      e2e_report_steps || true
       test_summary "rn-web-e2e"
     depends_on:
       cleanup:

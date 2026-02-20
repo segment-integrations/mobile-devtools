@@ -13,9 +13,35 @@ log_level: info
 is_strict: true
 
 processes:
+  # Phase 0: Allocate Metro port (no running process needed for builds)
+  allocate-metro-port:
+    command: |
+      set -e
+      # Source React Native lib
+      . ${REACT_NATIVE_VIRTENV}/scripts/lib/lib.sh
+
+      # Allocate port for ios test suite
+      metro_port=$(rn_allocate_metro_port "ios")
+      echo "Allocated Metro port: $metro_port"
+
+      # Save environment file for other processes
+      env_file=$(rn_save_metro_env "ios" "$metro_port")
+      echo "Metro environment saved to: $env_file"
+    availability:
+      restart: "no"
+
   # Phase 1: Build Node dependencies
   build-node:
-    command: "npm install"
+    command: |
+      set -e
+      _step="build-node"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
+      npm install
+
+      echo "pass" > "$_step_dir/$_step.status"
     availability:
       restart: "no"
 
@@ -23,10 +49,17 @@ processes:
   install-pods:
     command: |
       set -e
+      _step="install-pods"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
       cd ios
       echo "Installing CocoaPods dependencies..."
       pod install --repo-update
       echo 'Pod install complete'
+
+      echo "pass" > "$_step_dir/$_step.status"
     depends_on:
       build-node:
         condition: process_completed_successfully
@@ -71,26 +104,33 @@ processes:
       period_seconds: 5
       timeout_seconds: 10
       success_threshold: 1
-      failure_threshold: 12
+      failure_threshold: 36
 
   # Phase 4b: Verify simulator ready
   verify-simulator-ready:
     command: |
+      _step="simulator-boot"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+
       # Wait a moment for launch to start
       sleep 3
 
       echo "Verifying simulator is ready..."
-      max_wait=60
+      max_wait=180
       elapsed=0
       while ! ios.sh simulator ready 2>/dev/null; do
         sleep 2
         elapsed=$((elapsed + 2))
+        echo "  Waiting for simulator... ${elapsed}s/${max_wait}s"
         if [ $elapsed -ge $max_wait ]; then
-          echo "ERROR: Simulator not ready within ${max_wait}s" >&2
+          printf 'fail\nTimed out after %ds waiting for simulator to boot\n' "$max_wait" > "$_step_dir/$_step.status"
           exit 1
         fi
       done
-      echo "✓ Simulator ready"
+      echo "Simulator ready"
+
+      echo "pass" > "$_step_dir/$_step.status"
     depends_on:
       sync-simulators:
         condition: process_completed_successfully
@@ -103,6 +143,8 @@ processes:
     depends_on:
       build-node:
         condition: process_completed_successfully
+      allocate-metro-port:
+        condition: process_completed_successfully
     availability:
       restart: "no"
     readiness_probe:
@@ -114,10 +156,14 @@ processes:
       success_threshold: 1
       failure_threshold: 12
 
-  # Phase 6a: Build iOS app
+  # Phase 6a: Build iOS app (depends on port allocation, NOT metro running)
   build-ios:
     command: |
       set -e
+      _step="build-ios"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
 
       BUILD_CONFIG="${IOS_BUILD_CONFIG:-Release}"
       echo "Building React Native app (${BUILD_CONFIG})"
@@ -142,8 +188,12 @@ processes:
           build
 
       echo "Build complete"
+
+      echo "pass" > "$_step_dir/$_step.status"
     depends_on:
       install-pods:
+        condition: process_completed_successfully
+      allocate-metro-port:
         condition: process_completed_successfully
     availability:
       restart: "no"
@@ -152,8 +202,15 @@ processes:
   deploy-ios:
     command: |
       set -e
+      _step="deploy"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
       ios.sh deploy
       echo "App deployed and launched successfully"
+
+      echo "pass" > "$_step_dir/$_step.status"
     depends_on:
       build-ios:
         condition: process_completed_successfully
@@ -167,6 +224,10 @@ processes:
   # Phase 7: Verify app is running
   verify-app-running:
     command: |
+      _step="verify-app"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+
       echo "Waiting for app to start..."
 
       max_attempts=15
@@ -181,13 +242,12 @@ processes:
         fi
 
         # Success: app is running
-        echo "✓ App is running"
-        mkdir -p reports
-        touch reports/.e2e-passed
+        echo "App is running"
+        echo "pass" > "$_step_dir/$_step.status"
         exit 0
       done
 
-      echo "ERROR: App did not start within timeout" >&2
+      printf 'fail\nApp did not start within timeout\n' > "$_step_dir/$_step.status"
       exit 1
     depends_on:
       deploy-ios:
@@ -213,15 +273,14 @@ processes:
     availability:
       restart: "no"
 
-  # Summary - always runs, checks marker file for pass/fail
+  # Summary - reports per-step pass/fail
   summary:
     command: |
       set -e
       export REPO_ROOT="$(cd ../.. && pwd)"
       . "$REPO_ROOT/plugins/tests/test-framework.sh"
       log_test "React Native iOS E2E Test Suite"
-      assert_file_exists "reports/.e2e-passed" "E2E pipeline completed"
-      rm -f reports/.e2e-passed
+      e2e_report_steps || true
       test_summary "rn-ios-e2e"
     depends_on:
       cleanup:

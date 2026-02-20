@@ -428,6 +428,13 @@ android_run_app() {
   echo "Deploying to: $emulator_serial"
   echo ""
 
+  # Stop and uninstall existing app to avoid signature conflicts
+  if adb -s "$emulator_serial" shell pm list packages 2>/dev/null | grep -q "package:${package_name}$"; then
+    echo "Removing existing install: $package_name"
+    adb -s "$emulator_serial" shell am force-stop "$package_name" 2>/dev/null || true
+    adb -s "$emulator_serial" uninstall "$package_name" >/dev/null 2>&1 || true
+  fi
+
   android_install_apk "$apk_path" "$emulator_serial"
   echo ""
   android_launch_app "$package_name" "$activity_name" "$emulator_serial"

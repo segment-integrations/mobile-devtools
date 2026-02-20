@@ -446,6 +446,13 @@ ios_run_app() {
   echo "Deploying to: ${IOS_SIM_NAME:-$udid}"
   echo ""
 
+  # Terminate and uninstall existing app for a clean deploy
+  xcrun simctl terminate "$udid" "$bundle_id" 2>/dev/null || true
+  if xcrun simctl get_app_container "$udid" "$bundle_id" >/dev/null 2>&1; then
+    echo "Removing existing install: $bundle_id"
+    xcrun simctl uninstall "$udid" "$bundle_id" 2>/dev/null || true
+  fi
+
   echo "Installing app: $(basename "$app_path")"
   xcrun simctl install "$udid" "$app_path"
   echo "✓ App installed"

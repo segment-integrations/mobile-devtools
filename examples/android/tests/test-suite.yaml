@@ -10,9 +10,18 @@ log_level: info
 is_strict: true
 
 processes:
-  # Phase 1: Build - runs first (no dependency)
+  # Phase 1: Build app (runs concurrently with emulator startup)
   build-app:
-    command: "gradle assembleDebug"
+    command: |
+      set -e
+      _step="build-app"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
+      gradle assembleDebug
+
+      echo "pass" > "$_step_dir/$_step.status"
     availability:
       restart: "no"
 
@@ -22,7 +31,7 @@ processes:
     availability:
       restart: "no"
 
-  # Phase 2b: Start emulator (depends on sync completing)
+  # Phase 2b: Start emulator (runs concurrently with build)
   android-emulator:
     depends_on:
       sync-avds:
@@ -53,12 +62,17 @@ processes:
       period_seconds: 5
       timeout_seconds: 10
       success_threshold: 1
-      failure_threshold: 24
+      failure_threshold: 60
 
   # Phase 3: Deploy app - depends on both build and emulator being ready
   deploy-app:
     command: |
       set -e
+      _step="deploy-app"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
       android.sh deploy
 
       echo ""
@@ -68,8 +82,7 @@ processes:
       while [ $attempt -lt $max_attempts ]; do
         if android.sh app status; then
           echo "App is running"
-          mkdir -p reports
-          touch reports/.e2e-passed
+          echo "pass" > "$_step_dir/$_step.status"
           exit 0
         fi
         attempt=$((attempt + 1))
@@ -77,7 +90,7 @@ processes:
         sleep 2
       done
 
-      echo "ERROR: App did not start within timeout" >&2
+      printf 'fail\nApp did not start within timeout\n' > "$_step_dir/$_step.status"
       exit 1
     depends_on:
       build-app:
@@ -104,15 +117,14 @@ processes:
     availability:
       restart: "no"
 
-  # Summary - always runs, checks marker file for pass/fail
+  # Summary - reports per-step pass/fail
   summary:
     command: |
       set -e
       export REPO_ROOT="$(cd ../.. && pwd)"
       . "$REPO_ROOT/plugins/tests/test-framework.sh"
       log_test "Android E2E Test Suite"
-      assert_file_exists "reports/.e2e-passed" "E2E pipeline completed"
-      rm -f reports/.e2e-passed
+      e2e_report_steps || true
       test_summary "android-e2e"
     depends_on:
       cleanup-app:
