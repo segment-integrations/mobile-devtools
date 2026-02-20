@@ -46,7 +46,7 @@ processes:
     command: |
       set -e
       _step="build-android"
-      _step_dir="reports/steps"
+      _step_dir="$PWD/reports/steps"
       mkdir -p "$_step_dir"
       trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
 

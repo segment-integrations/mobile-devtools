@@ -171,6 +171,13 @@ case "$command_name" in
     echo "Package: $package_name"
     echo "Activity: $activity_name"
 
+    # Uninstall existing app to avoid signature conflicts
+    if adb -s "$emulator_serial" shell pm list packages 2>/dev/null | grep -q "package:${package_name}$"; then
+      echo "Removing existing install: $package_name"
+      adb -s "$emulator_serial" shell am force-stop "$package_name" 2>/dev/null || true
+      adb -s "$emulator_serial" uninstall "$package_name" >/dev/null 2>&1 || true
+    fi
+
     # Install and launch
     android_install_apk "$apk_path" "$emulator_serial"
     android_launch_app "$package_name" "$activity_name" "$emulator_serial"

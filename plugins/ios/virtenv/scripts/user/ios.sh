@@ -408,6 +408,13 @@ case "$command_name" in
       exit 1
     fi
 
+    # Terminate and uninstall existing app for a clean deploy
+    xcrun simctl terminate "$udid" "$bundle_id" 2>/dev/null || true
+    if xcrun simctl get_app_container "$udid" "$bundle_id" >/dev/null 2>&1; then
+      echo "Removing existing install: $bundle_id"
+      xcrun simctl uninstall "$udid" "$bundle_id" 2>/dev/null || true
+    fi
+
     # Install and launch
     echo "Installing on simulator: $udid"
     xcrun simctl install "$udid" "$app_path"
