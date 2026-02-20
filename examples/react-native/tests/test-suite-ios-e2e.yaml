@@ -143,16 +143,14 @@ processes:
   # Cleanup - runs after verify completes
   cleanup:
     command: |
-      echo "Stopping Metro bundler..."
-      metro.sh stop ios || true
-
       if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
         echo "Cleaning up (pure mode)..."
+        metro.sh stop ios || true
         ios.sh app stop || true
         ios.sh simulator stop
-        echo "App stopped, test simulator deleted"
+        echo "Metro, app, and test simulator stopped"
       else
-        echo "Test complete - app and simulator still running"
+        echo "Test complete - Metro, app, and simulator still running for iteration"
       fi
     depends_on:
       verify-app-running:

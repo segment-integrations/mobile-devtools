@@ -113,9 +113,13 @@ processes:
   # Cleanup
   cleanup:
     command: |
-      echo "Stopping Metro bundler..."
-      metro.sh stop web || true
-      echo "✓ Test complete"
+      if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
+        echo "Cleaning up (pure mode)..."
+        metro.sh stop web || true
+        echo "Metro stopped"
+      else
+        echo "Test complete - Metro still running for iteration"
+      fi
     depends_on:
       verify-web-serving:
         condition: process_completed

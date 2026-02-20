@@ -254,11 +254,9 @@ processes:
   # Cleanup - runs when both platforms complete
   cleanup:
     command: |
-      echo "Stopping Metro bundler..."
-      metro.sh stop all || true
-
       if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
         echo "Cleaning up (pure mode)..."
+        metro.sh stop all || true
 
         # Cleanup Android
         android.sh app stop || true
@@ -268,9 +266,9 @@ processes:
         ios.sh app stop || true
         ios.sh simulator stop || true
 
-        echo "Both platforms cleaned up"
+        echo "Metro, apps, and emulator/simulator stopped"
       else
-        echo "Test complete - apps and emulator/simulator still running"
+        echo "Test complete - Metro, apps, and emulator/simulator still running for iteration"
       fi
     depends_on:
       mark-passed:

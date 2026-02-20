@@ -138,16 +138,14 @@ processes:
   # Cleanup
   cleanup:
     command: |
-      echo "Stopping Metro bundler..."
-      metro.sh stop android || true
-
       if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
         echo "Cleaning up (pure mode)..."
+        metro.sh stop android || true
         android.sh app stop || true
         android.sh emulator stop || true
-        echo "App stopped, emulator stopped"
+        echo "Metro, app, and emulator stopped"
       else
-        echo "Test complete - app and emulator still running"
+        echo "Test complete - Metro, app, and emulator still running for iteration"
       fi
     depends_on:
       verify-app-running:
