@@ -82,8 +82,8 @@ processes:
       success_threshold: 1
       failure_threshold: 12
 
-  # Phase 6: Build and deploy app
-  deploy-ios:
+  # Phase 6a: Build iOS app
+  build-ios:
     command: |
       set -e
 
@@ -98,12 +98,21 @@ processes:
       NODE_BINARY="$NODE_BINARY" RCT_METRO_PORT="$METRO_PORT" \
         ios.sh build --config "$BUILD_CONFIG" --quiet
 
-      # Deploy to simulator
-      ios.sh deploy
-
-      echo "App deployed and launched successfully"
+      echo "Build complete"
     depends_on:
       install-pods:
+        condition: process_completed_successfully
+    availability:
+      restart: "no"
+
+  # Phase 6b: Deploy iOS app
+  deploy-ios:
+    command: |
+      set -e
+      ios.sh deploy
+      echo "App deployed and launched successfully"
+    depends_on:
+      build-ios:
         condition: process_completed_successfully
       ios-simulator:
         condition: process_healthy

@@ -133,6 +133,29 @@ processes:
       success_threshold: 1
       failure_threshold: 12
 
+  # Phase 5b: Build iOS app
+  build-ios:
+    command: |
+      set -e
+
+      BUILD_CONFIG="${IOS_BUILD_CONFIG:-Debug}"
+      echo "Building React Native app (${BUILD_CONFIG})"
+
+      # Source Metro environment so React Native uses correct port
+      . ${REACT_NATIVE_VIRTENV}/metro/env-all.sh
+      echo "Metro port: $METRO_PORT"
+
+      # Build with ios.sh build
+      NODE_BINARY="$NODE_BINARY" RCT_METRO_PORT="$METRO_PORT" \
+        ios.sh build --config "$BUILD_CONFIG" --quiet
+
+      echo "Build complete"
+    depends_on:
+      install-pods:
+        condition: process_completed_successfully
+    availability:
+      restart: "no"
+
   # Phase 6a: Deploy Android app
   deploy-android:
     command: |
@@ -167,28 +190,14 @@ processes:
     availability:
       restart: "no"
 
-  # Phase 6b: Build and deploy iOS app
+  # Phase 6b: Deploy iOS app
   deploy-ios:
     command: |
       set -e
-
-      BUILD_CONFIG="${IOS_BUILD_CONFIG:-Debug}"
-      echo "Building React Native app (${BUILD_CONFIG})"
-
-      # Source Metro environment so React Native uses correct port
-      . ${REACT_NATIVE_VIRTENV}/metro/env-all.sh
-      echo "Metro port: $METRO_PORT"
-
-      # Build with ios.sh build
-      NODE_BINARY="$NODE_BINARY" RCT_METRO_PORT="$METRO_PORT" \
-        ios.sh build --config "$BUILD_CONFIG" --quiet
-
-      # Deploy to simulator
       ios.sh deploy
-
       echo "App deployed and launched successfully"
     depends_on:
-      install-pods:
+      build-ios:
         condition: process_completed_successfully
       ios-simulator:
         condition: process_healthy
