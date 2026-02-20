@@ -142,7 +142,7 @@ ios_resolve_app_via_xcodebuild() {
   fi
 
   # Query build settings with matching DerivedData path
-  _settings="$(ios_xcodebuild "$_xc_flag" "$_xc_proj" -scheme "$_xc_scheme" \
+  _settings="$(xcodebuild "$_xc_flag" "$_xc_proj" -scheme "$_xc_scheme" \
     -configuration Debug -destination 'generic/platform=iOS Simulator' \
     -derivedDataPath "$_xc_derived_data" \
     -showBuildSettings 2>/dev/null || true)"

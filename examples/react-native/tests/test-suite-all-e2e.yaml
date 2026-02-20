@@ -280,7 +280,14 @@ processes:
 
   # Summary - always runs, checks marker file for pass/fail
   summary:
-    command: "bash tests/test-summary.sh 'React Native All Platforms E2E Test Suite' 'reports/react-native-all-e2e-logs' 'reports/.e2e-passed'"
+    command: |
+      set -e
+      export REPO_ROOT="$(cd ../.. && pwd)"
+      . "$REPO_ROOT/plugins/tests/test-framework.sh"
+      log_test "React Native All Platforms E2E Test Suite"
+      assert_file_exists "reports/.e2e-passed" "E2E pipeline completed"
+      rm -f reports/.e2e-passed
+      test_summary "rn-all-e2e"
     depends_on:
       cleanup:
         condition: process_completed

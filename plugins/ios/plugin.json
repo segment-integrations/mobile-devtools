@@ -18,7 +18,8 @@
     "IOS_DERIVED_DATA_PATH": "{{ .Virtenv }}/DerivedData",
     "IOS_XCODE_ENV_PATH": "",
     "IOS_RUNTIME_DIR": "{{ .Virtenv }}/runtime",
-    "REPORTS_DIR": "reports"
+    "REPORTS_DIR": "reports",
+    "LANG": "en_US.UTF-8"
   },
   "packages": {
     "bash": "latest",

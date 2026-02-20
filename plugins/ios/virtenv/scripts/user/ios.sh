@@ -510,7 +510,7 @@ case "$command_name" in
   xcodebuild)
     # shellcheck disable=SC1090
     . "${script_dir}/platform/core.sh"
-    ios_xcodebuild "$@"
+    xcodebuild "$@"
     ;;
   *)
     usage

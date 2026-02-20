@@ -197,9 +197,7 @@ Use this in `devbox.json` build scripts instead of manually stripping Nix flags:
 }
 ```
 
-Also available as the `ios_xcodebuild()` shell function (from `platform/core.sh`) for use within plugin scripts.
-
-> **Note:** Since the iOS init hook now strips Nix compilation variables (`LD`, `LDFLAGS`, `NIX_LDFLAGS`, `NIX_CFLAGS_COMPILE`, `NIX_CFLAGS_LINK`) at shell startup, `xcodebuild` works natively in devbox shell without the wrapper. The `ios.sh xcodebuild` wrapper and `ios_xcodebuild()` function are kept for backward compatibility and use outside devbox shell.
+The iOS init hook (`devbox_omit_nix_env()`) strips Nix compilation variables at shell startup, so `xcodebuild` works natively in devbox shell. The `ios.sh xcodebuild` subcommand forwards directly to `xcodebuild`.
 
 ### Run App
 

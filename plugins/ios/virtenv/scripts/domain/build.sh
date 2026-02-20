@@ -257,5 +257,5 @@ ios_build() {
   # Append the action (build, test, etc.)
   set -- "$@" "$_action"
 
-  ios_xcodebuild "$@"
+  xcodebuild "$@"
 }

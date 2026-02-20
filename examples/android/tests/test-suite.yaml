@@ -106,7 +106,14 @@ processes:
 
   # Summary - always runs, checks marker file for pass/fail
   summary:
-    command: "bash tests/test-summary.sh 'Android E2E Test Suite' 'reports/android-e2e-logs' 'reports/.e2e-passed'"
+    command: |
+      set -e
+      export REPO_ROOT="$(cd ../.. && pwd)"
+      . "$REPO_ROOT/plugins/tests/test-framework.sh"
+      log_test "Android E2E Test Suite"
+      assert_file_exists "reports/.e2e-passed" "E2E pipeline completed"
+      rm -f reports/.e2e-passed
+      test_summary "android-e2e"
     depends_on:
       cleanup-app:
         condition: process_completed
