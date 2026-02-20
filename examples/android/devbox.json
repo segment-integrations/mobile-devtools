@@ -11,10 +11,10 @@
   "shell": {
     "scripts": {
       "build": [
-        "android.sh build"
+        "gradle assembleDebug"
       ],
       "build:release": [
-        "android.sh build --config Release"
+        "gradle assembleRelease"
       ],
       "start:app": [
         "android.sh run ${1:-${ANDROID_DEFAULT_DEVICE:-max}}"
