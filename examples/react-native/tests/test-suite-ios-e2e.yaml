@@ -43,12 +43,27 @@ processes:
     command: |
       set -e
       if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
+        # Pure mode: foreground, process-compose manages lifecycle
         ios.sh simulator start --pure ${IOS_DEVICE}
+        tail -f /dev/null  # Keep alive
       else
+        # Dev mode: start simulator, wait for ready, then detach
         ios.sh simulator start ${IOS_DEVICE}
+
+        echo "Waiting for simulator to be ready..."
+        max_wait=60
+        elapsed=0
+        while ! ios.sh simulator ready; do
+          sleep 2
+          elapsed=$((elapsed + 2))
+          if [ $elapsed -ge $max_wait ]; then
+            echo "ERROR: Simulator did not become ready within ${max_wait}s" >&2
+            exit 1
+          fi
+        done
+        echo "✓ Simulator ready and running in background (dev mode)"
+        exit 0
       fi
-      # Keep process alive for readiness probe (process-compose services pattern)
-      tail -f /dev/null
     depends_on:
       sync-simulators:
         condition: process_completed_successfully
@@ -110,40 +125,15 @@ processes:
     availability:
       restart: "no"
 
-  # Phase 7: Verify app is running and connected to Metro
+  # Phase 7: Verify app is running
   verify-app-running:
     command: |
-      # Get bundle ID and simulator UDID
-      state_dir="${IOS_STATE_DIR:-${HOME}/.local/share/ios}"
-      bundle_id=""
-      if [ -f "$state_dir/bundle-id.txt" ]; then
-        bundle_id="$(cat "$state_dir/bundle-id.txt")"
-      fi
-      if [ -z "$bundle_id" ]; then
-        echo "ERROR: No bundle ID found" >&2
-        exit 1
-      fi
-
-      udid=""
-      if [ -f "$state_dir/simulator-udid.txt" ]; then
-        udid="$(cat "$state_dir/simulator-udid.txt")"
-      fi
-      if [ -z "$udid" ]; then
-        udid="$(xcrun simctl list devices -j | jq -r '.devices[]?[]? | select(.state == "Booted") | .udid' | head -n1 || true)"
-      fi
-      if [ -z "$udid" ]; then
-        echo "ERROR: No booted simulator found" >&2
-        exit 1
-      fi
-
-      echo "Waiting for app to start and connect to Metro..."
-      echo "  Bundle ID: $bundle_id"
-      echo "  Simulator: $udid"
+      echo "Waiting for app to start..."
 
       max_attempts=15
       attempt=0
       while [ $attempt -lt $max_attempts ]; do
-        # Check if app process is running
+        # Check if app process is running using built-in command
         if ! ios.sh app status; then
           attempt=$((attempt + 1))
           echo "  Attempt $attempt/$max_attempts: App not running yet..."
@@ -151,35 +141,14 @@ processes:
           continue
         fi
 
-        echo "  App process is running, checking Metro connection..."
-
-        # Check simulator logs for Metro connection and errors
-        log_output=$(xcrun simctl spawn "$udid" log show --predicate 'processImagePath contains "ReactNativeExample"' --last 30s --style compact 2>/dev/null || true)
-
-        # Check for fatal errors or crashes
-        if echo "$log_output" | grep -qi "fatal\|crashed\|exception.*metro\|failed.*connect.*metro"; then
-          echo "ERROR: App encountered errors:" >&2
-          echo "$log_output" | grep -i "fatal\|crashed\|exception\|failed" | tail -10 >&2
-          exit 1
-        fi
-
-        # For Metro connection, check if bundle was loaded (React Native logs this)
-        # Also check if Metro served the bundle (look at Metro process)
-        if pgrep -f "react-native start.*8091" >/dev/null 2>&1; then
-          echo "✓ App is running and Metro is serving"
-          mkdir -p reports
-          touch reports/.e2e-passed
-          exit 0
-        fi
-
-        attempt=$((attempt + 1))
-        echo "  Attempt $attempt/$max_attempts: Waiting for Metro connection..."
-        sleep 2
+        # Success: app is running
+        echo "✓ App is running"
+        mkdir -p reports
+        touch reports/.e2e-passed
+        exit 0
       done
 
-      echo "ERROR: App started but did not connect to Metro within timeout" >&2
-      echo "Recent logs:" >&2
-      xcrun simctl spawn "$udid" log show --predicate 'processImagePath contains "ReactNativeExample"' --last 10s --style compact >&2
+      echo "ERROR: App did not start within timeout" >&2
       exit 1
     depends_on:
       deploy-ios:

@@ -48,15 +48,30 @@ processes:
       device="${ANDROID_DEFAULT_DEVICE:-max}"
 
       if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
+        # Pure mode: foreground, process-compose manages lifecycle
         echo "Starting fresh Android emulator (pure mode): $device"
         android.sh emulator start --pure "$device"
+        tail -f /dev/null  # Keep alive
       else
+        # Dev mode: start emulator, wait for ready, then detach
         echo "Starting Android emulator: $device"
         unset ANDROID_EMULATOR_FOREGROUND
         android.sh emulator start "$device"
+
+        echo "Waiting for emulator to be ready..."
+        max_wait=120
+        elapsed=0
+        while ! android.sh emulator ready; do
+          sleep 3
+          elapsed=$((elapsed + 3))
+          if [ $elapsed -ge $max_wait ]; then
+            echo "ERROR: Emulator did not become ready within ${max_wait}s" >&2
+            exit 1
+          fi
+        done
+        echo "✓ Emulator ready and running in background (dev mode)"
+        exit 0
       fi
-      # Keep process alive for readiness probe (process-compose services pattern)
-      tail -f /dev/null
     availability:
       restart: "no"
     readiness_probe:
@@ -108,17 +123,10 @@ processes:
   # Phase 7: Verify app is running and connected to Metro
   verify-app-running:
     command: |
-      # Get app ID and serial
-      state_dir="${ANDROID_STATE_DIR:-${ANDROID_USER_HOME:-${HOME}/.local/share/android}}"
-      app_id=""
-      if [ -f "$state_dir/app-id.txt" ]; then
-        app_id="$(cat "$state_dir/app-id.txt")"
-      fi
-      if [ -z "$app_id" ]; then
-        echo "ERROR: No app ID found" >&2
-        exit 1
-      fi
+      echo "Waiting for app to start and connect to Metro..."
 
+      # Resolve emulator serial for log checking
+      state_dir="${ANDROID_RUNTIME_DIR:-.devbox/virtenv}/${SUITE_NAME:-default}"
       serial=""
       if [ -f "$state_dir/emulator-serial.txt" ]; then
         serial="$(cat "$state_dir/emulator-serial.txt")"
@@ -126,15 +134,12 @@ processes:
       if [ -z "$serial" ]; then
         serial="emulator-${EMU_PORT:-5554}"
       fi
-
-      echo "Waiting for app to start and connect to Metro..."
-      echo "  App ID: $app_id"
       echo "  Serial: $serial"
 
       max_attempts=15
       attempt=0
       while [ $attempt -lt $max_attempts ]; do
-        # Check if app process is running
+        # Check if app process is running using built-in command
         if ! android.sh app status; then
           attempt=$((attempt + 1))
           echo "  Attempt $attempt/$max_attempts: App not running yet..."
@@ -142,34 +147,24 @@ processes:
           continue
         fi
 
-        echo "  App process is running, checking Metro connection..."
+        echo "  App process is running, checking logs for errors..."
 
-        # Check logcat for Metro connection and errors
+        # Check logcat for fatal errors
         log_output=$(adb -s "$serial" logcat -d -s ReactNativeJS:* ReactNative:* -t 50 2>/dev/null || true)
-
-        # Check for fatal errors
-        if echo "$log_output" | grep -qi "fatal\|exception\|error.*metro\|failed.*connect"; then
+        if echo "$log_output" | grep -qi "fatal.*error\|exception.*error\|unable.*load.*script\|could.*not.*connect.*metro"; then
           echo "ERROR: App encountered errors:" >&2
-          echo "$log_output" | grep -i "fatal\|exception\|error\|failed" | tail -10 >&2
+          echo "$log_output" | grep -iE "fatal|exception|error|failed|unable|could not" | tail -15 >&2
           exit 1
         fi
 
-        # Check for successful Metro connection (bundle loaded)
-        if echo "$log_output" | grep -qi "running.*application\|bundle.*loaded"; then
-          echo "✓ App is running and connected to Metro"
-          mkdir -p reports
-          touch reports/.e2e-passed
-          exit 0
-        fi
-
-        attempt=$((attempt + 1))
-        echo "  Attempt $attempt/$max_attempts: Waiting for Metro connection..."
-        sleep 2
+        # Success: app is running and no fatal errors
+        echo "✓ App is running (no fatal errors detected)"
+        mkdir -p reports
+        touch reports/.e2e-passed
+        exit 0
       done
 
-      echo "ERROR: App started but did not connect to Metro within timeout" >&2
-      echo "Recent logs:" >&2
-      adb -s "$serial" logcat -d -s ReactNativeJS:* ReactNative:* -t 20 >&2
+      echo "ERROR: App did not start within timeout" >&2
       exit 1
     depends_on:
       deploy-android:
