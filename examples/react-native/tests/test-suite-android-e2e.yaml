@@ -26,7 +26,8 @@ processes:
 
       BUILD_CONFIG="${ANDROID_BUILD_CONFIG:-Debug}"
       echo "Building Android app (${BUILD_CONFIG})..."
-      android.sh build --config "$BUILD_CONFIG" -- -PreactNativeDevServerPort="$METRO_PORT"
+      cd android
+      ./gradlew assemble${BUILD_CONFIG} -PreactNativeDevServerPort="$METRO_PORT"
       echo 'Build complete'
     depends_on:
       build-node:

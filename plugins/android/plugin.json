@@ -47,7 +47,6 @@
     "{{ .Virtenv }}/scripts/domain/avd.sh": "virtenv/scripts/domain/avd.sh",
     "{{ .Virtenv }}/scripts/domain/avd-reset.sh": "virtenv/scripts/domain/avd-reset.sh",
     "{{ .Virtenv }}/scripts/domain/emulator.sh": "virtenv/scripts/domain/emulator.sh",
-    "{{ .Virtenv }}/scripts/domain/build.sh": "virtenv/scripts/domain/build.sh",
     "{{ .Virtenv }}/scripts/domain/deploy.sh": "virtenv/scripts/domain/deploy.sh",
     "{{ .Virtenv }}/scripts/domain/validate.sh": "virtenv/scripts/domain/validate.sh",
     "{{ .Virtenv }}/scripts/user/android.sh": "virtenv/scripts/user/android.sh",

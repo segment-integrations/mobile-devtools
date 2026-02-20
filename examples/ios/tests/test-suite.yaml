@@ -11,7 +11,11 @@ is_strict: true
 processes:
   # Phase 1: Build app - runs first
   build-app:
-    command: "ios.sh build"
+    command: |
+      xcodebuild -project ios.xcodeproj -scheme ios \
+        -configuration Debug \
+        -destination "generic/platform=iOS Simulator" \
+        build
     availability:
       restart: "no"
 

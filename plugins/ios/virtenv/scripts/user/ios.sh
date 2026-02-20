@@ -6,7 +6,6 @@ usage() {
 Usage: ios.sh <command> [args]
 
 Commands:
-  build [flags]              Auto-detect and build Xcode project
   deploy [app_path]          Install and launch app on running simulator
   devices <command> [args]
   simulator start [device] [--pure]
@@ -15,25 +14,12 @@ Commands:
   simulator reset
   app status                 Check if deployed app is running
   app stop                   Stop the deployed app
-  run [app_path] [device]    Build, start sim, install, and launch
+  run [app_path] [device]    Start simulator, install, and launch app
   xcodebuild [args...]
   config show
   info
 
-Build flags:
-  --config Debug|Release     Build configuration (default: Debug)
-  --scheme name              Xcode scheme (default: auto-detect)
-  --workspace path           Path to .xcworkspace
-  --project path             Path to .xcodeproj
-  --derived-data path        DerivedData path
-  --quiet                    Suppress xcodebuild output
-  --action build|test        xcodebuild action (default: build)
-  -- extra_args...           Extra args passed to xcodebuild
-
 Examples:
-  ios.sh build
-  ios.sh build --config Release
-  ios.sh build --action test
   ios.sh deploy
   ios.sh deploy /path/to/MyApp.app
   ios.sh devices list
@@ -50,6 +36,8 @@ Examples:
   ios.sh run /path/to/MyApp.app
   ios.sh xcodebuild -project MyApp.xcodeproj -scheme MyApp build
   ios.sh config show
+
+Note: Build your app with xcodebuild directly (e.g., cd ios && xcodebuild ...)
 USAGE
   exit 1
 }
@@ -81,11 +69,6 @@ ios_state_dir() {
 }
 
 case "$command_name" in
-  build)
-    # shellcheck disable=SC1090
-    . "${script_dir}/domain/build.sh"
-    ios_build "$@"
-    ;;
   devices)
     exec "${script_dir}/user/devices.sh" "$@"
     ;;

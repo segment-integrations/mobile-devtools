@@ -29,7 +29,6 @@ usage() {
 Usage: android.sh <command> [args]
 
 Commands:
-  build [flags]                    Auto-detect and build Gradle project
   deploy [apk_path]                Install and launch app on running emulator
   devices <command> [args]         Manage device definitions
   info                             Display resolved SDK information
@@ -40,18 +39,9 @@ Commands:
   emulator reset                   Reset all emulator AVDs
   app status                       Check if deployed app is running
   app stop                         Stop the deployed app
-  run [apk_path] [device]          Build, install, and launch app on emulator
-
-Build flags:
-  --config Debug|Release           Build configuration (default: Debug)
-  --task gradle_task               Gradle task override
-  --quiet                          Suppress Gradle output
-  -- extra_args...                 Extra args passed to gradle
+  run [apk_path] [device]          Start emulator, install, and launch app
 
 Examples:
-  android.sh build
-  android.sh build --config Release
-  android.sh build --task bundleRelease
   android.sh deploy
   android.sh deploy path/to/app.apk
   android.sh devices list
@@ -63,12 +53,13 @@ Examples:
   android.sh emulator ready
   android.sh app status
   android.sh app stop
-  android.sh run                             # Build, install, launch
+  android.sh run                             # Start emulator, install, launch
   android.sh run max                         # Same, but on 'max' device
   android.sh run path/to/app.apk             # Install provided APK
   android.sh run path/to/app.apk max         # Install APK on 'max' device
 
 Note: Configuration is managed via environment variables in devbox.json.
+Note: Build your app with gradle directly (e.g., cd android && ./gradlew assembleDebug)
 USAGE
   exit 1
 }
@@ -118,23 +109,6 @@ android_state_dir() {
 # ============================================================================
 
 case "$command_name" in
-  # --------------------------------------------------------------------------
-  # build - Auto-detect and build Gradle project
-  # --------------------------------------------------------------------------
-  build)
-    ensure_lib_loaded
-
-    build_script="${scripts_dir%/}/domain/build.sh"
-    if [ ! -f "$build_script" ]; then
-      echo "ERROR: domain/build.sh not found: $build_script" >&2
-      exit 1
-    fi
-
-    # shellcheck source=/dev/null
-    . "$build_script"
-    android_build "$@"
-    ;;
-
   # --------------------------------------------------------------------------
   # deploy - Install and launch app on running emulator (no build, no emu start)
   # --------------------------------------------------------------------------

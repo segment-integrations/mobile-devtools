@@ -46,7 +46,6 @@
     "{{ .Virtenv }}/scripts/domain/device_manager.sh": "virtenv/scripts/domain/device_manager.sh",
     "{{ .Virtenv }}/scripts/domain/validate.sh": "virtenv/scripts/domain/validate.sh",
     "{{ .Virtenv }}/scripts/domain/simulator.sh": "virtenv/scripts/domain/simulator.sh",
-    "{{ .Virtenv }}/scripts/domain/build.sh": "virtenv/scripts/domain/build.sh",
     "{{ .Virtenv }}/scripts/domain/deploy.sh": "virtenv/scripts/domain/deploy.sh",
     "{{ .Virtenv }}/scripts/user/config.sh": "virtenv/scripts/user/config.sh",
     "{{ .Virtenv }}/scripts/user/ios.sh": "virtenv/scripts/user/ios.sh",

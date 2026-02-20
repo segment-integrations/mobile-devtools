@@ -126,9 +126,15 @@ processes:
       . ${REACT_NATIVE_VIRTENV}/metro/env-ios.sh
       echo "Metro port: $METRO_PORT"
 
-      # Build with ios.sh build
+      # Build with xcodebuild
+      cd ios
       NODE_BINARY="$NODE_BINARY" RCT_METRO_PORT="$METRO_PORT" \
-        ios.sh build --config "$BUILD_CONFIG" --quiet
+        xcodebuild -workspace ReactNativeExample.xcworkspace \
+          -scheme ReactNativeExample \
+          -configuration "$BUILD_CONFIG" \
+          -destination "generic/platform=iOS Simulator" \
+          -quiet \
+          build
 
       echo "Build complete"
     depends_on:
