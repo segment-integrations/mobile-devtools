@@ -732,12 +732,12 @@ plugins/tests/
 
 **File naming:**
 ```
-process-compose-{suite}.yaml
+{suite}.yaml
 
 Examples:
-- process-compose-lint.yaml
-- process-compose-unit-tests.yaml
-- process-compose-e2e.yaml
+- lint.yaml
+- unit-tests.yaml
+- e2e.yaml
 ```
 
 **Process naming:**

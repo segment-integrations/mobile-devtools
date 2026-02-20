@@ -1002,7 +1002,7 @@ run_tests test_new_feature
 2. Add to process-compose config:
 
 ```yaml
-# tests/process-compose-unit-tests.yaml
+# tests/unit-tests.yaml
 test-android-new-feature:
   command: "bash plugins/tests/android/test-new-feature.sh"
   depends_on:

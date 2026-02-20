@@ -33,7 +33,7 @@
       ],
       "test:unit": [
         "echo 'Running orchestrated unit tests...'",
-        "process-compose -f tests/process-compose-unit-tests.yaml --tui=${TEST_TUI:-false}"
+        "process-compose -f tests/unit-tests.yaml --tui=${TEST_TUI:-false}"
       ],
       "test:e2e:android": [
         "echo 'Running Android example E2E test...'",
@@ -49,7 +49,7 @@
       ],
       "test:e2e": [
         "echo 'Running E2E tests (orchestrated: android+ios parallel, then rn)...'",
-        "process-compose -f tests/process-compose-e2e.yaml --no-server --tui=${TEST_TUI:-false}"
+        "process-compose -f tests/e2e.yaml --no-server --tui=${TEST_TUI:-false}"
       ],
       "test": [
         "echo '========================================'",

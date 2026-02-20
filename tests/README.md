@@ -173,7 +173,7 @@ Runs all static analysis in parallel:
 
 ### 3. Unit Test Suite (`devbox run test:unit`)
 
-**Configuration**: `tests/process-compose-unit-tests.yaml`
+**Configuration**: `tests/unit-tests.yaml`
 
 Runs plugin unit tests after linting:
 
@@ -192,7 +192,7 @@ Runs plugin unit tests after linting:
 
 ### 4. E2E Test Suite (`devbox run test:e2e`)
 
-**Configuration**: `tests/process-compose-e2e.yaml`
+**Configuration**: `tests/e2e.yaml`
 
 Runs end-to-end tests with orchestrated dependencies (one platform at a time to avoid resource conflicts):
 
