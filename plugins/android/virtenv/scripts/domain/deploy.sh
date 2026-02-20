@@ -258,7 +258,7 @@ android_install_apk() {
   echo "✓ APK installed"
 }
 
-# Launch app on emulator (tries activity manager, falls back to monkey)
+# Launch app on emulator via activity manager
 android_launch_app() {
   package_name="$1"
   activity_name="$2"
@@ -271,15 +271,14 @@ android_launch_app() {
 
   android_debug_log "Launch component: $component_name"
 
-  # Try launching via activity manager
-  if adb -s "$emulator_serial" shell am start -n "$component_name" >/dev/null 2>&1; then
-    echo "✓ App launched via activity manager"
-  else
-    echo "WARNING: Activity manager launch failed, trying monkey launcher" >&2
-
-    # Fallback: Use monkey to launch via launcher intent
-    adb -s "$emulator_serial" shell monkey -p "$package_name" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 || true
+  # Launch via activity manager
+  if ! adb -s "$emulator_serial" shell am start -n "$component_name" >/dev/null 2>&1; then
+    android_log_error "deploy.sh" "Failed to launch app: $component_name"
+    android_log_error "deploy.sh" "Verify the package name and activity are correct."
+    return 1
   fi
+
+  echo "✓ App launched via activity manager"
 
   # Wait a moment for the app process to start
   sleep 2
@@ -298,8 +297,9 @@ android_launch_app() {
     fi
   done
 
-  echo "WARNING: App process not detected after ${max_attempts} attempts" >&2
-  echo "         App may still have launched successfully" >&2
+  android_log_error "deploy.sh" "App process not detected after ${max_attempts} attempts"
+  android_log_error "deploy.sh" "Check logcat for crash details: adb -s $emulator_serial logcat -d | grep $package_name"
+  return 1
 }
 
 # Run Android app (build, install, launch)
