@@ -241,26 +241,6 @@ User calls scripts (android.sh, ios.sh)
 
 ---
 
-## Implementation Checklist
-
-### Android:
-- [ ] Move `android_resolve_java_home()` from avd.sh → lib.sh
-- [ ] Add ANDROID_JAVA_HOME export to core.sh
-- [ ] Remove ANDROID_HOME/ANDROID_JAVA_HOME setup from avd.sh
-- [ ] Verify all domain scripts assume environment is set
-
-### iOS:
-- [ ] Review PATH/DEVELOPER_DIR exports in device_manager.sh
-- [ ] Ensure all core setup is in platform/core.sh
-- [ ] Verify domain scripts don't duplicate environment setup
-
-### React Native:
-- [ ] Verify it only adds Metro-specific setup
-- [ ] Doesn't duplicate Android/iOS setup
-- [ ] Metro port allocation is in lib.sh (utility)
-
----
-
 ## Benefits of This Strategy
 
 1. **Single Source of Truth:** Each variable has exactly one place where it's set
