@@ -24,21 +24,21 @@
       ],
       "build:android": [
         "devbox run install",
-        "android.sh build"
+        "cd android && ./gradlew assembleDebug"
       ],
       "build:android:release": [
         "devbox run install",
-        "android.sh build --config Release"
+        "cd android && ./gradlew assembleRelease"
       ],
       "build:ios": [
         "devbox run install",
         "cd ios && pod install --repo-update",
-        "ios.sh build --quiet"
+        "ios.sh xcodebuild -workspace ReactNativeExample.xcworkspace -scheme ReactNativeExample -configuration Debug -destination 'generic/platform=iOS Simulator' build"
       ],
       "build:ios:release": [
         "devbox run install",
         "cd ios && pod install --repo-update",
-        "ios.sh build --config Release --quiet"
+        "ios.sh xcodebuild -workspace ReactNativeExample.xcworkspace -scheme ReactNativeExample -configuration Release build"
       ],
       "build:web": [
         "devbox run install",

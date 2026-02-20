@@ -26,7 +26,8 @@ processes:
       set -e
       BUILD_CONFIG="${ANDROID_BUILD_CONFIG:-Debug}"
       echo "Building Android app (${BUILD_CONFIG})..."
-      android.sh build --config "$BUILD_CONFIG"
+      TASK="assemble${BUILD_CONFIG}"
+      cd android && ./gradlew "$TASK"
       echo 'Build complete'
     depends_on:
       build-node:

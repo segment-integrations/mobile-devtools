@@ -6,16 +6,16 @@
   "shell": {
     "scripts": {
       "build": [
-        "ios.sh build"
+        "ios.sh xcodebuild -project ios.xcodeproj -scheme ios -configuration Debug -destination 'generic/platform=iOS Simulator' build"
       ],
       "build:release": [
-        "ios.sh build --config Release"
+        "ios.sh xcodebuild -project ios.xcodeproj -scheme ios -configuration Release build"
       ],
       "start:app": [
         "ios.sh run ${1:-}"
       ],
       "test": [
-        "ios.sh build --action test"
+        "ios.sh xcodebuild -project ios.xcodeproj -scheme ios -destination 'platform=iOS Simulator,name=iPhone 17' test"
       ],
       "test:e2e": [
         "process-compose -f tests/test-suite.yaml --no-server --tui=${TEST_TUI:-false}"
