@@ -198,6 +198,59 @@ assert_command_success() {
 }
 
 # ============================================================================
+# E2E Step Tracking
+# ============================================================================
+
+# Record a passing E2E step. Call from process-compose YAML processes.
+e2e_step_pass() {
+  local step_name="$1"
+  mkdir -p reports/steps
+  echo "pass" > "reports/steps/${step_name}.status"
+}
+
+# Record a failing E2E step with an optional reason.
+e2e_step_fail() {
+  local step_name="$1"
+  local reason="${2:-Unknown error}"
+  mkdir -p reports/steps
+  printf 'fail\n%s\n' "$reason" > "reports/steps/${step_name}.status"
+}
+
+# Read all step status files and report results. Replaces assert_file_exists
+# for E2E summaries. Returns 0 if all steps passed, 1 otherwise.
+e2e_report_steps() {
+  local steps_dir="reports/steps"
+  local any_failure=0
+
+  if [ ! -d "$steps_dir" ] || [ -z "$(ls "$steps_dir"/*.status 2>/dev/null)" ]; then
+    echo "  No step status files found - pipeline may not have started"
+    test_failed=$((test_failed + 1))
+    return 1
+  fi
+
+  for status_file in "$steps_dir"/*.status; do
+    local step_name
+    step_name="$(basename "$status_file" .status)"
+    local status
+    status="$(head -1 "$status_file")"
+    if [ "$status" = "pass" ]; then
+      echo "  ✓ PASS: $step_name"
+      test_passed=$((test_passed + 1))
+    else
+      local reason
+      reason="$(tail -n +2 "$status_file")"
+      echo "  ✗ FAIL: $step_name"
+      [ -n "$reason" ] && echo "    Reason: $reason"
+      test_failed=$((test_failed + 1))
+      any_failure=1
+    fi
+  done
+
+  rm -rf "$steps_dir"
+  return $any_failure
+}
+
+# ============================================================================
 # Fixture Helpers
 # ============================================================================
 
