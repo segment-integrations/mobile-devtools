@@ -137,8 +137,8 @@ ios_resolve_devbox_bin() {
 # ============================================================================
 
 # Setup Darwin environment for iOS (use system Xcode/tools instead of Nix)
-devbox_omit_nix_env() {
-  if [ "${DEVBOX_OMIT_NIX_ENV_APPLIED:-}" = "1" ]; then
+ios_setup_native_toolchain() {
+  if [ "${IOS_NATIVE_TOOLCHAIN_APPLIED:-}" = "1" ]; then
     return 0
   fi
 
@@ -164,7 +164,7 @@ devbox_omit_nix_env() {
     unset SDKROOT
   fi
 
-  export DEVBOX_OMIT_NIX_ENV_APPLIED=1
+  export IOS_NATIVE_TOOLCHAIN_APPLIED=1
 }
 
 # Setup macOS system PATH and DEVELOPER_DIR
@@ -177,7 +177,7 @@ ios_setup_environment() {
   fi
 
   # Setup omit-nix-env
-  devbox_omit_nix_env
+  ios_setup_native_toolchain
 
   # Ensure DEVELOPER_DIR is set
   if [ "$(uname -s)" = "Darwin" ]; then
