@@ -35,7 +35,7 @@ Create or modify your `devbox.json` to include the iOS plugin:
 }
 ```
 
-The `ios.sh build` command stores build output in `.devbox/virtenv/ios/DerivedData` by default (configurable via `IOS_DERIVED_DATA_PATH`).
+Build output is stored in `.devbox/virtenv/ios/DerivedData` by default (configurable via `IOS_DERIVED_DATA_PATH`).
 
 ### Initial Setup
 
@@ -241,10 +241,10 @@ The plugin provides simulator and device management. Build and deploy commands a
   "shell": {
     "scripts": {
       "build:ios": [
-        "ios.sh build"
+        "ios.sh xcodebuild -scheme MyApp -configuration Debug -destination 'generic/platform=iOS Simulator' build"
       ],
       "build:release": [
-        "ios.sh build --config Release"
+        "ios.sh xcodebuild -scheme MyApp -configuration Release build"
       ],
       "start:app": [
         "ios.sh run ${1:-}"
@@ -645,13 +645,11 @@ This shows:
 
 **Symptom**: Xcode build errors related to linker flags or Nix environment variables.
 
-**Solution**: The iOS init hook now strips Nix compilation variables (`LD`, `LDFLAGS`, `NIX_LDFLAGS`, `NIX_CFLAGS_COMPILE`, `NIX_CFLAGS_LINK`) at shell startup, so `xcodebuild` works natively in devbox shell. If you still encounter issues, use `ios.sh build` which handles this automatically:
+**Solution**: The iOS init hook strips Nix compilation variables (`LD`, `LDFLAGS`, `NIX_LDFLAGS`, `NIX_CFLAGS_COMPILE`, `NIX_CFLAGS_LINK`) at shell startup, so `xcodebuild` works natively in devbox shell. If you still encounter issues, use the `ios.sh xcodebuild` wrapper which strips these variables in a subshell:
 
 ```bash
-ios.sh build
+ios.sh xcodebuild -scheme MyApp build
 ```
-
-The `ios.sh xcodebuild` wrapper is also available for backward compatibility when running outside devbox shell.
 
 ### Lock File Out of Sync
 

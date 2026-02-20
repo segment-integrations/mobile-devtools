@@ -497,9 +497,9 @@ Use Ctrl/Cmd+F to search for specific error messages or symptoms.
    defaults read "$IOS_APP_ARTIFACT/Info.plist" CFBundleIdentifier
    ```
 
-5. Use `ios.sh build` which auto-detects your project and handles Nix flags:
+5. Use `ios.sh xcodebuild` wrapper which strips Nix flags in a subshell:
    ```bash
-   ios.sh build
+   ios.sh xcodebuild -scheme MyApp build
    ```
    Alternatively, `xcodebuild` works natively in devbox shell since Nix vars are stripped at init time.
 

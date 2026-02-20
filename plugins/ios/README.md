@@ -15,8 +15,8 @@ devbox run ios.sh devices list
 # Start simulator
 devbox run start:sim
 
-# Build iOS app (auto-detects project)
-ios.sh build
+# Build iOS app (define build:ios in devbox.json)
+devbox run build:ios
 
 # Build, install, and launch app on simulator
 ios.sh run
@@ -76,9 +76,10 @@ devbox run ios.sh devices sync   # Ensure simulators match device definitions
 
 ### Build Commands
 ```sh
-ios.sh build                     # Build iOS app (auto-detects project)
-ios.sh build --config Release    # Build Release
-ios.sh build --action test       # Run xcodebuild tests
+# Define build scripts in devbox.json using native xcodebuild:
+#   "build:ios": ["ios.sh xcodebuild -scheme MyApp build"]
+devbox run build:ios             # Build iOS app
+ios.sh xcodebuild <args>         # Run xcodebuild with Nix flags stripped
 devbox run test:e2e              # Run E2E tests with simulator
 ```
 

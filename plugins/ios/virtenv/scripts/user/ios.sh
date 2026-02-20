@@ -391,7 +391,7 @@ case "$command_name" in
       project_root="$(ios_resolve_project_root)"
       app_path="$(ios_find_app "$project_root" || true)"
       if [ -z "$app_path" ] || [ ! -d "$app_path" ]; then
-        echo "ERROR: No .app bundle found. Build first with 'ios.sh build'." >&2
+        echo "ERROR: No .app bundle found. Build first (e.g., xcodebuild) or define a build:ios script in devbox.json." >&2
         exit 1
       fi
     fi

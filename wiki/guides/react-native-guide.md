@@ -514,8 +514,7 @@ devbox run start:sim
 
 ```bash
 # Clean build
-cd android && gradle clean
-android.sh build
+cd android && ./gradlew clean assembleDebug
 ```
 
 **iOS Xcode errors:**
@@ -528,7 +527,7 @@ rm -rf .devbox/virtenv/ios/DerivedData
 cd ios && pod install --repo-update
 
 # Rebuild
-ios.sh build
+devbox run build:ios
 ```
 
 ### Platform-Specific Issues

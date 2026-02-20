@@ -151,10 +151,10 @@ The Android plugin runs two initialization hooks:
   "shell": {
     "scripts": {
       "build": [
-        "android.sh build"
+        "gradle assembleDebug"
       ],
       "build:release": [
-        "android.sh build --config Release"
+        "gradle assembleRelease"
       ],
       "start:app": [
         "android.sh run ${1:-${ANDROID_DEFAULT_DEVICE:-max}}"
@@ -270,11 +270,11 @@ The iOS plugin runs two initialization hooks:
   },
   "shell": {
     "scripts": {
-      "build": [
-        "ios.sh build"
+      "build:ios": [
+        "ios.sh xcodebuild -scheme MyApp -configuration Debug -destination 'generic/platform=iOS Simulator' build"
       ],
       "build:release": [
-        "ios.sh build --config Release"
+        "ios.sh xcodebuild -scheme MyApp -configuration Release build"
       ],
       "start:app": [
         "ios.sh run ${1:-}"
@@ -377,12 +377,12 @@ Additional exports:
       ],
       "build:android": [
         "devbox run install",
-        "android.sh build"
+        "cd android && ./gradlew assembleDebug"
       ],
       "build:ios": [
         "devbox run install",
         "cd ios && pod install --repo-update",
-        "ios.sh build --quiet"
+        "ios.sh xcodebuild -workspace MyApp.xcworkspace -scheme MyApp -configuration Debug -destination 'generic/platform=iOS Simulator' build"
       ],
       "start:android": [
         "process-compose -f tests/dev-android.yaml"
@@ -432,10 +432,10 @@ React Native projects can skip unused platform setup:
   "shell": {
     "scripts": {
       "build:ios": [
-        "ANDROID_SKIP_SETUP=1 devbox run --pure ios.sh build"
+        "ANDROID_SKIP_SETUP=1 devbox run --pure build:ios"
       ],
       "build:android": [
-        "IOS_SKIP_SETUP=1 devbox run --pure android.sh build"
+        "IOS_SKIP_SETUP=1 devbox run --pure build:android"
       ]
     }
   }

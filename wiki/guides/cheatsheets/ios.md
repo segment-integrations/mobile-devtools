@@ -56,14 +56,8 @@ devbox run stop:sim
 ## Build and Deploy
 
 ```bash
-# Build (auto-detects project)
-ios.sh build
-
-# Build Release
-ios.sh build --config Release
-
-# Run xcodebuild tests
-ios.sh build --action test
+# Build (define build:ios in devbox.json using xcodebuild)
+devbox run build:ios
 
 # Run app (starts simulator, builds, installs, launches)
 ios.sh run
@@ -78,9 +72,8 @@ ios.sh run /path/to/MyApp.app
 Build scripts in `devbox.json`:
 
 ```bash
-# "build": ["ios.sh build"]
-# "build:release": ["ios.sh build --config Release"]
-# "test": ["ios.sh build --action test"]
+# "build:ios": ["ios.sh xcodebuild -scheme MyApp -configuration Debug -destination 'generic/platform=iOS Simulator' build"]
+# "build:release": ["ios.sh xcodebuild -scheme MyApp -configuration Release build"]
 # "start:app": ["ios.sh run ${1:-}"]
 ```
 
@@ -182,12 +175,12 @@ reports/
 ## Common Xcode Commands
 
 ```bash
-# Build project (preferred)
-ios.sh build
-
-# Build project (direct xcodebuild - works natively, Nix vars stripped at init)
+# Build project (xcodebuild works natively, Nix vars stripped at init)
 xcodebuild -project ios.xcodeproj -scheme ios -configuration Debug \
   -destination 'generic/platform=iOS Simulator' build
+
+# Or use ios.sh xcodebuild wrapper if Nix vars cause issues
+ios.sh xcodebuild -project ios.xcodeproj -scheme ios build
 
 # Install app to simulator
 xcrun simctl install booted path/to/app.app

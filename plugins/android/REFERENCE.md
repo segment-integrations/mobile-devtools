@@ -45,49 +45,6 @@ Configure the plugin by setting environment variables in `plugin.json`. These ar
 
 ## Commands
 
-### Build
-
-```bash
-android.sh build [--config Debug|Release] [--task gradle_task] [--quiet]
-                  [-- extra_gradle_args...]
-```
-- Auto-detects Gradle project by looking for `build.gradle`, `build.gradle.kts`, or `settings.gradle`
-- Default: runs `gradle assembleDebug` (or `assembleRelease` if `--config Release`)
-- Uses `gradlew` if present in the project, otherwise falls back to system `gradle`
-
-**Project detection order:**
-1. Current working directory
-2. `$DEVBOX_PROJECT_ROOT` (if different)
-3. `$PWD/android/` (React Native convention)
-4. `$DEVBOX_PROJECT_ROOT/android/` (if different)
-
-**Examples:**
-```bash
-# Build with defaults (assembleDebug)
-android.sh build
-
-# Build Release
-android.sh build --config Release
-
-# Custom Gradle task
-android.sh build --task bundleRelease
-
-# Pass extra Gradle flags
-android.sh build -- --info --stacktrace
-```
-
-Use in `devbox.json`:
-```json
-{
-  "shell": {
-    "scripts": {
-      "build": ["android.sh build"],
-      "build:release": ["android.sh build --config Release"]
-    }
-  }
-}
-```
-
 ### Emulator
 
 - `devbox run --pure android.sh emulator start [--pure] [device]`
@@ -150,7 +107,7 @@ android.sh app stop
 2. Recursive search of project root for `*.apk` files (excludes .gradle/, build/intermediates/, node_modules/, .devbox/)
 3. Recursive search of `$PWD` if different from project root (same exclusions)
 
-**Build script detection:** Tries `build:android` first, then falls back to `build`. If neither script exists, it runs `android.sh build` to auto-detect and build the Gradle project.
+**Build script detection:** Tries `build:android` first, then falls back to `build`. Define a build script in `devbox.json` using native tools (e.g., `gradle assembleDebug`).
 
 ### Device management
 

@@ -308,7 +308,7 @@ ios_run_build() {
     return 0
   fi
 
-  # Try platform-specific build command first, then fall back to generic, then auto-detect
+  # Try platform-specific build command first, then fall back to generic
   if (cd "$_build_root" && "$_devbox_bin" run --list 2>/dev/null | grep -q "build:ios"); then
     ios_log_info "deploy.sh" "Running build:ios"
     (cd "$_build_root" && "$_devbox_bin" run --pure build:ios)
@@ -316,8 +316,9 @@ ios_run_build() {
     ios_log_info "deploy.sh" "Running build"
     (cd "$_build_root" && "$_devbox_bin" run --pure build)
   else
-    ios_log_info "deploy.sh" "No build:ios or build script found; using ios.sh build"
-    (cd "$_build_root" && ios.sh build)
+    ios_log_error "deploy.sh" "No build:ios or build script found in devbox.json."
+    ios_log_error "deploy.sh" "Define a build script using native tools (e.g., xcodebuild)."
+    return 1
   fi
 }
 

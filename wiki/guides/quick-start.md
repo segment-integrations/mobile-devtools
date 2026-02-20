@@ -97,10 +97,10 @@ The plugin provides emulator and device management. Build and deploy commands ar
   "shell": {
     "scripts": {
       "build": [
-        "android.sh build"
+        "gradle assembleDebug"
       ],
       "build:release": [
-        "android.sh build --config Release"
+        "gradle assembleRelease"
       ],
       "start:app": [
         "android.sh run ${1:-}"
@@ -115,7 +115,7 @@ The `${1:-}` syntax passes an optional argument through to the command. It means
 Now you can build and deploy:
 
 ```sh
-# Build the APK (auto-detects Gradle project)
+# Build the APK
 devbox run build
 
 # Build, install, and launch on the default device
@@ -222,14 +222,11 @@ The plugin provides simulator and device management. Build and deploy commands a
   "include": ["github:segment-integrations/devbox-plugins?dir=plugins/ios"],
   "shell": {
     "scripts": {
-      "build": [
-        "ios.sh build"
+      "build:ios": [
+        "ios.sh xcodebuild -scheme MyApp -configuration Debug -destination 'generic/platform=iOS Simulator' build"
       ],
       "build:release": [
-        "ios.sh build --config Release"
-      ],
-      "test": [
-        "ios.sh build --action test"
+        "ios.sh xcodebuild -scheme MyApp -configuration Release build"
       ],
       "start:app": [
         "ios.sh run ${1:-}"
@@ -244,14 +241,14 @@ As with the Android example, `${1:-}` passes an optional device nickname through
 Now you can build and deploy:
 
 ```sh
-# Build the app (auto-detects Xcode project)
-devbox run build
+# Build the app
+devbox run build:ios
 
 # Start simulator, install, and launch
 devbox run start:app
 ```
 
-**How app auto-detection works:** The `ios.sh run` command starts the simulator, builds the app (using `build:ios`, `build`, or `ios.sh build` auto-detection), then locates the `.app` bundle. It uses this precedence chain:
+**How app auto-detection works:** The `ios.sh run` command starts the simulator, builds the app (using `build:ios` or `build` from devbox.json), then locates the `.app` bundle. It uses this precedence chain:
 
 1. Query `xcodebuild -showBuildSettings` for the built products path (works when your project has an `.xcodeproj` or `.xcworkspace` in the project root)
 2. Recursive search of the project directory for `.app` bundles, skipping `Pods/`, `.build/`, `node_modules/`, `.devbox/`, and similar directories
@@ -340,12 +337,12 @@ The plugin provides emulator/simulator control, device management, and Metro bun
     "scripts": {
       "build:android": [
         "npm install",
-        "android.sh build"
+        "cd android && ./gradlew assembleDebug"
       ],
       "build:ios": [
         "npm install",
         "cd ios && pod install --repo-update",
-        "ios.sh build --quiet"
+        "ios.sh xcodebuild -workspace MyApp.xcworkspace -scheme MyApp -configuration Debug -destination 'generic/platform=iOS Simulator' build"
       ]
     }
   }

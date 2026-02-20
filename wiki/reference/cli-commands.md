@@ -17,28 +17,6 @@ The `--pure` flag runs commands in an isolated environment without environment v
 
 The main Android CLI provides device and emulator management.
 
-#### Build
-
-**Build project:**
-```bash
-android.sh build [--config Debug|Release] [--task gradle_task] [--quiet] [-- extra_args...]
-```
-- Auto-detects Gradle project (`build.gradle`, `build.gradle.kts`, or `settings.gradle`)
-- Default: runs `assembleDebug` (or `assembleRelease` with `--config Release`)
-- Uses `gradlew` if present, otherwise system `gradle`
-
-**Examples:**
-```bash
-# Build with defaults
-android.sh build
-
-# Build Release
-android.sh build --config Release
-
-# Custom task with extra flags
-android.sh build --task bundleRelease -- --info
-```
-
 #### Emulator Management
 
 **Start emulator:**
@@ -293,33 +271,6 @@ devbox run verify:setup
 
 The main iOS CLI provides device and simulator management.
 
-#### Build
-
-**Build project:**
-```bash
-ios.sh build [--config Debug|Release] [--scheme name] [--workspace path]
-             [--project path] [--derived-data path] [--quiet] [--action build|test]
-             [-- extra_xcodebuild_args...]
-```
-- Auto-detects Xcode project (`.xcworkspace` preferred over `.xcodeproj`)
-- Default action: `build`. Use `--action test` for xcodebuild tests.
-- Nix compilation vars are stripped at init time, so `xcodebuild` works natively.
-
-**Examples:**
-```bash
-# Build with defaults (Debug, auto-detect)
-ios.sh build
-
-# Build Release
-ios.sh build --config Release
-
-# Run tests
-ios.sh build --action test
-
-# Quiet mode with explicit workspace
-ios.sh build --workspace ios/MyApp.xcworkspace --scheme MyApp --quiet
-```
-
 #### Simulator Management
 
 **Start simulator:**
@@ -496,9 +447,8 @@ ios.sh app stop
 {
   "shell": {
     "scripts": {
-      "build": ["ios.sh build"],
-      "build:release": ["ios.sh build --config Release"],
-      "test": ["ios.sh build --action test"],
+      "build:ios": ["xcodebuild -scheme MyApp -configuration Debug -destination 'generic/platform=iOS Simulator' build"],
+      "build:release": ["xcodebuild -scheme MyApp -configuration Release build"],
       "start:app": ["ios.sh run ${1:-}"]
     }
   }
@@ -796,12 +746,10 @@ The following are NOT provided by the plugins. Define them in your project's `de
 ### Application Deployment
 
 **Plugin-provided:**
-- `android.sh build [flags]` - Auto-detect and build Gradle project
 - `android.sh deploy [apk_path]` - Install and launch on running emulator
 - `android.sh app status` - Check if deployed app is running
 - `android.sh app stop` - Stop the deployed app
 - `android.sh run [apk_path] [device]` - Build, start emulator, install and launch
-- `ios.sh build [flags]` - Auto-detect and build Xcode project
 - `ios.sh deploy [app_path]` - Install and launch on running simulator
 - `ios.sh app status` - Check if deployed app is running
 - `ios.sh app stop` - Stop the deployed app

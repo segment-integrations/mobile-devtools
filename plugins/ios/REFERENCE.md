@@ -124,56 +124,6 @@ ios.sh app stop
 - Terminates the deployed app via `xcrun simctl terminate`
 - Reads bundle ID and simulator UDID from suite-namespaced state files
 
-### Build
-
-```bash
-ios.sh build [--config Debug|Release] [--scheme name] [--workspace path]
-             [--project path] [--derived-data path] [--quiet] [--action build|test]
-             [-- extra_xcodebuild_args...]
-```
-- Auto-detects Xcode project (.xcworkspace preferred over .xcodeproj)
-- Default action: `build`. Use `--action test` for xcodebuild tests.
-- Calls `xcodebuild` directly (Nix vars are stripped at init time)
-
-**Project detection order:**
-1. Current working directory
-2. `$DEVBOX_PROJECT_ROOT` (if different)
-3. `$PWD/ios/` (React Native convention)
-4. `$DEVBOX_PROJECT_ROOT/ios/` (if different)
-
-Within each directory, prefers `.xcworkspace` over `.xcodeproj`. Scheme is derived from the project filename (e.g., `MyApp.xcodeproj` → `MyApp`), overridable via `--scheme` or `IOS_APP_SCHEME`.
-
-**Examples:**
-```bash
-# Build with defaults (Debug, auto-detect project)
-ios.sh build
-
-# Build Release
-ios.sh build --config Release
-
-# Run xcodebuild tests
-ios.sh build --action test
-
-# Explicit workspace and scheme
-ios.sh build --workspace ios/MyApp.xcworkspace --scheme MyApp
-
-# Pass extra flags to xcodebuild
-ios.sh build --quiet -- -allowProvisioningUpdates
-```
-
-Use in `devbox.json`:
-```json
-{
-  "shell": {
-    "scripts": {
-      "build": ["ios.sh build"],
-      "build:release": ["ios.sh build --config Release"],
-      "test": ["ios.sh build --action test"]
-    }
-  }
-}
-```
-
 ### Xcode Build Wrapper
 
 ```bash
@@ -197,7 +147,7 @@ Use this in `devbox.json` build scripts instead of manually stripping Nix flags:
 }
 ```
 
-The iOS init hook (`devbox_omit_nix_env()`) strips Nix compilation variables at shell startup, so `xcodebuild` works natively in devbox shell. The `ios.sh xcodebuild` subcommand forwards directly to `xcodebuild`.
+The iOS init hook strips Nix compilation variables at shell startup, so `xcodebuild` works natively in devbox shell. The `ios.sh xcodebuild` subcommand forwards directly to `xcodebuild`.
 
 ### Run App
 
@@ -217,7 +167,7 @@ ios.sh run [app_path] [device]
 
 Bundle ID is auto-extracted from the .app's `Info.plist` via PlistBuddy, or from `xcodebuild -showBuildSettings` if available.
 
-**Build script detection:** The `run` command tries `build:ios` first, then falls back to `build`. If neither script exists, it runs `ios.sh build` to auto-detect and build the Xcode project.
+**Build script detection:** The `run` command tries `build:ios` first, then falls back to `build`. Define a build script in `devbox.json` using native tools (e.g., `xcodebuild`).
 
 ### Device Management
 

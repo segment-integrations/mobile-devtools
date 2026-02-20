@@ -156,7 +156,7 @@ case "$command_name" in
       project_root="${DEVBOX_PROJECT_ROOT:-${DEVBOX_PROJECT_DIR:-${DEVBOX_WD:-$PWD}}}"
       apk_path="$(android_find_apk "$project_root" || true)"
       if [ -z "$apk_path" ] || [ ! -f "$apk_path" ]; then
-        echo "ERROR: No APK found. Build first with 'android.sh build'." >&2
+        echo "ERROR: No APK found. Build first (e.g., gradle assembleDebug) or define a build:android script in devbox.json." >&2
         exit 1
       fi
     fi

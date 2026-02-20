@@ -228,10 +228,10 @@ The plugin provides emulator and device management. Build and deploy commands ar
   "shell": {
     "scripts": {
       "build:android": [
-        "android.sh build"
+        "gradle assembleDebug"
       ],
       "build:release": [
-        "android.sh build --config Release"
+        "gradle assembleRelease"
       ],
       "start:app": [
         "android.sh run ${1:-}"
