@@ -69,7 +69,7 @@ jobs:
 
       - name: Upload reports and logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: android-${{ matrix.device }}-reports
           path: |
@@ -129,7 +129,7 @@ jobs:
 
       - name: Upload reports and logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ios-${{ matrix.device }}-reports
           path: |
@@ -232,7 +232,7 @@ jobs:
 
       - name: Upload reports and logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: react-native-${{ matrix.platform }}-${{ matrix.device }}-reports
           path: |
