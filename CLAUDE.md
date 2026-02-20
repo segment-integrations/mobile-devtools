@@ -469,6 +469,10 @@ act -j ios-plugin-tests
 │   ├── e2e-react-native.sh
 │   ├── e2e-sequential.sh
 │   └── e2e-all.sh
+├── wiki/                 # Documentation
+│   ├── guides/           # User guides and cheatsheets
+│   ├── reference/        # CLI, config, and env var references
+│   └── project/          # Architecture and strategy docs
 ├── .github/workflows/
 │   ├── pr-checks.yml     # Fast PR validation
 │   └── e2e-full.yml      # Full E2E tests
@@ -590,7 +594,12 @@ Document public APIs exhaustively in REFERENCE.md files, not in code comments.
 
 **Reduce edge cases and unexpected behavior.** Design for the common path. When edge cases arise, validate assumptions early and fail fast rather than adding complex branching logic.
 
-**Scripts fail on error.** All shell scripts use `set -euo pipefail` (or `set -eu` for POSIX sh). Functions return 0 on success, non-zero on failure. Avoid `|| true` except in validation functions where warnings shouldn't block execution.
+**Scripts fail on error.** Shell scripts use different strictness levels depending on context:
+- Sourced scripts (lib.sh, core.sh, setup.sh): `set -e` (no `-u` due to Node.js package compatibility issues with unset variables)
+- User-facing CLIs (android.sh, ios.sh, devices.sh): `set -eu`
+- Test scripts: `set -euo pipefail`
+
+Functions return 0 on success, non-zero on failure. Avoid `|| true` except in validation functions where warnings shouldn't block execution.
 
 **Validation warns but doesn't block.** User-facing validation commands (like lock file checksum mismatches) should warn with actionable fix commands but never prevent the user from continuing. The validation philosophy is "inform, don't obstruct."
 
@@ -816,7 +825,7 @@ act -W .github/workflows/pr-checks.yml
 
 ## Configuration
 
-Configuration for both Android and iOS plugins is now managed via environment variables defined in `plugin.json`. These env vars are converted to JSON at runtime for internal use.
+Configuration for both Android and iOS plugins is managed via environment variables defined in `plugin.json`. These env vars are converted to JSON at runtime for internal use.
 
 ### Android Plugin Environment Variables
 - `ANDROID_DEFAULT_DEVICE` - Default emulator
@@ -850,7 +859,9 @@ Configuration for both Android and iOS plugins is now managed via environment va
 - Examples: lock file checksum mismatches, missing SDK paths
 
 ### Script Safety
-- All scripts use `set -euo pipefail` (or `set -eu` for POSIX)
+- Sourced scripts: `set -e` (no `-u` due to Node.js package compatibility)
+- User-facing CLIs: `set -eu`
+- Test scripts: `set -euo pipefail`
 - Functions return 0 on success, non-zero on failure
 - Validation functions use `|| true` to avoid blocking
 
@@ -861,4 +872,6 @@ For complete command and configuration references, see:
 - `plugins/ios/REFERENCE.md`
 - `plugins/react-native/REFERENCE.md`
 - `plugins/CONVENTIONS.md`
+- `wiki/project/ARCHITECTURE.md`
+- `wiki/project/ENVIRONMENT-SETUP-STRATEGY.md`
 - `.github/workflows/README.md`
