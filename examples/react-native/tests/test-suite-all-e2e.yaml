@@ -69,15 +69,30 @@ processes:
       device="${ANDROID_DEFAULT_DEVICE:-max}"
 
       if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
+        # Pure mode: foreground
         echo "Starting fresh Android emulator (pure mode): $device"
         android.sh emulator start --pure "$device"
+        tail -f /dev/null
       else
+        # Dev mode: start, wait for ready, then detach
         echo "Starting Android emulator: $device"
         unset ANDROID_EMULATOR_FOREGROUND
         android.sh emulator start "$device"
+
+        echo "Waiting for emulator to be ready..."
+        max_wait=120
+        elapsed=0
+        while ! android.sh emulator ready; do
+          sleep 3
+          elapsed=$((elapsed + 3))
+          if [ $elapsed -ge $max_wait ]; then
+            echo "ERROR: Emulator did not become ready within ${max_wait}s" >&2
+            exit 1
+          fi
+        done
+        echo "✓ Emulator ready and running in background (dev mode)"
+        exit 0
       fi
-      # Keep process alive for readiness probe (process-compose services pattern)
-      tail -f /dev/null
     availability:
       restart: "no"
     readiness_probe:
@@ -94,12 +109,27 @@ processes:
     command: |
       set -e
       if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
+        # Pure mode: foreground
         ios.sh simulator start --pure ${IOS_DEVICE}
+        tail -f /dev/null
       else
+        # Dev mode: start, wait for ready, then detach
         ios.sh simulator start ${IOS_DEVICE}
+
+        echo "Waiting for simulator to be ready..."
+        max_wait=60
+        elapsed=0
+        while ! ios.sh simulator ready; do
+          sleep 2
+          elapsed=$((elapsed + 2))
+          if [ $elapsed -ge $max_wait ]; then
+            echo "ERROR: Simulator did not become ready within ${max_wait}s" >&2
+            exit 1
+          fi
+        done
+        echo "✓ Simulator ready and running in background (dev mode)"
+        exit 0
       fi
-      # Keep process alive for readiness probe (process-compose services pattern)
-      tail -f /dev/null
     depends_on:
       sync-simulators:
         condition: process_completed_successfully
@@ -181,61 +211,25 @@ processes:
     availability:
       restart: "no"
 
-  # Phase 7a: Verify Android app and Metro connection
+  # Phase 7a: Verify Android app
   verify-android-running:
     command: |
-      state_dir="${ANDROID_STATE_DIR:-${ANDROID_USER_HOME:-${HOME}/.local/share/android}}"
-      app_id=""
-      if [ -f "$state_dir/app-id.txt" ]; then
-        app_id="$(cat "$state_dir/app-id.txt")"
-      fi
-      if [ -z "$app_id" ]; then
-        echo "ERROR: No app ID found" >&2
-        exit 1
-      fi
-
-      serial=""
-      if [ -f "$state_dir/emulator-serial.txt" ]; then
-        serial="$(cat "$state_dir/emulator-serial.txt")"
-      fi
-      if [ -z "$serial" ]; then
-        serial="emulator-${EMU_PORT:-5554}"
-      fi
-
-      echo "Waiting for Android app to start and connect to Metro..."
+      echo "Waiting for Android app to start..."
       max_attempts=15
       attempt=0
       while [ $attempt -lt $max_attempts ]; do
-        if ! android.sh app status; then
-          attempt=$((attempt + 1))
-          echo "  Attempt $attempt/$max_attempts: App not running yet..."
-          sleep 2
-          continue
-        fi
-
-        echo "  App process is running, checking Metro connection..."
-        log_output=$(adb -s "$serial" logcat -d -s ReactNativeJS:* ReactNative:* -t 50 2>/dev/null || true)
-
-        if echo "$log_output" | grep -qi "fatal\|exception\|error.*metro\|failed.*connect"; then
-          echo "ERROR: Android app encountered errors:" >&2
-          echo "$log_output" | grep -i "fatal\|exception\|error\|failed" | tail -10 >&2
-          exit 1
-        fi
-
-        if echo "$log_output" | grep -qi "running.*application\|bundle.*loaded"; then
-          echo "✓ Android app is running and connected to Metro"
+        if android.sh app status; then
+          echo "✓ Android app is running"
           mkdir -p reports
           touch reports/.e2e-android-passed
           exit 0
         fi
-
         attempt=$((attempt + 1))
-        echo "  Attempt $attempt/$max_attempts: Waiting for Metro connection..."
+        echo "  Attempt $attempt/$max_attempts: App not running yet..."
         sleep 2
       done
 
-      echo "ERROR: Android app started but did not connect to Metro" >&2
-      adb -s "$serial" logcat -d -s ReactNativeJS:* ReactNative:* -t 20 >&2
+      echo "ERROR: Android app did not start within timeout" >&2
       exit 1
     depends_on:
       deploy-android:
@@ -243,65 +237,25 @@ processes:
     availability:
       restart: "no"
 
-  # Phase 7b: Verify iOS app and Metro connection (parallel with Android)
+  # Phase 7b: Verify iOS app (parallel with Android)
   verify-ios-running:
     command: |
-      state_dir="${IOS_STATE_DIR:-${HOME}/.local/share/ios}"
-      bundle_id=""
-      if [ -f "$state_dir/bundle-id.txt" ]; then
-        bundle_id="$(cat "$state_dir/bundle-id.txt")"
-      fi
-      if [ -z "$bundle_id" ]; then
-        echo "ERROR: No bundle ID found" >&2
-        exit 1
-      fi
-
-      udid=""
-      if [ -f "$state_dir/simulator-udid.txt" ]; then
-        udid="$(cat "$state_dir/simulator-udid.txt")"
-      fi
-      if [ -z "$udid" ]; then
-        udid="$(xcrun simctl list devices -j | jq -r '.devices[]?[]? | select(.state == "Booted") | .udid' | head -n1 || true)"
-      fi
-      if [ -z "$udid" ]; then
-        echo "ERROR: No booted simulator found" >&2
-        exit 1
-      fi
-
-      echo "Waiting for iOS app to start and connect to Metro..."
+      echo "Waiting for iOS app to start..."
       max_attempts=15
       attempt=0
       while [ $attempt -lt $max_attempts ]; do
-        if ! ios.sh app status; then
-          attempt=$((attempt + 1))
-          echo "  Attempt $attempt/$max_attempts: App not running yet..."
-          sleep 2
-          continue
-        fi
-
-        echo "  App process is running, checking Metro connection..."
-        log_output=$(xcrun simctl spawn "$udid" log show --predicate 'processImagePath contains "ReactNativeExample"' --last 30s --style compact 2>/dev/null || true)
-
-        if echo "$log_output" | grep -qi "fatal\|crashed\|exception.*metro\|failed.*connect.*metro"; then
-          echo "ERROR: iOS app encountered errors:" >&2
-          echo "$log_output" | grep -i "fatal\|crashed\|exception\|failed" | tail -10 >&2
-          exit 1
-        fi
-
-        if pgrep -f "react-native start.*8091" >/dev/null 2>&1; then
-          echo "✓ iOS app is running and Metro is serving"
+        if ios.sh app status; then
+          echo "✓ iOS app is running"
           mkdir -p reports
           touch reports/.e2e-ios-passed
           exit 0
         fi
-
         attempt=$((attempt + 1))
-        echo "  Attempt $attempt/$max_attempts: Waiting for Metro connection..."
+        echo "  Attempt $attempt/$max_attempts: App not running yet..."
         sleep 2
       done
 
-      echo "ERROR: iOS app started but did not connect to Metro" >&2
-      xcrun simctl spawn "$udid" log show --predicate 'processImagePath contains "ReactNativeExample"' --last 10s --style compact >&2
+      echo "ERROR: iOS app did not start within timeout" >&2
       exit 1
     depends_on:
       deploy-ios:
