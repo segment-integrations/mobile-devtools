@@ -215,6 +215,10 @@ processes:
       . ${REACT_NATIVE_VIRTENV}/metro/env-all.sh
       echo "Metro port: $METRO_PORT"
 
+      # Set up DerivedData path
+      DERIVED_DATA="${DEVBOX_PROJECT_ROOT:-.}/.devbox/virtenv/ios/DerivedData"
+      mkdir -p "$DERIVED_DATA"
+
       # Build with xcodebuild
       cd ios
       NODE_BINARY="$NODE_BINARY" RCT_METRO_PORT="$METRO_PORT" \
@@ -222,6 +226,7 @@ processes:
           -scheme ReactNativeExample \
           -configuration "$BUILD_CONFIG" \
           -destination "generic/platform=iOS Simulator" \
+          -derivedDataPath "$DERIVED_DATA" \
           -quiet \
           build
 

@@ -12,9 +12,12 @@ processes:
   # Phase 1: Build app - runs first
   build-app:
     command: |
+      DERIVED_DATA="${DEVBOX_PROJECT_ROOT:-.}/.devbox/virtenv/ios/DerivedData"
+      mkdir -p "$DERIVED_DATA"
       xcodebuild -project ios.xcodeproj -scheme ios \
         -configuration Debug \
         -destination "generic/platform=iOS Simulator" \
+        -derivedDataPath "$DERIVED_DATA" \
         build
     availability:
       restart: "no"

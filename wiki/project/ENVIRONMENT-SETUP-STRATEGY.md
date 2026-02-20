@@ -148,18 +148,41 @@ ios_setup_environment() {
 
 ---
 
-### 4. Runtime State Variables → `domain/*.sh`
-**Purpose:** Process-specific runtime state
+### 4. Runtime State → `domain/*.sh`
+**Purpose:** Process-specific runtime state (persisted to suite-namespaced files)
 
-**Examples:**
-- `ANDROID_EMULATOR_SERIAL` (running emulator ID)
-- `ANDROID_DEVICE_NAME` (current device name)
-- `IOS_SIM_UDID` (running simulator UDID)
+**What belongs here:**
+- **State files** (primary): Suite-namespaced state persisted to disk
+  - `$ANDROID_RUNTIME_DIR/$SUITE_NAME/emulator-serial.txt`
+  - `$IOS_RUNTIME_DIR/$SUITE_NAME/simulator-udid.txt`
+  - `$ANDROID_RUNTIME_DIR/$SUITE_NAME/app-id.txt`
+
+- **Environment variables** (internal): Process-scoped, not suite-safe
+  - `ANDROID_EMULATOR_SERIAL` - Used within emulator start process
+  - `ANDROID_DEVICE_NAME` - Used within device operations
+  - `IOS_SIM_UDID` - Used within simulator start process
+  - These are **implementation details**, not user-facing
+
+**How concurrent test suites work:**
+```bash
+# Test suite A (SUITE_NAME=android-e2e)
+android.sh emulator start
+  → Writes to: .devbox/virtenv/android-e2e/emulator-serial.txt
+  → Exports: ANDROID_EMULATOR_SERIAL=emulator-5556 (process-scoped)
+
+# Test suite B (SUITE_NAME=rn-android-e2e)
+android.sh emulator start
+  → Writes to: .devbox/virtenv/rn-android-e2e/emulator-serial.txt
+  → Exports: ANDROID_EMULATOR_SERIAL=emulator-5558 (different process)
+
+# No conflict! Each suite reads its own state file.
+```
 
 **Rules:**
-- Only set variables related to current process/operation
-- Do NOT set core environment (SDK paths, etc.)
-- Assume environment is already set up by init/setup.sh
+- State MUST be persisted to suite-namespaced files for concurrent execution
+- Environment variables are okay for internal use within a process
+- Do NOT rely on env vars across processes - use state files
+- Assume core environment is already set up by init/setup.sh
 
 ---
 
