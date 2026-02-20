@@ -16,6 +16,16 @@ processes:
     availability:
       restart: "no"
 
+  test-android-apk-detection:
+    command: "cd examples/android && devbox run bash ../../plugins/tests/android/test-apk-detection.sh"
+    availability:
+      restart: "no"
+
+  test-android-apk-resolution:
+    command: "bash plugins/tests/android/test-apk-resolution.sh"
+    availability:
+      restart: "no"
+
   # Android integration tests
   test-android-device-mgmt:
     command: "bash tests/integration/android/test-device-mgmt.sh"
@@ -38,6 +48,11 @@ processes:
     availability:
       restart: "no"
 
+  test-ios-app-resolution:
+    command: "bash plugins/tests/ios/test-app-resolution.sh"
+    availability:
+      restart: "no"
+
   # iOS integration tests
   test-ios-device-mgmt:
     command: "bash tests/integration/ios/test-device-mgmt.sh"
@@ -55,6 +70,12 @@ processes:
     availability:
       restart: "no"
 
+  # devbox-mcp plugin tests
+  test-devbox-mcp:
+    command: "process-compose -f plugins/devbox-mcp/tests/test-suite.yaml --no-server --tui=false"
+    availability:
+      restart: "no"
+
   # Summary - only runs when all tests pass
   summary:
     command: |
@@ -66,17 +87,23 @@ processes:
       echo "Android Tests:"
       echo "  - lib.sh"
       echo "  - devices.sh"
+      echo "  - apk-detection"
+      echo "  - apk-resolution"
       echo "  - device-mgmt (integration)"
       echo "  - validation (integration)"
       echo ""
       echo "iOS Tests:"
       echo "  - lib.sh"
       echo "  - devices.sh"
+      echo "  - app-resolution"
       echo "  - device-mgmt (integration)"
       echo "  - cache (integration)"
       echo ""
       echo "React Native Tests:"
       echo "  - lib.sh"
+      echo ""
+      echo "devbox-mcp Tests:"
+      echo "  - All tests"
       echo ""
       echo "========================================"
       echo "     ALL UNIT TESTS PASSED"
@@ -95,6 +122,10 @@ processes:
         condition: process_completed_successfully
       test-android-devices:
         condition: process_completed_successfully
+      test-android-apk-detection:
+        condition: process_completed_successfully
+      test-android-apk-resolution:
+        condition: process_completed_successfully
       test-android-device-mgmt:
         condition: process_completed_successfully
       test-android-validation:
@@ -103,11 +134,15 @@ processes:
         condition: process_completed_successfully
       test-ios-devices:
         condition: process_completed_successfully
+      test-ios-app-resolution:
+        condition: process_completed_successfully
       test-ios-device-mgmt:
         condition: process_completed_successfully
       test-ios-cache:
         condition: process_completed_successfully
       test-rn-lib:
+        condition: process_completed_successfully
+      test-devbox-mcp:
         condition: process_completed_successfully
     availability:
       restart: "no"

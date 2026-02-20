@@ -195,10 +195,9 @@
         "bash scripts/bump.sh \"${@}\""
       ],
       "test:fast": [
-        "echo 'Running fast tests (lint + unit + integration)...'",
+        "echo 'Running fast tests (lint + unit + integration in parallel)...'",
         "devbox run lint",
-        "devbox run test:plugin:unit",
-        "devbox run test:integration",
+        "devbox run test:unit",
         "bash tests/test-summary.sh"
       ]
     }
