@@ -136,45 +136,12 @@ ios_resolve_devbox_bin() {
 # Environment Setup
 # ============================================================================
 
-# Resolves devbox project bin directory
-ios_resolve_devbox_project_bin() {
-  if [ -n "${DEVBOX_PROJECT_ROOT:-}" ] && [ -d "${DEVBOX_PROJECT_ROOT}/.devbox/bin" ]; then
-    printf '%s\n' "${DEVBOX_PROJECT_ROOT}/.devbox/bin"
-  elif [ -n "${DEVBOX_WD:-}" ] && [ -d "${DEVBOX_WD}/.devbox/bin" ]; then
-    printf '%s\n' "${DEVBOX_WD}/.devbox/bin"
-  fi
-}
-
-# Resolves devbox config path
-ios_resolve_devbox_config() {
-  if [ -n "${DEVBOX_CONFIG:-}" ] && [ -f "$DEVBOX_CONFIG" ]; then
-    printf '%s\n' "$DEVBOX_CONFIG"
-  elif [ -n "${DEVBOX_CONFIG_PATH:-}" ] && [ -f "$DEVBOX_CONFIG_PATH" ]; then
-    printf '%s\n' "$DEVBOX_CONFIG_PATH"
-  elif [ -n "${DEVBOX_CONFIG_DIR:-}" ] && [ -f "${DEVBOX_CONFIG_DIR%/}/devbox.json" ]; then
-    printf '%s\n' "${DEVBOX_CONFIG_DIR%/}/devbox.json"
-  fi
-}
-
-# Setup omit-nix-env for iOS (use system Xcode/tools instead of Nix)
+# Setup Darwin environment for iOS (use system Xcode/tools instead of Nix)
 devbox_omit_nix_env() {
   if [ "${DEVBOX_OMIT_NIX_ENV_APPLIED:-}" = "1" ]; then
     return 0
   fi
 
-  devbox_bin="$(ios_resolve_devbox_bin 2>/dev/null || true)"
-  if [ -n "$devbox_bin" ]; then
-    devbox_config_path="$(ios_resolve_devbox_config)"
-    if [ -n "$devbox_config_path" ]; then
-      eval "$("$devbox_bin" --config "$devbox_config_path" shellenv --install --no-refresh-alias --omit-nix-env=true)"
-    else
-      eval "$("$devbox_bin" shellenv --install --no-refresh-alias --omit-nix-env=true)"
-    fi
-  else
-    ios_log_debug "devbox not found; skipping shellenv eval (Darwin cleanup still runs)."
-  fi
-
-  # Darwin cleanup — runs unconditionally (even if devbox binary not found)
   if [ "$(uname -s)" = "Darwin" ]; then
     # Unset standard build variables that Xcode tools read
     unset LD LDFLAGS CFLAGS
@@ -197,21 +164,6 @@ devbox_omit_nix_env() {
     unset SDKROOT
   fi
 
-  # Re-add devbox paths to PATH
-  devbox_init_path="${DEVBOX_INIT_PATH:-}"
-  if [ -n "$devbox_init_path" ]; then
-    PATH="${devbox_init_path}:${PATH}"
-  fi
-  if [ -n "$devbox_bin" ]; then
-    PATH="$(dirname "$devbox_bin"):${PATH}"
-  fi
-  devbox_project_bin="$(ios_resolve_devbox_project_bin)"
-  if [ -n "$devbox_project_bin" ]; then
-    PATH="${devbox_project_bin}:${PATH}"
-  fi
-  export PATH
-
-  # Flag set AFTER all cleanup succeeds
   export DEVBOX_OMIT_NIX_ENV_APPLIED=1
 }
 
