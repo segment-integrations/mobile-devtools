@@ -2,9 +2,9 @@
 
 This directory contains comprehensive CI/CD workflows using **orchestrated testing** powered by process-compose for the Devbox mobile plugins and example projects.
 
-## What's New: Orchestrated Testing 🚀
+## Orchestrated Testing
 
-All workflows now use process-compose orchestration with:
+All workflows use process-compose orchestration with:
 - ✅ **Automatic status checks** - Boot verification, app deployment, process health
 - ✅ **Concurrent execution** - Independent tests run in parallel
 - ✅ **Configurable timeouts** - No infinite hangs (`BOOT_TIMEOUT`, `TEST_TIMEOUT`)
@@ -77,17 +77,17 @@ This workflow provides fast feedback with **improved reliability** through autom
 - **Min**: API 21 (Android 5.0 Lollipop) on ubuntu-24.04
 - **Max**: API 36 (Android 15) on ubuntu-24.04
 - **Hardware Acceleration**: KVM enabled for performance
-- **NEW**: Orchestrated with automatic boot verification
+- Orchestrated with automatic boot verification
 
 #### iOS
 - **Min**: iOS 15.4 on macos-14 (first Apple Silicon macOS supporting iOS 15.4)
 - **Max**: iOS 26.2 on macos-15 (latest macOS version)
-- **NEW**: Orchestrated with automatic boot verification
+- Orchestrated with automatic boot verification
 
 #### React Native
 - Tests both Android and iOS builds on min/max versions
-- **NEW**: Unified job with platform matrix (was split before)
-- **NEW**: Orchestrated with full status checking
+- Unified job with platform matrix
+- Orchestrated with full status checking
 
 **Jobs**:
 
@@ -210,7 +210,7 @@ When a test fails:
 
 1. **Check the job logs** in the Actions tab
 2. **Download artifacts** (uploaded automatically on failure):
-   - **NEW**: Process-compose logs per process (setup, build, boot, deploy, verify)
+   - Process-compose logs per process (setup, build, boot, deploy, verify)
    - Android: `/tmp/android-e2e-logs/`, build outputs
    - iOS: `/tmp/ios-e2e-logs/`, CoreSimulator logs
    - React Native: `/tmp/rn-e2e-logs/`, both platforms

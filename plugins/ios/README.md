@@ -173,7 +173,7 @@ launchctl list | grep CoreSimulator
 ```
 
 ### Build Failures with Nix Flags
-The iOS init hook now strips Nix compilation variables (`LD`, `LDFLAGS`, `NIX_LDFLAGS`, `NIX_CFLAGS_COMPILE`, `NIX_CFLAGS_LINK`) at shell startup, so `xcodebuild` works natively in devbox shell. If you encounter issues outside devbox shell, use the `ios.sh xcodebuild` wrapper:
+The iOS init hook strips Nix compilation variables (`LD`, `LDFLAGS`, `NIX_LDFLAGS`, `NIX_CFLAGS_COMPILE`, `NIX_CFLAGS_LINK`) at shell startup, so `xcodebuild` works natively in devbox shell. If you encounter issues outside devbox shell, use the `ios.sh xcodebuild` wrapper:
 ```sh
 ios.sh xcodebuild -project MyApp.xcodeproj -scheme MyApp build
 ```

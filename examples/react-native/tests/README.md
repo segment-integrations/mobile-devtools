@@ -101,7 +101,7 @@ devbox run test:e2e:android   # Clean, isolated test run
 
 ## Metro Bundler Management
 
-The React Native plugin provides robust Metro bundler management with isolated state:
+The React Native plugin provides Metro bundler management with isolated state:
 
 ```bash
 # Automatic Metro management (via process-compose)

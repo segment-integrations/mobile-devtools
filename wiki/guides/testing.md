@@ -299,7 +299,7 @@ React Native E2E tests follow this sequence:
 
 ### Metro Bundler Management
 
-The React Native plugin provides robust Metro bundler management with isolated state for parallel testing.
+The React Native plugin provides Metro bundler management with isolated state for parallel testing.
 
 #### Automatic Metro Management
 
