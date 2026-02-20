@@ -622,8 +622,7 @@ Format (JSON):
       "runtime": "17.5"
     }
   ],
-  "checksum": "abc123...",
-  "generated_at": "2026-02-09T12:00:00Z"
+  "checksum": "abc123..."
 }
 ```
 

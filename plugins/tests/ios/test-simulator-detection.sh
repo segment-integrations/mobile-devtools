@@ -156,7 +156,6 @@ if [ -f "$lock_file" ]; then
 
   assert_success "jq -e '.devices' '$lock_file'" "Lock file has devices array"
   assert_success "jq -e '.checksum' '$lock_file'" "Lock file has checksum"
-  assert_success "jq -e '.generated_at' '$lock_file'" "Lock file has timestamp"
 
   device_count=$(jq '.devices | length' "$lock_file")
   echo "Devices in lock file: $device_count"

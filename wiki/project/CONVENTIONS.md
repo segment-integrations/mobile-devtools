@@ -120,8 +120,7 @@ Lock files are generated from device definitions to optimize CI builds:
 ```json
 {
   "devices": ["min", "max"],
-  "checksum": "def456...",
-  "generated_at": "2026-02-02T12:00:00Z"
+  "checksum": "def456..."
 }
 ```
 

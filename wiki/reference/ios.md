@@ -298,14 +298,12 @@ The `devices.lock` file tracks which devices should be created:
       "runtime": "17.5"
     }
   ],
-  "checksum": "abc123...",
-  "generated_at": "2026-02-09T12:00:00Z"
+  "checksum": "abc123..."
 }
 ```
 
 - `devices`: Array of device definitions to create
 - `checksum`: SHA-256 hash of all device definition files (for validation)
-- `generated_at`: ISO 8601 timestamp
 
 ## Script Architecture
 

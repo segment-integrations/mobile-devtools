@@ -209,8 +209,7 @@ case "$command_name" in
 
     echo "$devices_json" | jq \
       --arg cs "$checksum" \
-      --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date +%Y-%m-%dT%H:%M:%SZ)" \
-      '{devices: ., checksum: $cs, generated_at: $ts}' > "$temp_lock"
+      '{devices: ., checksum: $cs}' > "$temp_lock"
     mv "$temp_lock" "$lock_path"
 
     device_count="$(echo "$devices_json" | jq '. | length')"
@@ -252,8 +251,7 @@ case "$command_name" in
 
     echo "$devices_json" | jq \
       --arg cs "$checksum" \
-      --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date +%Y-%m-%dT%H:%M:%SZ)" \
-      '{devices: ., checksum: $cs, generated_at: $ts}' > "$temp_lock"
+      '{devices: ., checksum: $cs}' > "$temp_lock"
     mv "$temp_lock" "$lock_path"
 
     echo "Lock file generated: ${device_count} devices"

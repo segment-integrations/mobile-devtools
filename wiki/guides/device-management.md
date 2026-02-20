@@ -394,15 +394,13 @@ With lock files:
       "tag": "google_apis"
     }
   ],
-  "checksum": "2f3ab0e3cefd3e9909185c0717dc9d63038da1e81625eb6fce585e3af446bfef",
-  "generated_at": "2026-02-12T06:54:22Z"
+  "checksum": "2f3ab0e3cefd3e9909185c0717dc9d63038da1e81625eb6fce585e3af446bfef"
 }
 ```
 
 **Fields:**
 - `devices` - Array of device configurations to evaluate
 - `checksum` - SHA-256 hash of all device definition files
-- `generated_at` - ISO 8601 timestamp
 
 ### iOS Lock File
 
@@ -421,8 +419,7 @@ With lock files:
       "runtime": "15.4"
     }
   ],
-  "checksum": "dd575d31a5adf2f471655389df301215f6ef7130ca284d433929b08b68e42890",
-  "generated_at": "2026-02-12T06:55:59Z"
+  "checksum": "dd575d31a5adf2f471655389df301215f6ef7130ca284d433929b08b68e42890"
 }
 ```
 
