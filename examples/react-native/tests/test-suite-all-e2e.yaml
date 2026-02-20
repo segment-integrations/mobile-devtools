@@ -122,10 +122,6 @@ processes:
         condition: process_completed_successfully
     availability:
       restart: "no"
-    shutdown:
-      command: "metro.sh stop all || true"
-      signal: 15
-      timeout_seconds: 5
     readiness_probe:
       exec:
         command: "metro.sh health all ios"
