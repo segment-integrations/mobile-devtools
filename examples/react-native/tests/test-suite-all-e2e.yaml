@@ -282,8 +282,9 @@ processes:
       if [ -z "$serial" ]; then
         serial="emulator-${EMU_PORT:-5554}"
       fi
+      echo "  Serial: $serial"
 
-      max_attempts=15
+      max_attempts=20
       attempt=0
       while [ $attempt -lt $max_attempts ]; do
         if ! android.sh app status; then
@@ -293,20 +294,28 @@ processes:
           continue
         fi
 
-        echo "  App process is running, checking logs for errors..."
+        echo "  App process is running, waiting 5 seconds for startup..."
+        sleep 5
 
-        # Check logcat for Metro connection errors
-        log_output=$(adb -s "$serial" logcat -d -s ReactNativeJS:* ReactNative:* -t 100 2>/dev/null || true)
+        echo "  Checking logs for errors..."
 
-        if echo "$log_output" | grep -qi "unable.*load.*script\|could.*not.*connect.*metro\|connection.*refused.*8081"; then
+        # Get recent logs from ALL tags (not just ReactNative), more lines
+        log_output=$(adb -s "$serial" logcat -d -t 500 2>/dev/null || true)
+
+        # Check for Metro connection errors (these appear in red box)
+        if echo "$log_output" | grep -qi "unable.*load.*script\|could.*not.*connect.*metro\|connection.*refused.*8081\|packaged.*correctly.*for.*release"; then
           echo "ERROR: App cannot connect to Metro bundler:" >&2
-          echo "$log_output" | grep -iE "unable|load|script|connect|metro|refused|8081" | tail -20 >&2
+          echo "$log_output" | grep -iE "unable|load|script|connect|metro|refused|8081|packaged|release|bundle" | tail -30 >&2
+          echo "" >&2
+          echo "Full recent logs:" >&2
+          echo "$log_output" | tail -50 >&2
           exit 1
         fi
 
+        # Check for other fatal errors
         if echo "$log_output" | grep -qi "fatal.*error\|exception.*error"; then
           echo "ERROR: App encountered fatal errors:" >&2
-          echo "$log_output" | grep -iE "fatal|exception" | tail -15 >&2
+          echo "$log_output" | grep -iE "fatal|exception" | tail -20 >&2
           exit 1
         fi
 
