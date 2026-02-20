@@ -172,7 +172,7 @@ processes:
     command: |
       set -e
 
-      BUILD_CONFIG="${IOS_BUILD_CONFIG:-Release}"
+      BUILD_CONFIG="${IOS_BUILD_CONFIG:-Debug}"
       echo "Building React Native app (${BUILD_CONFIG})"
 
       # Source Metro environment so React Native uses correct port
@@ -201,18 +201,48 @@ processes:
   verify-android-running:
     command: |
       echo "Waiting for Android app to start..."
+
+      # Resolve emulator serial for log checking
+      serial=""
+      state_dir="${ANDROID_RUNTIME_DIR:-.devbox/virtenv}/${SUITE_NAME:-default}"
+      if [ -f "$state_dir/emulator-serial.txt" ]; then
+        serial="$(cat "$state_dir/emulator-serial.txt")"
+      fi
+      if [ -z "$serial" ]; then
+        serial="emulator-${EMU_PORT:-5554}"
+      fi
+
       max_attempts=15
       attempt=0
       while [ $attempt -lt $max_attempts ]; do
-        if android.sh app status; then
-          echo "✓ Android app is running"
-          mkdir -p reports
-          touch reports/.e2e-android-passed
-          exit 0
+        if ! android.sh app status; then
+          attempt=$((attempt + 1))
+          echo "  Attempt $attempt/$max_attempts: App not running yet..."
+          sleep 2
+          continue
         fi
-        attempt=$((attempt + 1))
-        echo "  Attempt $attempt/$max_attempts: App not running yet..."
-        sleep 2
+
+        echo "  App process is running, checking logs for errors..."
+
+        # Check logcat for Metro connection errors
+        log_output=$(adb -s "$serial" logcat -d -s ReactNativeJS:* ReactNative:* -t 100 2>/dev/null || true)
+
+        if echo "$log_output" | grep -qi "unable.*load.*script\|could.*not.*connect.*metro\|connection.*refused.*8081"; then
+          echo "ERROR: App cannot connect to Metro bundler:" >&2
+          echo "$log_output" | grep -iE "unable|load|script|connect|metro|refused|8081" | tail -20 >&2
+          exit 1
+        fi
+
+        if echo "$log_output" | grep -qi "fatal.*error\|exception.*error"; then
+          echo "ERROR: App encountered fatal errors:" >&2
+          echo "$log_output" | grep -iE "fatal|exception" | tail -15 >&2
+          exit 1
+        fi
+
+        echo "✓ Android app is running and connected to Metro"
+        mkdir -p reports
+        touch reports/.e2e-android-passed
+        exit 0
       done
 
       echo "ERROR: Android app did not start within timeout" >&2

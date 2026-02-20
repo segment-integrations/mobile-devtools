@@ -3,6 +3,7 @@ version: "0.5"
 environment:
   - "IOS_DEVICE=${IOS_DEFAULT_DEVICE:-max}"
   - "SUITE_NAME=rn-ios-e2e"
+  - "IOS_BUILD_CONFIG=Debug"
   - "ANDROID_SKIP_SETUP=1"
   - "TEST_TUI=${TEST_TUI:-false}"
   - "REACT_NATIVE_VIRTENV=${REACT_NATIVE_VIRTENV}"

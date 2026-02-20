@@ -149,16 +149,25 @@ processes:
 
         echo "  App process is running, checking logs for errors..."
 
-        # Check logcat for fatal errors
-        log_output=$(adb -s "$serial" logcat -d -s ReactNativeJS:* ReactNative:* -t 50 2>/dev/null || true)
-        if echo "$log_output" | grep -qi "fatal.*error\|exception.*error\|unable.*load.*script\|could.*not.*connect.*metro"; then
-          echo "ERROR: App encountered errors:" >&2
-          echo "$log_output" | grep -iE "fatal|exception|error|failed|unable|could not" | tail -15 >&2
+        # Check logcat for errors (including Metro connection issues)
+        log_output=$(adb -s "$serial" logcat -d -s ReactNativeJS:* ReactNative:* -t 100 2>/dev/null || true)
+
+        # Check for Metro connection errors (these appear in red box but may not be "fatal")
+        if echo "$log_output" | grep -qi "unable.*load.*script\|could.*not.*connect.*metro\|connection.*refused.*8081"; then
+          echo "ERROR: App cannot connect to Metro bundler:" >&2
+          echo "$log_output" | grep -iE "unable|load|script|connect|metro|refused|8081" | tail -20 >&2
           exit 1
         fi
 
-        # Success: app is running and no fatal errors
-        echo "✓ App is running (no fatal errors detected)"
+        # Check for other fatal errors
+        if echo "$log_output" | grep -qi "fatal.*error\|exception.*error"; then
+          echo "ERROR: App encountered fatal errors:" >&2
+          echo "$log_output" | grep -iE "fatal|exception" | tail -15 >&2
+          exit 1
+        fi
+
+        # Success: app is running and no errors
+        echo "✓ App is running and connected to Metro"
         mkdir -p reports
         touch reports/.e2e-passed
         exit 0
