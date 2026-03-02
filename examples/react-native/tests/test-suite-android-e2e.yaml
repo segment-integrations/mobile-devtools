@@ -13,25 +13,16 @@ processes:
   setup-sdk:
     environment:
       - "IOS_SKIP_SETUP=1"
-      - "ANDROID_DEBUG_SETUP=1"
     command: |
       set -e
       _step="setup-sdk"
       _step_dir="reports/steps"
       mkdir -p "$_step_dir"
-      trap 'printf "fail\nAndroid SDK setup failed\n" > "$_step_dir/$_step.status"' ERR
 
       . ${ANDROID_RUNTIME_DIR}/scripts/init/setup.sh
 
-      # If init/setup.sh didn't set ANDROID_SDK_ROOT, print diagnostics
+      # Fallback: detect from adb in PATH
       if [ -z "${ANDROID_SDK_ROOT:-}" ]; then
-        echo "⚠️  SDK not resolved by init/setup.sh. Diagnostics:" >&2
-        echo "  ANDROID_SDK_FLAKE_PATH=${ANDROID_SDK_FLAKE_PATH:-unset}" >&2
-        echo "  ANDROID_RUNTIME_DIR=${ANDROID_RUNTIME_DIR:-unset}" >&2
-        echo "  nix in PATH: $(command -v nix 2>/dev/null || echo 'not found')" >&2
-        echo "  adb in PATH: $(command -v adb 2>/dev/null || echo 'not found')" >&2
-
-        # Fallback: detect from adb in PATH
         adb_path="$(command -v adb 2>/dev/null || true)"
         if [ -n "$adb_path" ]; then
           sdk_candidate="$(cd "$(dirname "$adb_path")/.." && pwd)"
@@ -44,10 +35,15 @@ processes:
 
       mkdir -p "${ANDROID_RUNTIME_DIR}/.state"
       echo "${ANDROID_SDK_ROOT:-}" > "${ANDROID_RUNTIME_DIR}/.state/sdk_root"
-      echo "✅ Android SDK ready: ${ANDROID_SDK_ROOT:-NOT SET}"
-      [ -n "${ANDROID_SDK_ROOT:-}" ] || exit 1
 
-      echo "pass" > "$_step_dir/$_step.status"
+      if [ -n "${ANDROID_SDK_ROOT:-}" ]; then
+        echo "✅ Android SDK ready: ${ANDROID_SDK_ROOT}"
+        echo "pass" > "$_step_dir/$_step.status"
+      else
+        echo "❌ Android SDK setup failed: ANDROID_SDK_ROOT not set" >&2
+        printf 'fail\nANDROID_SDK_ROOT not set after setup\n' > "$_step_dir/$_step.status"
+        exit 1
+      fi
     availability:
       restart: "no"
 
@@ -353,6 +349,8 @@ processes:
       fi
     depends_on:
       verify-app-running:
+        condition: process_completed
+      build-node:
         condition: process_completed
     availability:
       restart: "no"
