@@ -50,6 +50,7 @@
     "{{ .Virtenv }}/scripts/user/config.sh": "virtenv/scripts/user/config.sh",
     "{{ .Virtenv }}/scripts/user/ios.sh": "virtenv/scripts/user/ios.sh",
     "{{ .Virtenv }}/scripts/user/devices.sh": "virtenv/scripts/user/devices.sh",
+    "{{ .Virtenv }}/scripts/user/setup.sh": "virtenv/scripts/user/setup.sh",
     "{{ .Virtenv }}/scripts/init/init-hook.sh": "virtenv/scripts/init/init-hook.sh",
     "{{ .Virtenv }}/scripts/init/setup.sh": "virtenv/scripts/init/setup.sh",
     "{{ .DevboxDir }}/devices/min.json": "config/devices/min.json",
@@ -61,6 +62,9 @@
       ". {{ .Virtenv }}/scripts/init/setup.sh"
     ],
     "scripts": {
+      "setup": [
+        "bash {{ .Virtenv }}/scripts/user/setup.sh"
+      ],
       "ios:devices:eval": [
         "ios.sh devices eval"
       ],
