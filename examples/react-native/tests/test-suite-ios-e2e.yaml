@@ -13,9 +13,14 @@ log_level: info
 is_strict: true
 
 processes:
-  # Phase -1: Setup - ensure environment is ready
+  # Phase -1: Setup - ensure iOS environment is ready
   setup-sdk:
-    command: "bash ${REACT_NATIVE_VIRTENV}/scripts/user/setup.sh"
+    command: |
+      set -e
+      if [ -n "${IOS_SCRIPTS_DIR:-}" ] && [ -f "${IOS_SCRIPTS_DIR}/init/setup.sh" ]; then
+        . "${IOS_SCRIPTS_DIR}/init/setup.sh"
+      fi
+      echo "✅ iOS environment ready"
     availability:
       restart: "no"
 
@@ -173,6 +178,11 @@ processes:
       _step_dir="$PWD/reports/steps"
       mkdir -p "$_step_dir"
       trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
+      # Source iOS setup (process-compose processes have isolated environments)
+      if [ -n "${IOS_SCRIPTS_DIR:-}" ] && [ -f "${IOS_SCRIPTS_DIR}/init/setup.sh" ]; then
+        . "${IOS_SCRIPTS_DIR}/init/setup.sh"
+      fi
 
       BUILD_CONFIG="${IOS_BUILD_CONFIG:-Release}"
       echo "Building React Native app (${BUILD_CONFIG})"

@@ -12,7 +12,14 @@ is_strict: true
 processes:
   # Phase -1: Setup - ensure both Android and iOS environments are ready
   setup-sdk:
-    command: "bash ${REACT_NATIVE_VIRTENV}/scripts/user/setup.sh"
+    command: |
+      set -e
+      . ${ANDROID_RUNTIME_DIR}/scripts/init/setup.sh
+      echo "✅ Android SDK ready: ${ANDROID_SDK_ROOT:-not set}"
+      if [ -n "${IOS_SCRIPTS_DIR:-}" ] && [ -f "${IOS_SCRIPTS_DIR}/init/setup.sh" ]; then
+        . "${IOS_SCRIPTS_DIR}/init/setup.sh"
+      fi
+      echo "✅ iOS environment ready"
     availability:
       restart: "no"
 
@@ -59,6 +66,9 @@ processes:
       _step_dir="$PWD/reports/steps"
       mkdir -p "$_step_dir"
       trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
+      # Source SDK setup (process-compose processes have isolated environments)
+      . ${ANDROID_RUNTIME_DIR}/scripts/init/setup.sh
 
       # Source Metro environment so build knows correct port
       . ${REACT_NATIVE_VIRTENV}/metro/env-all.sh

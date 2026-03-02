@@ -11,7 +11,12 @@ is_strict: true
 processes:
   # Phase 0: Setup - ensure iOS environment is ready
   setup-sdk:
-    command: "bash ${IOS_SCRIPTS_DIR}/user/setup.sh"
+    command: |
+      set -e
+      if [ -n "${IOS_SCRIPTS_DIR:-}" ] && [ -f "${IOS_SCRIPTS_DIR}/init/setup.sh" ]; then
+        . "${IOS_SCRIPTS_DIR}/init/setup.sh"
+      fi
+      echo "✅ iOS environment ready"
     availability:
       restart: "no"
 
@@ -26,6 +31,11 @@ processes:
       _step_dir="reports/steps"
       mkdir -p "$_step_dir"
       trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
+      # Source iOS setup (process-compose processes have isolated environments)
+      if [ -n "${IOS_SCRIPTS_DIR:-}" ] && [ -f "${IOS_SCRIPTS_DIR}/init/setup.sh" ]; then
+        . "${IOS_SCRIPTS_DIR}/init/setup.sh"
+      fi
 
       DERIVED_DATA="${DEVBOX_PROJECT_ROOT:-.}/.devbox/virtenv/ios/DerivedData"
       mkdir -p "$DERIVED_DATA"

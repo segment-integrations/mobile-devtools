@@ -13,7 +13,9 @@ is_strict: true
 processes:
   # Phase -1: Setup - ensure environment is ready (skips Android/iOS for web)
   setup-sdk:
-    command: "bash ${REACT_NATIVE_VIRTENV}/scripts/user/setup.sh"
+    command: |
+      echo "⏭️  Web-only mode: Android and iOS setup skipped"
+      echo "✅ Environment ready"
     availability:
       restart: "no"
 
