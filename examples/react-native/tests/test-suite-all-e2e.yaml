@@ -12,6 +12,8 @@ is_strict: true
 processes:
   # Phase -1: Setup - ensure both Android and iOS environments are ready
   setup-sdk:
+    environment:
+      - "ANDROID_DEBUG_SETUP=1"
     command: |
       set -e
       _step="setup-sdk"
@@ -21,33 +23,15 @@ processes:
 
       . ${ANDROID_RUNTIME_DIR}/scripts/init/setup.sh
 
-      # If init/setup.sh didn't set ANDROID_SDK_ROOT (Nix eval failed),
-      # try direct Nix build with visible errors for CI debugging
+      # If init/setup.sh didn't set ANDROID_SDK_ROOT, print diagnostics
       if [ -z "${ANDROID_SDK_ROOT:-}" ]; then
-        echo "SDK not resolved by init/setup.sh, trying direct Nix build with visible errors..."
-        flake_root="${ANDROID_SDK_FLAKE_PATH:-${ANDROID_RUNTIME_DIR}}"
-        flake_output="${ANDROID_SDK_FLAKE_OUTPUT:-android-sdk}"
-        if command -v nix >/dev/null 2>&1; then
-          sdk_out=$(
-            nix --extra-experimental-features 'nix-command flakes' \
-              build "path:${flake_root}#${flake_output}" --no-link --print-out-paths 2>&1
-          ) || true
-          if [ -n "${sdk_out:-}" ] && echo "$sdk_out" | grep -q "^/nix/store/"; then
-            sdk_path=$(echo "$sdk_out" | grep "^/nix/store/" | head -1)
-            if [ -d "$sdk_path/libexec/android-sdk" ]; then
-              ANDROID_SDK_ROOT="$sdk_path/libexec/android-sdk"
-              export ANDROID_SDK_ROOT ANDROID_HOME="$ANDROID_SDK_ROOT"
-            fi
-          fi
-          if [ -z "${ANDROID_SDK_ROOT:-}" ] && [ -n "${sdk_out:-}" ]; then
-            echo "⚠️  Nix build output (last 30 lines):" >&2
-            echo "$sdk_out" | tail -30 >&2
-          fi
-        fi
-      fi
+        echo "⚠️  SDK not resolved by init/setup.sh. Diagnostics:" >&2
+        echo "  ANDROID_SDK_FLAKE_PATH=${ANDROID_SDK_FLAKE_PATH:-unset}" >&2
+        echo "  ANDROID_RUNTIME_DIR=${ANDROID_RUNTIME_DIR:-unset}" >&2
+        echo "  nix in PATH: $(command -v nix 2>/dev/null || echo 'not found')" >&2
+        echo "  adb in PATH: $(command -v adb 2>/dev/null || echo 'not found')" >&2
 
-      # Fallback: detect from adb in PATH
-      if [ -z "${ANDROID_SDK_ROOT:-}" ]; then
+        # Fallback: detect from adb in PATH
         adb_path="$(command -v adb 2>/dev/null || true)"
         if [ -n "$adb_path" ]; then
           sdk_candidate="$(cd "$(dirname "$adb_path")/.." && pwd)"
