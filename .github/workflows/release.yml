@@ -20,7 +20,7 @@ jobs:
       mcp_bumped: ${{ steps.check-mcp.outputs.mcp_bumped }}
       mcp_version: ${{ steps.check-mcp.outputs.mcp_version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -92,7 +92,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
