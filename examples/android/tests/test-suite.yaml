@@ -10,8 +10,17 @@ log_level: info
 is_strict: true
 
 processes:
-  # Phase 1: Build app (runs concurrently with emulator startup)
+  # Phase 0: Setup - ensure Android SDK is evaluated and ready
+  setup-sdk:
+    command: "setup"
+    availability:
+      restart: "no"
+
+  # Phase 1: Build app (depends on SDK setup)
   build-app:
+    depends_on:
+      setup-sdk:
+        condition: process_completed_successfully
     command: |
       set -e
       _step="build-app"
@@ -27,6 +36,9 @@ processes:
 
   # Phase 2a: Sync AVDs - ensure all AVDs match device definitions
   sync-avds:
+    depends_on:
+      setup-sdk:
+        condition: process_completed_successfully
     command: "android.sh devices sync"
     availability:
       restart: "no"

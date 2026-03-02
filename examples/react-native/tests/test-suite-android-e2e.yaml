@@ -9,8 +9,19 @@ log_level: info
 is_strict: true
 
 processes:
+  # Phase -1: Setup - ensure environment is ready
+  setup-sdk:
+    environment:
+      - "IOS_SKIP_SETUP=1"
+    command: "setup"
+    availability:
+      restart: "no"
+
   # Phase 0: Allocate Metro port (no running process needed for builds)
   allocate-metro-port:
+    depends_on:
+      setup-sdk:
+        condition: process_completed_successfully
     command: |
       set -e
       # Source React Native lib

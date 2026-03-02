@@ -3,14 +3,25 @@ version: "0.5"
 environment:
   - "TEST_TUI=${TEST_TUI:-false}"
   - "WEB_PORT=8081"
+  - "ANDROID_SKIP_SETUP=1"
+  - "IOS_SKIP_SETUP=1"
 
 log_location: "reports/react-native-web-e2e-logs"
 log_level: info
 is_strict: true
 
 processes:
+  # Phase -1: Setup - ensure environment is ready (skips Android/iOS for web)
+  setup-sdk:
+    command: "setup"
+    availability:
+      restart: "no"
+
   # Phase 0: Allocate Metro port
   allocate-metro-port:
+    depends_on:
+      setup-sdk:
+        condition: process_completed_successfully
     command: |
       set -e
       # Source React Native lib

@@ -9,8 +9,17 @@ log_level: info
 is_strict: true
 
 processes:
-  # Phase 1: Build app (runs concurrently with simulator startup)
+  # Phase 0: Setup - ensure iOS environment is ready
+  setup-sdk:
+    command: "setup"
+    availability:
+      restart: "no"
+
+  # Phase 1: Build app (depends on SDK setup)
   build-app:
+    depends_on:
+      setup-sdk:
+        condition: process_completed_successfully
     command: |
       set -e
       _step="build-app"
@@ -32,6 +41,9 @@ processes:
 
   # Phase 2: Sync simulators - ensure all simulators match device definitions
   sync-simulators:
+    depends_on:
+      setup-sdk:
+        condition: process_completed_successfully
     command: "ios.sh devices sync"
     availability:
       restart: "no"
