@@ -13,7 +13,7 @@ processes:
   setup-sdk:
     environment:
       - "IOS_SKIP_SETUP=1"
-    command: "setup"
+    command: "bash ${REACT_NATIVE_VIRTENV}/scripts/user/setup.sh"
     availability:
       restart: "no"
 

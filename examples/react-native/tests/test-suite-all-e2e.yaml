@@ -12,7 +12,7 @@ is_strict: true
 processes:
   # Phase -1: Setup - ensure both Android and iOS environments are ready
   setup-sdk:
-    command: "setup"
+    command: "bash ${REACT_NATIVE_VIRTENV}/scripts/user/setup.sh"
     availability:
       restart: "no"
 

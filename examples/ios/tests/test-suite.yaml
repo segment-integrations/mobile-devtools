@@ -11,7 +11,7 @@ is_strict: true
 processes:
   # Phase 0: Setup - ensure iOS environment is ready
   setup-sdk:
-    command: "setup"
+    command: "bash ${IOS_SCRIPTS_DIR}/user/setup.sh"
     availability:
       restart: "no"
 

@@ -12,7 +12,7 @@ is_strict: true
 processes:
   # Phase 0: Setup - ensure Android SDK is evaluated and ready
   setup-sdk:
-    command: "setup"
+    command: "bash ${ANDROID_SCRIPTS_DIR}/user/setup.sh"
     availability:
       restart: "no"
 
