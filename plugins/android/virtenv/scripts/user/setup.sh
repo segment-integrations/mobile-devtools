@@ -13,23 +13,30 @@ fi
 
 echo "🔧 Setting up Android environment..."
 
-# Source the init setup to trigger SDK evaluation
-if [ -n "${ANDROID_SCRIPTS_DIR:-}" ] && [ -f "${ANDROID_SCRIPTS_DIR}/init/setup.sh" ]; then
-  . "${ANDROID_SCRIPTS_DIR}/init/setup.sh"
-fi
+# If ANDROID_SDK_ROOT is already set and valid (e.g. from devbox init_hook),
+# skip re-evaluation. This avoids redundant Nix flake builds that can fail
+# in process-compose subprocesses on CI.
+if [ -n "${ANDROID_SDK_ROOT:-}" ] && [ -d "${ANDROID_SDK_ROOT}" ]; then
+  echo "✅ Android SDK ready: ${ANDROID_SDK_ROOT}"
+else
+  # Source the init setup to trigger SDK evaluation
+  if [ -n "${ANDROID_SCRIPTS_DIR:-}" ] && [ -f "${ANDROID_SCRIPTS_DIR}/init/setup.sh" ]; then
+    . "${ANDROID_SCRIPTS_DIR}/init/setup.sh"
+  fi
 
-# Verify SDK was set up
-if [ -z "${ANDROID_SDK_ROOT:-}" ]; then
-  echo "❌ Android SDK setup failed: ANDROID_SDK_ROOT not set" >&2
-  exit 1
-fi
+  # Verify SDK was set up
+  if [ -z "${ANDROID_SDK_ROOT:-}" ]; then
+    echo "❌ Android SDK setup failed: ANDROID_SDK_ROOT not set" >&2
+    exit 1
+  fi
 
-if [ ! -d "${ANDROID_SDK_ROOT}" ]; then
-  echo "❌ Android SDK setup failed: ANDROID_SDK_ROOT directory does not exist: ${ANDROID_SDK_ROOT}" >&2
-  exit 1
-fi
+  if [ ! -d "${ANDROID_SDK_ROOT}" ]; then
+    echo "❌ Android SDK setup failed: ANDROID_SDK_ROOT directory does not exist: ${ANDROID_SDK_ROOT}" >&2
+    exit 1
+  fi
 
-echo "✅ Android SDK ready: ${ANDROID_SDK_ROOT}"
+  echo "✅ Android SDK ready: ${ANDROID_SDK_ROOT}"
+fi
 
 # Verify essential tools are in PATH
 if ! command -v adb >/dev/null 2>&1; then

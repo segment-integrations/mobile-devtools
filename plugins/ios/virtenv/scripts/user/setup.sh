@@ -19,9 +19,12 @@ fi
 
 echo "🔧 Setting up iOS environment..."
 
-# Source the init setup
-if [ -n "${IOS_SCRIPTS_DIR:-}" ] && [ -f "${IOS_SCRIPTS_DIR}/init/setup.sh" ]; then
-  . "${IOS_SCRIPTS_DIR}/init/setup.sh"
+# Source the init setup if not already initialized
+# (Skip if IOS_DEVELOPER_DIR is already set from devbox init_hook)
+if [ -z "${IOS_DEVELOPER_DIR:-}" ]; then
+  if [ -n "${IOS_SCRIPTS_DIR:-}" ] && [ -f "${IOS_SCRIPTS_DIR}/init/setup.sh" ]; then
+    . "${IOS_SCRIPTS_DIR}/init/setup.sh"
+  fi
 fi
 
 # Verify Xcode is available
