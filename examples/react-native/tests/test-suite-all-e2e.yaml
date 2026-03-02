@@ -15,11 +15,28 @@ processes:
     command: |
       set -e
       . ${ANDROID_RUNTIME_DIR}/scripts/init/setup.sh
-      echo "✅ Android SDK ready: ${ANDROID_SDK_ROOT:-not set}"
+
+      # Fallback: detect from adb in PATH if Nix eval failed
+      if [ -z "${ANDROID_SDK_ROOT:-}" ]; then
+        adb_path="$(command -v adb 2>/dev/null || true)"
+        if [ -n "$adb_path" ]; then
+          sdk_candidate="$(cd "$(dirname "$adb_path")/.." && pwd)"
+          if [ -d "$sdk_candidate/platform-tools" ]; then
+            ANDROID_SDK_ROOT="$sdk_candidate"
+            export ANDROID_SDK_ROOT ANDROID_HOME="$ANDROID_SDK_ROOT"
+          fi
+        fi
+      fi
+
+      mkdir -p "${ANDROID_RUNTIME_DIR}/.state"
+      echo "${ANDROID_SDK_ROOT:-}" > "${ANDROID_RUNTIME_DIR}/.state/sdk_root"
+      echo "✅ Android SDK ready: ${ANDROID_SDK_ROOT:-NOT SET}"
+
       if [ -n "${IOS_SCRIPTS_DIR:-}" ] && [ -f "${IOS_SCRIPTS_DIR}/init/setup.sh" ]; then
         . "${IOS_SCRIPTS_DIR}/init/setup.sh"
       fi
       echo "✅ iOS environment ready"
+      [ -n "${ANDROID_SDK_ROOT:-}" ] || exit 1
     availability:
       restart: "no"
 
@@ -67,8 +84,12 @@ processes:
       mkdir -p "$_step_dir"
       trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
 
-      # Source SDK setup (process-compose processes have isolated environments)
-      . ${ANDROID_RUNTIME_DIR}/scripts/init/setup.sh
+      # Read SDK root from setup-sdk (process-compose processes have isolated envs)
+      if [ -z "${ANDROID_SDK_ROOT:-}" ] && [ -f "${ANDROID_RUNTIME_DIR}/.state/sdk_root" ]; then
+        ANDROID_SDK_ROOT="$(cat "${ANDROID_RUNTIME_DIR}/.state/sdk_root")"
+        ANDROID_HOME="$ANDROID_SDK_ROOT"
+        export ANDROID_SDK_ROOT ANDROID_HOME
+      fi
 
       # Source Metro environment so build knows correct port
       . ${REACT_NATIVE_VIRTENV}/metro/env-all.sh

@@ -10,12 +10,31 @@ log_level: info
 is_strict: true
 
 processes:
-  # Phase 0: Setup - evaluate Android SDK (warms Nix cache for subsequent processes)
+  # Phase 0: Setup - evaluate Android SDK and write path for sibling processes
   setup-sdk:
     command: |
       set -e
       . ${ANDROID_RUNTIME_DIR}/scripts/init/setup.sh
-      echo "✅ Android SDK ready: ${ANDROID_SDK_ROOT:-not set}"
+
+      # If init/setup.sh didn't set ANDROID_SDK_ROOT (Nix eval failed),
+      # detect from adb in PATH (devbox already installed the SDK)
+      if [ -z "${ANDROID_SDK_ROOT:-}" ]; then
+        adb_path="$(command -v adb 2>/dev/null || true)"
+        if [ -n "$adb_path" ]; then
+          # adb is at <sdk>/platform-tools/adb
+          sdk_candidate="$(cd "$(dirname "$adb_path")/.." && pwd)"
+          if [ -d "$sdk_candidate/platform-tools" ]; then
+            ANDROID_SDK_ROOT="$sdk_candidate"
+            export ANDROID_SDK_ROOT ANDROID_HOME="$ANDROID_SDK_ROOT"
+          fi
+        fi
+      fi
+
+      # Write SDK root to shared file for sibling processes
+      mkdir -p "${ANDROID_RUNTIME_DIR}/.state"
+      echo "${ANDROID_SDK_ROOT:-}" > "${ANDROID_RUNTIME_DIR}/.state/sdk_root"
+      echo "✅ Android SDK ready: ${ANDROID_SDK_ROOT:-NOT SET}"
+      [ -n "${ANDROID_SDK_ROOT:-}" ] || exit 1
     availability:
       restart: "no"
 
@@ -31,8 +50,12 @@ processes:
       mkdir -p "$_step_dir"
       trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
 
-      # Source SDK setup (process-compose processes have isolated environments)
-      . ${ANDROID_RUNTIME_DIR}/scripts/init/setup.sh
+      # Read SDK root from setup-sdk (process-compose processes have isolated envs)
+      if [ -z "${ANDROID_SDK_ROOT:-}" ] && [ -f "${ANDROID_RUNTIME_DIR}/.state/sdk_root" ]; then
+        ANDROID_SDK_ROOT="$(cat "${ANDROID_RUNTIME_DIR}/.state/sdk_root")"
+        ANDROID_HOME="$ANDROID_SDK_ROOT"
+        export ANDROID_SDK_ROOT ANDROID_HOME
+      fi
 
       gradle assembleDebug
 
