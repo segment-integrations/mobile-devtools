@@ -15,9 +15,39 @@ processes:
       - "IOS_SKIP_SETUP=1"
     command: |
       set -e
+      _step="setup-sdk"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nAndroid SDK setup failed\n" > "$_step_dir/$_step.status"' ERR
+
       . ${ANDROID_RUNTIME_DIR}/scripts/init/setup.sh
 
-      # Fallback: detect from adb in PATH if Nix eval failed
+      # If init/setup.sh didn't set ANDROID_SDK_ROOT (Nix eval failed),
+      # try direct Nix build with visible errors for CI debugging
+      if [ -z "${ANDROID_SDK_ROOT:-}" ]; then
+        echo "SDK not resolved by init/setup.sh, trying direct Nix build with visible errors..."
+        flake_root="${ANDROID_SDK_FLAKE_PATH:-${ANDROID_RUNTIME_DIR}}"
+        flake_output="${ANDROID_SDK_FLAKE_OUTPUT:-android-sdk}"
+        if command -v nix >/dev/null 2>&1; then
+          sdk_out=$(
+            nix --extra-experimental-features 'nix-command flakes' \
+              build "path:${flake_root}#${flake_output}" --no-link --print-out-paths 2>&1
+          ) || true
+          if [ -n "${sdk_out:-}" ] && echo "$sdk_out" | grep -q "^/nix/store/"; then
+            sdk_path=$(echo "$sdk_out" | grep "^/nix/store/" | head -1)
+            if [ -d "$sdk_path/libexec/android-sdk" ]; then
+              ANDROID_SDK_ROOT="$sdk_path/libexec/android-sdk"
+              export ANDROID_SDK_ROOT ANDROID_HOME="$ANDROID_SDK_ROOT"
+            fi
+          fi
+          if [ -z "${ANDROID_SDK_ROOT:-}" ] && [ -n "${sdk_out:-}" ]; then
+            echo "⚠️  Nix build output (last 30 lines):" >&2
+            echo "$sdk_out" | tail -30 >&2
+          fi
+        fi
+      fi
+
+      # Fallback: detect from adb in PATH
       if [ -z "${ANDROID_SDK_ROOT:-}" ]; then
         adb_path="$(command -v adb 2>/dev/null || true)"
         if [ -n "$adb_path" ]; then
@@ -33,6 +63,8 @@ processes:
       echo "${ANDROID_SDK_ROOT:-}" > "${ANDROID_RUNTIME_DIR}/.state/sdk_root"
       echo "✅ Android SDK ready: ${ANDROID_SDK_ROOT:-NOT SET}"
       [ -n "${ANDROID_SDK_ROOT:-}" ] || exit 1
+
+      echo "pass" > "$_step_dir/$_step.status"
     availability:
       restart: "no"
 

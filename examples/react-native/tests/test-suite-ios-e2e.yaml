@@ -17,10 +17,17 @@ processes:
   setup-sdk:
     command: |
       set -e
+      _step="setup-sdk"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\niOS setup failed\n" > "$_step_dir/$_step.status"' ERR
+
       if [ -n "${IOS_SCRIPTS_DIR:-}" ] && [ -f "${IOS_SCRIPTS_DIR}/init/setup.sh" ]; then
         . "${IOS_SCRIPTS_DIR}/init/setup.sh"
       fi
       echo "✅ iOS environment ready"
+
+      echo "pass" > "$_step_dir/$_step.status"
     availability:
       restart: "no"
 
