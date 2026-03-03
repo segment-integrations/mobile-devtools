@@ -36,7 +36,8 @@
     "{{ .Virtenv }}/scripts/init/init-hook.sh": "virtenv/scripts/init/init-hook.sh",
     "{{ .Virtenv }}/scripts/lib/lib.sh": "virtenv/scripts/lib/lib.sh",
     "{{ .Virtenv }}/scripts/user/rn.sh": "virtenv/scripts/user/rn.sh",
-    "{{ .Virtenv }}/scripts/user/metro.sh": "virtenv/scripts/user/metro.sh"
+    "{{ .Virtenv }}/scripts/user/metro.sh": "virtenv/scripts/user/metro.sh",
+    "{{ .Virtenv }}/scripts/user/setup.sh": "virtenv/scripts/user/setup.sh"
   },
   "shell": {
     "init_hook": [
@@ -44,6 +45,9 @@
       "export NODE_BINARY=\"$(command -v node)\""
     ],
     "scripts": {
+      "setup": [
+        "bash {{ .Virtenv }}/scripts/user/setup.sh"
+      ],
       "rn:metro:port": [
         "rn.sh metro port ${1:-default}"
       ],

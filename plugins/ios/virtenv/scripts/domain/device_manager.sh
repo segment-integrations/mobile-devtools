@@ -74,14 +74,14 @@ resolve_runtime() {
   fi
 
   if [ "${IOS_DOWNLOAD_RUNTIME:-1}" != "0" ] && command -v xcodebuild >/dev/null 2>&1; then
-    echo "Preferred runtime iOS ${preferred} not found. Attempting to download via xcodebuild -downloadPlatform iOS..." >&2
-    if xcodebuild -downloadPlatform iOS; then
+    echo "Preferred runtime iOS ${preferred} not found. Attempting to download via xcodebuild -downloadPlatform iOS -buildVersion ${preferred}..." >&2
+    if xcodebuild -downloadPlatform iOS -buildVersion "$preferred"; then
       if choice="$(pick_runtime "$preferred")"; then
         printf '%s\n' "$choice"
         return 0
       fi
     else
-      echo "xcodebuild -downloadPlatform iOS failed; continuing with available runtimes." >&2
+      echo "xcodebuild -downloadPlatform iOS -buildVersion ${preferred} failed; continuing with available runtimes." >&2
     fi
   fi
 
@@ -99,14 +99,14 @@ resolve_runtime_strict() {
   fi
 
   if [ "${IOS_DOWNLOAD_RUNTIME:-1}" != "0" ] && command -v xcodebuild >/dev/null 2>&1; then
-    echo "Preferred runtime iOS ${preferred} not found. Attempting to download via xcodebuild -downloadPlatform iOS..." >&2
-    if xcodebuild -downloadPlatform iOS; then
+    echo "Preferred runtime iOS ${preferred} not found. Attempting to download via xcodebuild -downloadPlatform iOS -buildVersion ${preferred}..." >&2
+    if xcodebuild -downloadPlatform iOS -buildVersion "$preferred"; then
       if choice="$(pick_runtime_strict "$preferred")"; then
         printf '%s\n' "$choice"
         return 0
       fi
     else
-      echo "xcodebuild -downloadPlatform iOS failed." >&2
+      echo "xcodebuild -downloadPlatform iOS -buildVersion ${preferred} failed." >&2
     fi
   fi
 
@@ -231,14 +231,7 @@ ios_ensure_device_from_definition() {
   fi
 
   # Resolve runtime strictly (don't fallback)
-  choice="$(resolve_runtime_strict "$runtime" 2>&1 || true)"
-  if [ -z "$choice" ]; then
-    echo "  ⚠ Runtime iOS $runtime not available, skipping $name"
-    return 3
-  fi
-
-  # Check if choice contains error message (resolve_runtime_strict failed)
-  if echo "$choice" | grep -q "not found"; then
+  if ! choice="$(resolve_runtime_strict "$runtime")"; then
     echo "  ⚠ Runtime iOS $runtime not available, skipping $name"
     return 3
   fi

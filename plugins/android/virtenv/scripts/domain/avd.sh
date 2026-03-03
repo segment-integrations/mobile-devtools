@@ -353,6 +353,10 @@ android_setup_avds() {
   first_avd_file="${ANDROID_AVD_HOME}/.first_avd"
   rm -f "$first_avd_file"
 
+  # Track skipped devices (loop runs in subshell, so use temp file)
+  skip_count_file="$(mktemp "${TMPDIR:-/tmp}/android-avd-skips-XXXXXX")"
+  echo "0" > "$skip_count_file"
+
   # Get default system image tag
   default_image_tag="${ANDROID_SYSTEM_IMAGE_TAG:-google_apis}"
 
@@ -370,6 +374,7 @@ android_setup_avds() {
     # Validate required fields
     if [ -z "$api_level" ] || [ -z "$device_hardware" ]; then
       echo "ERROR: Device definition missing required fields (api, device)" >&2
+      echo "$(( $(cat "$skip_count_file") + 1 ))" > "$skip_count_file"
       continue
     fi
 
@@ -388,6 +393,7 @@ android_setup_avds() {
       echo "ERROR: Device '$device_hardware' not found in avdmanager" >&2
       echo "       Run: avdmanager list device" >&2
       echo "       Use exact device ID from the list" >&2
+      echo "$(( $(cat "$skip_count_file") + 1 ))" > "$skip_count_file"
       continue
     fi
 
@@ -398,6 +404,7 @@ android_setup_avds() {
       echo "       Preferred ABI: ${preferred_abi:-auto}" >&2
       echo "       Check: ${ANDROID_SDK_ROOT}/system-images/android-${api_level}" >&2
       echo "       Re-enter devbox shell to download system images" >&2
+      echo "$(( $(cat "$skip_count_file") + 1 ))" > "$skip_count_file"
       continue
     fi
 
@@ -476,6 +483,18 @@ android_setup_avds() {
     fi
   fi
 
+  # Check for skipped devices in strict mode
+  avd_skips="$(cat "$skip_count_file" 2>/dev/null || echo "0")"
+  rm -f "$skip_count_file"
+  if [ "$avd_skips" -gt 0 ]; then
+    if [ "${DEVBOX_PURE_SHELL:-}" = "1" ] || [ "${ANDROID_STRICT_SYNC:-}" = "1" ]; then
+      echo ""
+      echo "ERROR: $avd_skips device(s) skipped due to missing system images (strict mode)" >&2
+      echo "       Re-enter devbox shell to download system images or update device definitions" >&2
+      exit 1
+    fi
+  fi
+
   echo ""
   echo "AVD setup complete!"
   echo "Start emulator: emulator -avd <name> --netdelay none --netspeed full"
@@ -512,14 +531,14 @@ android_ensure_avd_from_definition() {
   device_hardware="$(android_resolve_device_hardware "$device" || true)"
   if [ -z "$device_hardware" ]; then
     echo "  ⚠ Device hardware '$device' not available, skipping $name"
-    return 0
+    return 3
   fi
 
   # Pick system image
   system_image="$(android_pick_system_image "$api" "$tag" "$preferred_abi" || true)"
   if [ -z "$system_image" ]; then
     echo "  ⚠ System image not available (API $api, tag $tag), skipping $name"
-    return 0
+    return 3
   fi
 
   # Extract expected ABI from system image package

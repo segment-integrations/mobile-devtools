@@ -53,6 +53,11 @@ processes:
     availability:
       restart: "no"
 
+  test-ios-native-toolchain:
+    command: "bash plugins/tests/ios/test-native-toolchain.sh"
+    availability:
+      restart: "no"
+
   # iOS integration tests
   test-ios-device-mgmt:
     command: "bash tests/integration/ios/test-device-mgmt.sh"
@@ -96,6 +101,7 @@ processes:
       echo "  - lib.sh"
       echo "  - devices.sh"
       echo "  - app-resolution"
+      echo "  - native-toolchain"
       echo "  - device-mgmt (integration)"
       echo "  - cache (integration)"
       echo ""
@@ -135,6 +141,8 @@ processes:
       test-ios-devices:
         condition: process_completed_successfully
       test-ios-app-resolution:
+        condition: process_completed_successfully
+      test-ios-native-toolchain:
         condition: process_completed_successfully
       test-ios-device-mgmt:
         condition: process_completed_successfully

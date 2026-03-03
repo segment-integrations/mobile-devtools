@@ -3,21 +3,62 @@ version: "0.5"
 environment:
   - "SUITE_NAME=android-e2e"
   - "TEST_TUI=${TEST_TUI:-false}"
-  - "ANDROID_DEBUG_SETUP=${ANDROID_DEBUG_SETUP:-}"
 
 log_location: "reports/android-e2e-logs"
 log_level: info
 is_strict: true
 
 processes:
-  # Phase 1: Build app (runs concurrently with emulator startup)
+  # Phase 0: Setup - evaluate Android SDK and write path for sibling processes
+  setup-sdk:
+    command: |
+      set -e
+      _step="setup-sdk"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+
+      bash ${ANDROID_RUNTIME_DIR}/scripts/user/setup.sh
+
+      # Verify state file was written
+      if [ -f "${ANDROID_RUNTIME_DIR}/.state/sdk_root" ]; then
+        sdk_root="$(cat "${ANDROID_RUNTIME_DIR}/.state/sdk_root")"
+        if [ -n "$sdk_root" ]; then
+          echo "pass" > "$_step_dir/$_step.status"
+        else
+          printf 'fail\nANDROID_SDK_ROOT not set after setup\n' > "$_step_dir/$_step.status"
+          exit 1
+        fi
+      else
+        printf 'fail\nSetup did not write state file\n' > "$_step_dir/$_step.status"
+        exit 1
+      fi
+    availability:
+      restart: "no"
+
+  # Phase 1: Build app (depends on SDK setup)
   build-app:
+    depends_on:
+      setup-sdk:
+        condition: process_completed_successfully
     command: |
       set -e
       _step="build-app"
       _step_dir="reports/steps"
       mkdir -p "$_step_dir"
       trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
+      # Read SDK root from setup-sdk (process-compose processes have isolated envs)
+      if [ -z "${ANDROID_SDK_ROOT:-}" ] && [ -f "${ANDROID_RUNTIME_DIR}/.state/sdk_root" ]; then
+        ANDROID_SDK_ROOT="$(cat "${ANDROID_RUNTIME_DIR}/.state/sdk_root")"
+        ANDROID_HOME="$ANDROID_SDK_ROOT"
+        export ANDROID_SDK_ROOT ANDROID_HOME
+      fi
+
+      if [ -z "${ANDROID_SDK_ROOT:-}" ]; then
+        echo "ERROR: ANDROID_SDK_ROOT empty after reading state file" >&2
+        printf 'fail\nANDROID_SDK_ROOT empty - setup may have failed\n' > "$_step_dir/$_step.status"
+        exit 1
+      fi
 
       gradle assembleDebug
 
@@ -27,6 +68,9 @@ processes:
 
   # Phase 2a: Sync AVDs - ensure all AVDs match device definitions
   sync-avds:
+    depends_on:
+      setup-sdk:
+        condition: process_completed_successfully
     command: "android.sh devices sync"
     availability:
       restart: "no"
@@ -64,45 +108,205 @@ processes:
       success_threshold: 1
       failure_threshold: 60
 
+  # Phase 2c: Verify emulator ready (timeout safety net)
+  verify-emulator-ready:
+    command: |
+      set -e
+      _step="emulator-boot"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+
+      # Wait a moment for launch to start
+      sleep 5
+
+      echo "Verifying emulator is ready..."
+      max_wait=300
+      elapsed=0
+      while ! android.sh emulator ready 2>/dev/null; do
+        sleep 3
+        elapsed=$((elapsed + 3))
+        echo "  Waiting for emulator... ${elapsed}s/${max_wait}s"
+        if [ $elapsed -ge $max_wait ]; then
+          printf 'fail\nTimed out after %ds waiting for emulator to boot\n' "$max_wait" > "$_step_dir/$_step.status"
+          exit 1
+        fi
+      done
+      echo "Emulator ready"
+
+      echo "pass" > "$_step_dir/$_step.status"
+    depends_on:
+      sync-avds:
+        condition: process_completed_successfully
+    availability:
+      restart: "no"
+
   # Phase 3: Deploy app - depends on both build and emulator being ready
   deploy-app:
     command: |
       set -e
       _step="deploy-app"
       _step_dir="reports/steps"
-      mkdir -p "$_step_dir"
-      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+      _logs_dir="reports/logs"
+      mkdir -p "$_step_dir" "$_logs_dir"
 
-      android.sh deploy
+      serial="${ANDROID_EMULATOR_SERIAL:-emulator-${EMU_PORT:-5554}}"
 
+      # Capture emulator state before deploy
+      echo "=== Pre-deploy emulator state ==="
+      echo "Serial: $serial"
+      adb -s "$serial" get-state 2>&1 || echo "WARNING: adb get-state failed"
+      echo "Emulator uptime:"
+      adb -s "$serial" shell uptime 2>&1 || echo "WARNING: uptime failed"
       echo ""
-      echo "Waiting for app to start..."
+
+      # Deploy (allow failure so we can capture diagnostics)
+      set +e
+      deploy_exit=0
+      android.sh deploy || deploy_exit=$?
+      set -e
+
+      if [ "$deploy_exit" -ne 0 ]; then
+        echo ""
+        echo "=== Deploy failed (exit $deploy_exit) - capturing diagnostics ==="
+        echo ""
+
+        # Check emulator is still responsive
+        echo "--- Emulator responsiveness ---"
+        adb -s "$serial" get-state 2>&1 || echo "ERROR: Emulator not responding to adb"
+        echo ""
+
+        # Check if the app package is installed
+        echo "--- Installed packages matching com.example ---"
+        adb -s "$serial" shell pm list packages 2>/dev/null | grep "example" || echo "(none found)"
+        echo ""
+
+        # Try launching manually and capture am start output
+        echo "--- Manual am start attempt ---"
+        adb -s "$serial" shell am start -n "com.example.devbox/.MainActivity" 2>&1 || true
+        sleep 3
+        echo ""
+
+        # Check for the process
+        echo "--- Process check (pidof) ---"
+        pid=$(adb -s "$serial" shell pidof com.example.devbox 2>&1 || true)
+        if [ -n "$pid" ]; then
+          echo "Process IS running: pid=$pid"
+          echo "(The deploy script's check may have been too early)"
+        else
+          echo "Process NOT running"
+          echo ""
+          echo "--- Checking for recent crashes ---"
+          adb -s "$serial" shell "dumpsys activity processes | grep -A5 'com.example.devbox'" 2>&1 || true
+        fi
+        echo ""
+
+        # Capture logcat filtered to app
+        echo "--- App logcat (last 100 lines) ---"
+        adb -s "$serial" logcat -d -t 100 --pid="$(adb -s "$serial" shell pidof com.example.devbox 2>/dev/null || echo 0)" 2>&1 | tail -50 || true
+        echo ""
+
+        echo "--- Crash/fatal logcat ---"
+        adb -s "$serial" logcat -d -s AndroidRuntime:E 2>&1 | tail -30 || true
+        echo ""
+
+        # Save full logcat to reports
+        echo "Saving full logcat to $_logs_dir/logcat-deploy-failure.txt"
+        adb -s "$serial" logcat -d > "$_logs_dir/logcat-deploy-failure.txt" 2>&1 || true
+
+        # Save bugreport-style info
+        echo "Saving device info to $_logs_dir/device-info.txt"
+        {
+          echo "=== Device Properties ==="
+          adb -s "$serial" shell getprop 2>&1 || true
+          echo ""
+          echo "=== Memory Info ==="
+          adb -s "$serial" shell cat /proc/meminfo 2>&1 | head -20 || true
+          echo ""
+          echo "=== Disk Space ==="
+          adb -s "$serial" shell df -h 2>&1 || true
+        } > "$_logs_dir/device-info.txt" 2>&1
+
+        printf 'fail\nDeploy failed with exit code %d\n' "$deploy_exit" > "$_step_dir/$_step.status"
+        exit 1
+      fi
+
+      # Deploy succeeded - verify app stays running
+      echo ""
+      echo "Waiting for app to stabilize..."
       max_attempts=10
       attempt=0
       while [ $attempt -lt $max_attempts ]; do
         if android.sh app status; then
-          echo "App is running"
-          echo "pass" > "$_step_dir/$_step.status"
-          exit 0
+          echo "App is running (verified after ${attempt}s)"
+          break
         fi
         attempt=$((attempt + 1))
         echo "  Attempt $attempt/$max_attempts..."
         sleep 2
       done
 
-      printf 'fail\nApp did not start within timeout\n' > "$_step_dir/$_step.status"
-      exit 1
+      if [ $attempt -ge $max_attempts ]; then
+        echo ""
+        echo "=== App not stable after deploy - capturing diagnostics ==="
+        adb -s "$serial" logcat -d -s AndroidRuntime:E 2>&1 | tail -30 || true
+        adb -s "$serial" logcat -d > "$_logs_dir/logcat-deploy-unstable.txt" 2>&1 || true
+        echo "Logcat saved to: $_logs_dir/logcat-deploy-unstable.txt"
+        printf 'fail\nApp did not stay running within timeout\n' > "$_step_dir/$_step.status"
+        exit 1
+      fi
+
+      # Soak period — verify app survives for 10 seconds
+      echo "App process confirmed, starting soak period (10s)..."
+      sleep 10
+
+      if ! android.sh app status; then
+        echo "FAIL: App crashed during soak period"
+        adb -s "$serial" logcat -d > "$_logs_dir/logcat-soak-crash.txt" 2>&1 || true
+        adb -s "$serial" logcat -d -s AndroidRuntime:E > "$_logs_dir/logcat-crash-fatal.txt" 2>&1 || true
+        echo "Logcat saved to: $_logs_dir/logcat-soak-crash.txt"
+        echo "Crash logs: $_logs_dir/logcat-crash-fatal.txt"
+        printf 'fail\nApp crashed during soak period\n' > "$_step_dir/$_step.status"
+        exit 1
+      fi
+
+      # Always save logcat snapshot for analysis
+      adb -s "$serial" logcat -d > "$_logs_dir/logcat-final.txt" 2>&1 || true
+
+      # Scan for crash patterns in logcat (AndroidRuntime tag is the definitive crash signal)
+      crash_patterns="FATAL EXCEPTION|AndroidRuntime.*FATAL"
+      if grep -qiE "$crash_patterns" "$_logs_dir/logcat-final.txt" 2>/dev/null; then
+        echo ""
+        echo "FAIL: Crash patterns detected in logcat"
+        echo "--- Error lines ---"
+        grep -iE "$crash_patterns" "$_logs_dir/logcat-final.txt" | tail -20
+        echo "---"
+        echo "Full logcat: $_logs_dir/logcat-final.txt"
+        printf 'fail\nCrash patterns detected in logcat\n' > "$_step_dir/$_step.status"
+        exit 1
+      fi
+
+      echo "pass" > "$_step_dir/$_step.status"
+      echo "App verified healthy (process alive, no crashes detected)"
+      echo "Logcat saved to: $_logs_dir/logcat-final.txt"
     depends_on:
       build-app:
         condition: process_completed_successfully
-      android-emulator:
-        condition: process_healthy
+      verify-emulator-ready:
+        condition: process_completed_successfully
     availability:
       restart: "no"
 
-  # Cleanup - stop everything in pure mode, keep running in dev mode
+  # Cleanup - capture final logs, then stop everything in pure mode
   cleanup-app:
     command: |
+      _logs_dir="reports/logs"
+      mkdir -p "$_logs_dir"
+
+      # Capture final logcat before teardown
+      serial="${ANDROID_EMULATOR_SERIAL:-emulator-${EMU_PORT:-5554}}"
+      adb -s "$serial" logcat -d > "$_logs_dir/logcat-cleanup.txt" 2>&1 || true
+      echo "Final logcat: $_logs_dir/logcat-cleanup.txt"
+
       if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
         echo "Cleaning up (pure mode)..."
         android.sh app stop || true
@@ -124,7 +328,7 @@ processes:
       export REPO_ROOT="$(cd ../.. && pwd)"
       . "$REPO_ROOT/plugins/tests/test-framework.sh"
       log_test "Android E2E Test Suite"
-      e2e_report_steps || true
+      e2e_report_steps setup-sdk build-app emulator-boot deploy-app || true
       test_summary "android-e2e"
     depends_on:
       cleanup-app:

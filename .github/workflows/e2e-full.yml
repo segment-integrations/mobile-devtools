@@ -94,6 +94,19 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Select pinned Xcode (max only)
+        if: matrix.device == 'max'
+        run: |
+          XCODE_VERSION=$(jq -r '.env.IOS_XCODE_VERSION' plugins/ios/plugin.json)
+          XCODE_APP=$(ls -d /Applications/Xcode_${XCODE_VERSION}*.app 2>/dev/null | head -1)
+          if [ -z "$XCODE_APP" ]; then
+            XCODE_APP="/Applications/Xcode.app"
+          fi
+          echo "Selecting: $XCODE_APP"
+          sudo xcode-select -s "$XCODE_APP/Contents/Developer"
+          xcodebuild -version
+          xcrun simctl list runtimes | grep -i ios
+
       - name: Setup CocoaPods cache
         uses: actions/cache@v4
         with:
@@ -174,6 +187,19 @@ jobs:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: examples/react-native/package-lock.json
+
+      - name: Select pinned Xcode (iOS max only)
+        if: matrix.platform == 'ios' && matrix.device == 'max'
+        run: |
+          XCODE_VERSION=$(jq -r '.env.IOS_XCODE_VERSION' plugins/ios/plugin.json)
+          XCODE_APP=$(ls -d /Applications/Xcode_${XCODE_VERSION}*.app 2>/dev/null | head -1)
+          if [ -z "$XCODE_APP" ]; then
+            XCODE_APP="/Applications/Xcode.app"
+          fi
+          echo "Selecting: $XCODE_APP"
+          sudo xcode-select -s "$XCODE_APP/Contents/Developer"
+          xcodebuild -version
+          xcrun simctl list runtimes | grep -i ios
 
       - name: Enable KVM (Android only)
         if: matrix.platform == 'android'

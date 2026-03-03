@@ -61,6 +61,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc \
+            /usr/local/share/powershell /usr/local/share/chromium \
+            /usr/local/share/boost /opt/hostedtoolcache
+          sudo apt-get clean
+          df -h /
+
       - name: Install Devbox
         uses: jetify-com/devbox-install-action@v0.14.0
         with:
@@ -72,8 +80,9 @@ jobs:
           BOOT_TIMEOUT: 180
           TEST_TIMEOUT: 300
           ANDROID_DEFAULT_DEVICE: max
+          ANDROID_DEVICES: max
           TEST_TUI: false
-        run: devbox run --pure -e EMU_HEADLESS=1 test:e2e
+        run: devbox run --pure -e EMU_HEADLESS=1 -e ANDROID_DEVICES=max test:e2e
 
       - name: Upload reports and logs
         if: always()
@@ -93,6 +102,18 @@ jobs:
     needs: fast-tests
     steps:
       - uses: actions/checkout@v6
+
+      - name: Select pinned Xcode
+        run: |
+          XCODE_VERSION=$(jq -r '.env.IOS_XCODE_VERSION' plugins/ios/plugin.json)
+          XCODE_APP=$(ls -d /Applications/Xcode_${XCODE_VERSION}*.app 2>/dev/null | head -1)
+          if [ -z "$XCODE_APP" ]; then
+            XCODE_APP="/Applications/Xcode.app"
+          fi
+          echo "Selecting: $XCODE_APP"
+          sudo xcode-select -s "$XCODE_APP/Contents/Developer"
+          xcodebuild -version
+          xcrun simctl list runtimes | grep -i ios
 
       - name: Setup CocoaPods cache
         uses: actions/cache@v4
@@ -125,7 +146,7 @@ jobs:
           TEST_TIMEOUT: 300
           IOS_DEFAULT_DEVICE: max
           TEST_TUI: false
-        run: devbox run --pure -e SIM_HEADLESS=1 test:e2e
+        run: devbox run --pure -e SIM_HEADLESS=1 -e IOS_DEVICES=max test:e2e
 
       - name: Upload reports and logs
         if: always()
@@ -184,6 +205,19 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
+      - name: Select pinned Xcode (iOS only)
+        if: matrix.platform == 'ios'
+        run: |
+          XCODE_VERSION=$(jq -r '.env.IOS_XCODE_VERSION' plugins/ios/plugin.json)
+          XCODE_APP=$(ls -d /Applications/Xcode_${XCODE_VERSION}*.app 2>/dev/null | head -1)
+          if [ -z "$XCODE_APP" ]; then
+            XCODE_APP="/Applications/Xcode.app"
+          fi
+          echo "Selecting: $XCODE_APP"
+          sudo xcode-select -s "$XCODE_APP/Contents/Developer"
+          xcodebuild -version
+          xcrun simctl list runtimes | grep -i ios
+
       - name: Setup CocoaPods cache (iOS only)
         if: matrix.platform == 'ios'
         uses: actions/cache@v4
@@ -205,6 +239,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-xcode-
 
+      - name: Free disk space (Android only)
+        if: matrix.platform == 'android'
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc \
+            /usr/local/share/powershell /usr/local/share/chromium \
+            /usr/local/share/boost /opt/hostedtoolcache
+          sudo apt-get clean
+          df -h /
+
       - name: Install Devbox
         uses: jetify-com/devbox-install-action@v0.14.0
         with:
@@ -214,9 +257,9 @@ jobs:
         working-directory: examples/react-native
         run: |
           if [ "${{ matrix.platform }}" = "android" ]; then
-            devbox run --pure -e IOS_SKIP_SETUP=1 -e EMU_HEADLESS=1 test:e2e:android
+            devbox run --pure -e IOS_SKIP_SETUP=1 -e EMU_HEADLESS=1 -e ANDROID_DEVICES=max test:e2e:android
           elif [ "${{ matrix.platform }}" = "ios" ]; then
-            devbox run --pure -e ANDROID_SKIP_SETUP=1 -e SIM_HEADLESS=1 test:e2e:ios
+            devbox run --pure -e ANDROID_SKIP_SETUP=1 -e SIM_HEADLESS=1 -e IOS_DEVICES=max test:e2e:ios
           elif [ "${{ matrix.platform }}" = "web" ]; then
             devbox run --pure -e ANDROID_SKIP_SETUP=1 -e IOS_SKIP_SETUP=1 test:e2e:web
           fi

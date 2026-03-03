@@ -555,17 +555,16 @@ case "$command_name" in
       device_json="$temp_dir/device_${device_index}.json"
       jq -c ".devices[$device_index]" "$lock_file_path" > "$device_json"
 
-      # Call ensure function and track result
-      if android_ensure_avd_from_definition "$device_json"; then
-        result=$?
-        case $result in
-          0) matched=$((matched + 1)) ;;
-          1) recreated=$((recreated + 1)) ;;
-          2) created=$((created + 1)) ;;
-        esac
-      else
-        skipped=$((skipped + 1))
-      fi
+      # Call ensure function and track result (use || true to prevent early exit)
+      android_ensure_avd_from_definition "$device_json" || result=$?
+      result=${result:-0}
+      case $result in
+        0) matched=$((matched + 1)) ;;
+        1) recreated=$((recreated + 1)) ;;
+        2) created=$((created + 1)) ;;
+        3) skipped=$((skipped + 1)) ;;
+        *) skipped=$((skipped + 1)) ;;
+      esac
 
       device_index=$((device_index + 1))
     done
@@ -581,6 +580,16 @@ case "$command_name" in
     fi
     if [ "$skipped" -gt 0 ]; then
       echo "  ⚠ Skipped:   $skipped"
+    fi
+
+    # In strict mode (pure shell / CI), fail if any devices were skipped
+    if [ "$skipped" -gt 0 ]; then
+      if [ "${DEVBOX_PURE_SHELL:-}" = "1" ] || [ "${ANDROID_STRICT_SYNC:-}" = "1" ]; then
+        echo ""
+        echo "ERROR: $skipped device(s) skipped due to missing system images (strict mode)" >&2
+        echo "       Re-enter devbox shell to download system images or update device definitions" >&2
+        exit 1
+      fi
     fi
     ;;
 

@@ -218,33 +218,86 @@ e2e_step_fail() {
 
 # Read all step status files and report results. Replaces assert_file_exists
 # for E2E summaries. Returns 0 if all steps passed, 1 otherwise.
+#
+# Usage:
+#   e2e_report_steps                           # Check existing status files only
+#   e2e_report_steps step1 step2 step3         # Also verify these steps ran
+#
+# When expected steps are provided, any missing status files are reported as
+# failures with "Step never executed". This catches false successes where
+# processes are skipped due to broken dependency chains.
 e2e_report_steps() {
   local steps_dir="reports/steps"
   local any_failure=0
+  local expected_steps=("$@")
+  local found_steps=()
 
   if [ ! -d "$steps_dir" ] || [ -z "$(ls "$steps_dir"/*.status 2>/dev/null)" ]; then
     echo "  No step status files found - pipeline may not have started"
     test_failed=$((test_failed + 1))
-    return 1
+    # Still check expected steps below (they'll all be missing)
+    if [ ${#expected_steps[@]} -eq 0 ]; then
+      return 1
+    fi
+    any_failure=1
+  else
+    for status_file in "$steps_dir"/*.status; do
+      local step_name
+      step_name="$(basename "$status_file" .status)"
+      found_steps+=("$step_name")
+      local status
+      status="$(head -1 "$status_file")"
+      if [ "$status" = "pass" ]; then
+        echo "  ✓ PASS: $step_name"
+        test_passed=$((test_passed + 1))
+      else
+        local reason
+        reason="$(tail -n +2 "$status_file")"
+        echo "  ✗ FAIL: $step_name"
+        [ -n "$reason" ] && echo "    Reason: $reason"
+        test_failed=$((test_failed + 1))
+        any_failure=1
+      fi
+    done
   fi
 
-  for status_file in "$steps_dir"/*.status; do
-    local step_name
-    step_name="$(basename "$status_file" .status)"
-    local status
-    status="$(head -1 "$status_file")"
-    if [ "$status" = "pass" ]; then
-      echo "  ✓ PASS: $step_name"
-      test_passed=$((test_passed + 1))
-    else
-      local reason
-      reason="$(tail -n +2 "$status_file")"
-      echo "  ✗ FAIL: $step_name"
-      [ -n "$reason" ] && echo "    Reason: $reason"
-      test_failed=$((test_failed + 1))
-      any_failure=1
-    fi
-  done
+  # Check for expected steps that never ran (no status file written)
+  if [ ${#expected_steps[@]} -gt 0 ]; then
+    for expected in "${expected_steps[@]}"; do
+      local was_found=0
+      for found in "${found_steps[@]+"${found_steps[@]}"}"; do
+        if [ "$found" = "$expected" ]; then
+          was_found=1
+          break
+        fi
+      done
+      if [ "$was_found" -eq 0 ]; then
+        echo "  ✗ FAIL: $expected"
+        echo "    Reason: Step never executed (process may have been skipped)"
+        test_failed=$((test_failed + 1))
+        any_failure=1
+      fi
+    done
+  fi
+
+  # List available diagnostic logs when there are failures
+  if [ "$any_failure" -eq 1 ]; then
+    local logs_dir="reports/logs"
+    local has_logs=0
+    for logfile in "$logs_dir"/*.log "$logs_dir"/*.txt; do
+      [ -f "$logfile" ] || continue
+      local size
+      size=$(wc -c < "$logfile" | tr -d ' ')
+      if [ "$size" -gt 0 ]; then
+        if [ "$has_logs" -eq 0 ]; then
+          echo ""
+          echo "  Diagnostic logs:"
+          has_logs=1
+        fi
+        echo "    $logfile (${size} bytes)"
+      fi
+    done
+  fi
 
   rm -rf "$steps_dir"
   return $any_failure

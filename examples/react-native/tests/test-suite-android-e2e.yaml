@@ -9,8 +9,39 @@ log_level: info
 is_strict: true
 
 processes:
+  # Phase -1: Setup - evaluate Android SDK and write path for sibling processes
+  setup-sdk:
+    environment:
+      - "IOS_SKIP_SETUP=1"
+    command: |
+      set -e
+      _step="setup-sdk"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+
+      bash ${ANDROID_RUNTIME_DIR}/scripts/user/setup.sh
+
+      # Verify state file was written
+      if [ -f "${ANDROID_RUNTIME_DIR}/.state/sdk_root" ]; then
+        sdk_root="$(cat "${ANDROID_RUNTIME_DIR}/.state/sdk_root")"
+        if [ -n "$sdk_root" ]; then
+          echo "pass" > "$_step_dir/$_step.status"
+        else
+          printf 'fail\nANDROID_SDK_ROOT not set after setup\n' > "$_step_dir/$_step.status"
+          exit 1
+        fi
+      else
+        printf 'fail\nSetup did not write state file\n' > "$_step_dir/$_step.status"
+        exit 1
+      fi
+    availability:
+      restart: "no"
+
   # Phase 0: Allocate Metro port (no running process needed for builds)
   allocate-metro-port:
+    depends_on:
+      setup-sdk:
+        condition: process_completed_successfully
     command: |
       set -e
       # Source React Native lib
@@ -49,6 +80,19 @@ processes:
       _step_dir="$PWD/reports/steps"
       mkdir -p "$_step_dir"
       trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
+      # Read SDK root from setup-sdk (process-compose processes have isolated envs)
+      if [ -z "${ANDROID_SDK_ROOT:-}" ] && [ -f "${ANDROID_RUNTIME_DIR}/.state/sdk_root" ]; then
+        ANDROID_SDK_ROOT="$(cat "${ANDROID_RUNTIME_DIR}/.state/sdk_root")"
+        ANDROID_HOME="$ANDROID_SDK_ROOT"
+        export ANDROID_SDK_ROOT ANDROID_HOME
+      fi
+
+      if [ -z "${ANDROID_SDK_ROOT:-}" ]; then
+        echo "ERROR: ANDROID_SDK_ROOT empty after reading state file" >&2
+        printf 'fail\nANDROID_SDK_ROOT empty - setup may have failed\n' > "$_step_dir/$_step.status"
+        exit 1
+      fi
 
       # Source Metro environment so build knows correct port
       . ${REACT_NATIVE_VIRTENV}/metro/env-android.sh
@@ -118,6 +162,7 @@ processes:
   # Phase 4b: Verify emulator ready
   verify-emulator-ready:
     command: |
+      set -e
       _step="emulator-boot"
       _step_dir="reports/steps"
       mkdir -p "$_step_dir"
@@ -171,15 +216,14 @@ processes:
       set -e
       _step="deploy"
       _step_dir="reports/steps"
-      mkdir -p "$_step_dir"
-      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+      _logs_dir="reports/logs"
+      mkdir -p "$_step_dir" "$_logs_dir"
 
       # Source Metro environment so React Native uses correct port
       . ${REACT_NATIVE_VIRTENV}/metro/env-android.sh
       echo "Metro port: $METRO_PORT"
 
       # Setup ADB reverse port forwarding so app can reach Metro
-      # React Native apps connect to localhost:8081 by default, forward to actual Metro port
       serial=""
       state_dir="${ANDROID_RUNTIME_DIR:-.devbox/virtenv}/${SUITE_NAME:-default}"
       if [ -f "$state_dir/emulator-serial.txt" ]; then
@@ -201,10 +245,106 @@ processes:
       echo "Verifying port forwarding..."
       adb -s "$serial" reverse --list
 
-      # Deploy using android.sh (APK already built by build-android)
-      android.sh deploy
+      # Capture emulator state before deploy
+      echo ""
+      echo "=== Pre-deploy emulator state ==="
+      echo "Serial: $serial"
+      adb -s "$serial" get-state 2>&1 || echo "WARNING: adb get-state failed"
+      echo "Emulator uptime:"
+      adb -s "$serial" shell uptime 2>&1 || echo "WARNING: uptime failed"
+      echo ""
 
-      echo "pass" > "$_step_dir/$_step.status"
+      # Deploy (allow failure so we can capture diagnostics)
+      set +e
+      deploy_exit=0
+      android.sh deploy || deploy_exit=$?
+      set -e
+
+      if [ "$deploy_exit" -ne 0 ]; then
+        echo ""
+        echo "=== Deploy failed (exit $deploy_exit) - capturing diagnostics ==="
+        echo ""
+
+        # Check emulator is still responsive
+        echo "--- Emulator responsiveness ---"
+        adb -s "$serial" get-state 2>&1 || echo "ERROR: Emulator not responding to adb"
+        echo ""
+
+        # Check if the app package is installed
+        echo "--- Installed packages matching app ---"
+        adb -s "$serial" shell pm list packages 2>/dev/null | grep -i "devbox\|example\|reactnative" || echo "(none found)"
+        echo ""
+
+        # Try launching manually and capture am start output
+        echo "--- Manual am start attempt ---"
+        adb -s "$serial" shell am start -n "com.devboxreactnativeexample/.MainActivity" 2>&1 || true
+        sleep 3
+        echo ""
+
+        # Check for the process
+        echo "--- Process check (pidof) ---"
+        pid=$(adb -s "$serial" shell pidof com.devboxreactnativeexample 2>&1 || true)
+        if [ -n "$pid" ]; then
+          echo "Process IS running: pid=$pid"
+          echo "(The deploy script's check may have been too early)"
+        else
+          echo "Process NOT running"
+          echo ""
+          echo "--- Checking for recent crashes ---"
+          adb -s "$serial" shell "dumpsys activity processes | grep -A5 'com.devboxreactnativeexample'" 2>&1 || true
+        fi
+        echo ""
+
+        echo "--- Crash/fatal logcat ---"
+        adb -s "$serial" logcat -d -s AndroidRuntime:E 2>&1 | tail -30 || true
+        echo ""
+
+        # Save full logcat to reports
+        echo "Saving full logcat to $_logs_dir/logcat-deploy-failure.txt"
+        adb -s "$serial" logcat -d > "$_logs_dir/logcat-deploy-failure.txt" 2>&1 || true
+
+        # Save device info
+        echo "Saving device info to $_logs_dir/device-info.txt"
+        {
+          echo "=== Device Properties ==="
+          adb -s "$serial" shell getprop 2>&1 || true
+          echo ""
+          echo "=== Memory Info ==="
+          adb -s "$serial" shell cat /proc/meminfo 2>&1 | head -20 || true
+          echo ""
+          echo "=== Disk Space ==="
+          adb -s "$serial" shell df -h 2>&1 || true
+        } > "$_logs_dir/device-info.txt" 2>&1
+
+        printf 'fail\nDeploy failed with exit code %d\n' "$deploy_exit" > "$_step_dir/$_step.status"
+        exit 1
+      fi
+
+      # Deploy succeeded - verify app stays running
+      echo ""
+      echo "Waiting for app to stabilize..."
+      max_attempts=10
+      attempt=0
+      while [ $attempt -lt $max_attempts ]; do
+        if android.sh app status; then
+          echo "App is running (verified after ${attempt}s)"
+          adb -s "$serial" logcat -d > "$_logs_dir/logcat-deploy-success.txt" 2>&1 || true
+          echo "pass" > "$_step_dir/$_step.status"
+          exit 0
+        fi
+        attempt=$((attempt + 1))
+        echo "  Attempt $attempt/$max_attempts..."
+        sleep 2
+      done
+
+      # App not stable after deploy
+      echo ""
+      echo "=== App not stable after deploy - capturing diagnostics ==="
+      adb -s "$serial" logcat -d -s AndroidRuntime:E 2>&1 | tail -30 || true
+      adb -s "$serial" logcat -d > "$_logs_dir/logcat-deploy-unstable.txt" 2>&1 || true
+
+      printf 'fail\nApp did not stay running within timeout\n' > "$_step_dir/$_step.status"
+      exit 1
     depends_on:
       build-android:
         condition: process_completed_successfully
@@ -215,12 +355,14 @@ processes:
     availability:
       restart: "no"
 
-  # Phase 7: Verify app is running and connected to Metro
+  # Phase 7: Verify app is running, healthy, and survives soak period
   verify-app-running:
     command: |
+      set -e
       _step="verify-app"
       _step_dir="reports/steps"
-      mkdir -p "$_step_dir"
+      _logs_dir="reports/logs"
+      mkdir -p "$_step_dir" "$_logs_dir"
 
       echo "Waiting for app to start and connect to Metro..."
 
@@ -238,58 +380,110 @@ processes:
       max_attempts=20
       attempt=0
       while [ $attempt -lt $max_attempts ]; do
-        # Check if app process is running using built-in command
-        if ! android.sh app status; then
-          attempt=$((attempt + 1))
-          echo "  Attempt $attempt/$max_attempts: App not running yet..."
-          sleep 2
-          continue
+        if android.sh app status; then
+          break
         fi
-
-        echo "  App process is running, waiting 5 seconds for startup..."
-        sleep 5
-
-        echo "  Checking logs for errors..."
-
-        # Get recent logs from ALL tags (not just ReactNative), more lines
-        log_output=$(adb -s "$serial" logcat -d -t 500 2>/dev/null || true)
-
-        # Check for Metro connection errors (these appear in red box)
-        if echo "$log_output" | grep -qi "unable.*load.*script\|could.*not.*connect.*metro\|connection.*refused.*8081\|packaged.*correctly.*for.*release"; then
-          echo "ERROR: App cannot connect to Metro bundler:" >&2
-          echo "$log_output" | grep -iE "unable|load|script|connect|metro|refused|8081|packaged|release|bundle" | tail -30 >&2
-          echo "" >&2
-          echo "Full recent logs:" >&2
-          echo "$log_output" | tail -50 >&2
-          printf 'fail\nApp cannot connect to Metro bundler\n' > "$_step_dir/$_step.status"
-          exit 1
-        fi
-
-        # Check for other fatal errors
-        if echo "$log_output" | grep -qi "fatal.*error\|exception.*error"; then
-          echo "ERROR: App encountered fatal errors:" >&2
-          echo "$log_output" | grep -iE "fatal|exception" | tail -20 >&2
-          printf 'fail\nApp encountered fatal errors\n' > "$_step_dir/$_step.status"
-          exit 1
-        fi
-
-        # Success: app is running and no errors
-        echo "App is running and connected to Metro"
-        echo "pass" > "$_step_dir/$_step.status"
-        exit 0
+        attempt=$((attempt + 1))
+        echo "  Attempt $attempt/$max_attempts: App not running yet..."
+        sleep 2
       done
 
-      printf 'fail\nApp did not start within timeout\n' > "$_step_dir/$_step.status"
-      exit 1
+      # Initial liveness check
+      if ! android.sh app status; then
+        echo "FAIL: App is not running"
+        adb -s "$serial" logcat -d > "$_logs_dir/logcat-verify-failure.txt" 2>&1 || true
+        adb -s "$serial" logcat -d -s AndroidRuntime:E > "$_logs_dir/logcat-crash-fatal.txt" 2>&1 || true
+        echo "Logcat saved to: $_logs_dir/logcat-verify-failure.txt"
+        echo "Crash logs: $_logs_dir/logcat-crash-fatal.txt"
+        printf 'fail\nApp not found in running processes\n' > "$_step_dir/$_step.status"
+        exit 1
+      fi
+
+      echo "  App process is running, waiting 5 seconds for startup..."
+      sleep 5
+
+      echo "  Checking logs for errors..."
+
+      # Save logcat snapshot to file
+      adb -s "$serial" logcat -d > "$_logs_dir/logcat-verify.txt" 2>&1 || true
+
+      # Check for Metro connection errors (these appear in red box)
+      metro_patterns="unable.*load.*script|could.*not.*connect.*metro|connection.*refused.*8081|packaged.*correctly.*for.*release"
+      if grep -qiE "$metro_patterns" "$_logs_dir/logcat-verify.txt" 2>/dev/null; then
+        echo "FAIL: App cannot connect to Metro bundler"
+        echo "--- Error lines ---"
+        grep -iE "unable|load|script|connect|metro|refused|8081|packaged|release|bundle" "$_logs_dir/logcat-verify.txt" | tail -30
+        echo "---"
+        echo "Full logcat: $_logs_dir/logcat-verify.txt"
+        printf 'fail\nApp cannot connect to Metro bundler\n' > "$_step_dir/$_step.status"
+        exit 1
+      fi
+
+      # Check for native crash patterns
+      crash_patterns="FATAL EXCEPTION|AndroidRuntime.*FATAL"
+      if grep -qiE "$crash_patterns" "$_logs_dir/logcat-verify.txt" 2>/dev/null; then
+        echo "FAIL: Crash patterns detected in logcat"
+        echo "--- Error lines ---"
+        grep -iE "$crash_patterns" "$_logs_dir/logcat-verify.txt" | tail -20
+        echo "---"
+        echo "Full logcat: $_logs_dir/logcat-verify.txt"
+        printf 'fail\nCrash patterns detected in logcat\n' > "$_step_dir/$_step.status"
+        exit 1
+      fi
+
+      # Check for React Native JS errors
+      rn_patterns="ReactNativeJS.*Error|Unhandled JS Exception|RedBoxError"
+      if grep -qiE "$rn_patterns" "$_logs_dir/logcat-verify.txt" 2>/dev/null; then
+        echo "FAIL: React Native JS error detected"
+        echo "--- Error lines ---"
+        grep -iE "$rn_patterns" "$_logs_dir/logcat-verify.txt" | tail -20
+        echo "---"
+        echo "Full logcat: $_logs_dir/logcat-verify.txt"
+        printf 'fail\nReact Native JS error detected\n' > "$_step_dir/$_step.status"
+        exit 1
+      fi
+
+      # Soak period — verify app survives for 10 seconds
+      echo "App process confirmed, starting soak period (10s)..."
+      sleep 10
+
+      if ! android.sh app status; then
+        echo "FAIL: App crashed during soak period"
+        adb -s "$serial" logcat -d > "$_logs_dir/logcat-soak-crash.txt" 2>&1 || true
+        adb -s "$serial" logcat -d -s AndroidRuntime:E > "$_logs_dir/logcat-crash-fatal.txt" 2>&1 || true
+        echo "Logcat saved to: $_logs_dir/logcat-soak-crash.txt"
+        echo "Crash logs: $_logs_dir/logcat-crash-fatal.txt"
+        printf 'fail\nApp crashed during soak period\n' > "$_step_dir/$_step.status"
+        exit 1
+      fi
+
+      echo "pass" > "$_step_dir/$_step.status"
+      echo "App verified healthy (process alive, no crashes detected)"
+      echo "Logcat saved to: $_logs_dir/logcat-verify.txt"
     depends_on:
       deploy-android:
         condition: process_completed_successfully
     availability:
       restart: "no"
 
-  # Cleanup
+  # Cleanup - capture final logs, then stop everything in pure mode
   cleanup:
     command: |
+      _logs_dir="reports/logs"
+      mkdir -p "$_logs_dir"
+
+      # Capture final logcat before teardown
+      state_dir="${ANDROID_RUNTIME_DIR:-.devbox/virtenv}/${SUITE_NAME:-default}"
+      serial=""
+      if [ -f "$state_dir/emulator-serial.txt" ]; then
+        serial="$(cat "$state_dir/emulator-serial.txt")"
+      fi
+      if [ -z "$serial" ]; then
+        serial="emulator-${EMU_PORT:-5554}"
+      fi
+      adb -s "$serial" logcat -d > "$_logs_dir/logcat-cleanup.txt" 2>&1 || true
+      echo "Final logcat: $_logs_dir/logcat-cleanup.txt"
+
       if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
         echo "Cleaning up (pure mode)..."
         metro.sh stop android || true
@@ -302,6 +496,8 @@ processes:
     depends_on:
       verify-app-running:
         condition: process_completed
+      build-node:
+        condition: process_completed
     availability:
       restart: "no"
 
@@ -312,7 +508,7 @@ processes:
       export REPO_ROOT="$(cd ../.. && pwd)"
       . "$REPO_ROOT/plugins/tests/test-framework.sh"
       log_test "React Native Android E2E Test Suite"
-      e2e_report_steps || true
+      e2e_report_steps setup-sdk build-node build-android emulator-boot deploy verify-app || true
       test_summary "rn-android-e2e"
     depends_on:
       cleanup:

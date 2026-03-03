@@ -145,9 +145,9 @@ case "$command_name" in
             fi
           fi
 
-          choice="$(resolve_runtime "$preferred_runtime" || true)"
+          choice="$(resolve_runtime_strict "$preferred_runtime" || true)"
           if [ -z "$choice" ]; then
-            echo "No available iOS simulator runtime found. Install one in Xcode (Settings > Platforms) and retry." >&2
+            echo "iOS Simulator runtime ${preferred_runtime:-} not available. Install it in Xcode (Settings > Platforms) or update your device definition." >&2
             exit 1
           fi
 

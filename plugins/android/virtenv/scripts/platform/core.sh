@@ -93,37 +93,41 @@ resolve_flake_sdk_root() {
     android_debug_log "Android SDK flake path: ${ANDROID_SDK_FLAKE_PATH:-$root}"
   fi
 
-  # Show progress message if not in CI (only once per session)
-  if [ -z "${CI:-}" ] && [ -z "${GITHUB_ACTIONS:-}" ] && [ -z "${ANDROID_NIX_EVAL_SHOWN:-}" ]; then
-    echo "🔍 Evaluating Android SDK from Nix flake..." >&2
+  # Show progress message (only once per session)
+  if [ -z "${ANDROID_NIX_EVAL_SHOWN:-}" ]; then
+    echo "🔍 [INFO] Evaluating Android SDK from Nix flake..." >&2
     echo "   This may take a few minutes on first run" >&2
     export ANDROID_NIX_EVAL_SHOWN=1
   fi
 
   # Build the SDK to ensure it's in the Nix store
+  # Capture stderr so failures are visible instead of silently swallowed
   [ -n "${ANDROID_DEBUG_SETUP:-}" ] && echo "[CORE-$$] Building SDK: path:${root}#${output}" >&2
+  _nix_stderr=""
+  _nix_stderr_file="$(mktemp "${TMPDIR:-/tmp}/android-nix-build-XXXXXX.stderr")"
   sdk_out=$(
     nix --extra-experimental-features 'nix-command flakes' \
-      build "path:${root}#${output}" --no-link --print-out-paths 2>/dev/null || true
-  )
-  [ -n "${ANDROID_DEBUG_SETUP:-}" ] && echo "[CORE-$$] nix build returned: ${sdk_out:-(empty)}" >&2
-
-  if android_debug_enabled; then
-    android_debug_log "Flake build returned: ${sdk_out:-empty}"
-    if [ -n "$sdk_out" ]; then
-      android_debug_log "Checking path: $sdk_out/libexec/android-sdk"
-      if [ -d "$sdk_out/libexec/android-sdk" ]; then
-        android_debug_log "Path exists!"
-      else
-        android_debug_log "Path does NOT exist. Checking alternatives..."
-        android_debug_log "Direct path: $(ls -d "$sdk_out" 2>&1 | head -1)"
-      fi
-    fi
+      build "path:${root}#${output}" --no-link --print-out-paths 2>"$_nix_stderr_file"
+  ) || true
+  _nix_stderr=""
+  if [ -f "$_nix_stderr_file" ]; then
+    _nix_stderr=$(cat "$_nix_stderr_file" 2>/dev/null || true)
+    rm -f "$_nix_stderr_file" 2>/dev/null || true
   fi
+  [ -n "${ANDROID_DEBUG_SETUP:-}" ] && echo "[CORE-$$] nix build returned: ${sdk_out:-(empty)}" >&2
 
   if [ -n "${sdk_out:-}" ] && [ -d "$sdk_out/libexec/android-sdk" ]; then
     printf '%s\n' "$sdk_out/libexec/android-sdk"
     return 0
+  fi
+
+  # Nix build failed - show the error so it's not a silent failure
+  if [ -n "$_nix_stderr" ]; then
+    echo "WARNING: Android SDK Nix flake evaluation failed:" >&2
+    # Show last 15 lines of stderr (skip noisy download progress)
+    printf '%s\n' "$_nix_stderr" | tail -15 >&2
+  elif [ -z "${sdk_out:-}" ]; then
+    echo "WARNING: Android SDK Nix flake evaluation returned empty output" >&2
   fi
   return 1
 }
@@ -202,7 +206,7 @@ android_setup_sdk_environment() {
     resolved_root="$(resolve_flake_sdk_root "$ANDROID_SDK_FLAKE_OUTPUT" || true)"
     if [ -n "$resolved_root" ]; then
       ANDROID_SDK_ROOT="$resolved_root"
-      if [ -z "${CI:-}" ] && [ -z "${GITHUB_ACTIONS:-}" ] && [ -n "${ANDROID_NIX_EVAL_SHOWN:-}" ]; then
+      if [ -n "${ANDROID_NIX_EVAL_SHOWN:-}" ]; then
         echo "✓ Android SDK resolved from Nix flake" >&2
       fi
     fi
@@ -224,12 +228,10 @@ android_setup_sdk_environment() {
 
   if [ -z "${ANDROID_SDK_ROOT:-}" ]; then
     # Warn but don't fail - SDK will be checked when actually needed (e.g., emulator start)
-    # Don't warn during device eval or CI
-    if [ -z "${CI:-}" ] && [ -z "${GITHUB_ACTIONS:-}" ] && [ -z "${ANDROID_DEVICES_EVAL:-}" ]; then
-      # Only warn if Nix is NOT available and no local SDK is configured
-      # (If Nix is available, the cache just needs time to warm up on first run)
+    # Don't warn during device eval
+    if [ -z "${ANDROID_DEVICES_EVAL:-}" ]; then
+      echo "WARNING: ANDROID_SDK_ROOT could not be resolved. Some commands may fail." >&2
       if ! command -v nix >/dev/null 2>&1 && [ "${ANDROID_LOCAL_SDK:-0}" = "0" ]; then
-        echo "WARNING: ANDROID_SDK_ROOT could not be resolved. Some commands may fail." >&2
         echo "         Ensure Nix is available or set ANDROID_LOCAL_SDK=1 with a local Android SDK." >&2
       fi
     fi
