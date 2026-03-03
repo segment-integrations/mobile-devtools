@@ -70,6 +70,7 @@ ios_latest_xcode_dev_dir() {
 }
 
 # Resolve developer directory with multiple fallback strategies
+# Priority: IOS_DEVELOPER_DIR env > xcode-select > latest Xcode scan > fallback
 ios_resolve_developer_dir() {
   desired="${IOS_DEVELOPER_DIR:-}"
   if [ -n "$desired" ] && [ -d "$desired" ]; then
@@ -77,18 +78,20 @@ ios_resolve_developer_dir() {
     return 0
   fi
 
-  desired="$(ios_latest_xcode_dev_dir 2>/dev/null || true)"
-  if [ -n "$desired" ] && [ -d "$desired" ]; then
-    printf '%s\n' "$desired"
-    return 0
-  fi
-
+  # Prefer xcode-select (respects system/CI Xcode pinning via sudo xcode-select -s)
   if command -v xcode-select >/dev/null 2>&1; then
     desired="$(xcode-select -p 2>/dev/null || true)"
     if [ -n "$desired" ] && [ -d "$desired" ]; then
       printf '%s\n' "$desired"
       return 0
     fi
+  fi
+
+  # Fallback: scan /Applications for highest-version Xcode
+  desired="$(ios_latest_xcode_dev_dir 2>/dev/null || true)"
+  if [ -n "$desired" ] && [ -d "$desired" ]; then
+    printf '%s\n' "$desired"
+    return 0
   fi
 
   if [ -d /Applications/Xcode.app/Contents/Developer ]; then
