@@ -103,6 +103,19 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Select stable Xcode
+        run: |
+          STABLE=$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -v beta | sort -V | tail -1)
+          if [ -z "$STABLE" ]; then
+            STABLE=$(ls -d /Applications/Xcode.app 2>/dev/null || true)
+          fi
+          if [ -n "$STABLE" ]; then
+            echo "Selecting: $STABLE"
+            sudo xcode-select -s "$STABLE/Contents/Developer"
+          fi
+          xcodebuild -version
+          xcrun --sdk iphonesimulator --show-sdk-version
+
       - name: Setup CocoaPods cache
         uses: actions/cache@v4
         with:
@@ -192,6 +205,20 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
+
+      - name: Select stable Xcode (iOS only)
+        if: matrix.platform == 'ios'
+        run: |
+          STABLE=$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -v beta | sort -V | tail -1)
+          if [ -z "$STABLE" ]; then
+            STABLE=$(ls -d /Applications/Xcode.app 2>/dev/null || true)
+          fi
+          if [ -n "$STABLE" ]; then
+            echo "Selecting: $STABLE"
+            sudo xcode-select -s "$STABLE/Contents/Developer"
+          fi
+          xcodebuild -version
+          xcrun --sdk iphonesimulator --show-sdk-version
 
       - name: Setup CocoaPods cache (iOS only)
         if: matrix.platform == 'ios'
