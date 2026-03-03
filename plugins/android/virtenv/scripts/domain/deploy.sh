@@ -283,8 +283,10 @@ android_launch_app() {
   # Wait a moment for the app process to start
   sleep 2
 
-  # Verify app process is running (try a few times)
-  max_attempts=5
+  # Verify app process is running
+  # CI emulators can be slow — adb shell pidof takes 1-2s per call and app
+  # startup may need 10-20s on cold boot. Use 15 attempts × 2s = ~32s window.
+  max_attempts=15
   attempt=0
   while [ $attempt -lt $max_attempts ]; do
     if adb -s "$emulator_serial" shell pidof "$package_name" >/dev/null 2>&1; then
@@ -293,7 +295,7 @@ android_launch_app() {
     fi
     attempt=$((attempt + 1))
     if [ $attempt -lt $max_attempts ]; then
-      sleep 1
+      sleep 2
     fi
   done
 
