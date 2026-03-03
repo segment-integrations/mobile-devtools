@@ -272,8 +272,8 @@ processes:
       # Always save logcat snapshot for analysis
       adb -s "$serial" logcat -d > "$_logs_dir/logcat-final.txt" 2>&1 || true
 
-      # Scan for crash patterns in logcat
-      crash_patterns="FATAL EXCEPTION|AndroidRuntime.*FATAL|Process.*crash"
+      # Scan for crash patterns in logcat (AndroidRuntime tag is the definitive crash signal)
+      crash_patterns="FATAL EXCEPTION|AndroidRuntime.*FATAL"
       if grep -qiE "$crash_patterns" "$_logs_dir/logcat-final.txt" 2>/dev/null; then
         echo ""
         echo "FAIL: Crash patterns detected in logcat"

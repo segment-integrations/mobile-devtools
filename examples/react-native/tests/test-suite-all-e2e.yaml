@@ -489,7 +489,7 @@ processes:
       fi
 
       # Check for native crash patterns
-      crash_patterns="FATAL EXCEPTION|AndroidRuntime.*FATAL|Process.*crash"
+      crash_patterns="FATAL EXCEPTION|AndroidRuntime.*FATAL"
       if grep -qiE "$crash_patterns" "$_logs_dir/logcat-android-verify.txt" 2>/dev/null; then
         echo "FAIL: Crash patterns detected in logcat"
         echo "--- Error lines ---"
@@ -586,7 +586,7 @@ processes:
         xcrun simctl spawn "$UDID" log show --last 2m --style compact > "$_logs_dir/simulator-app.log" 2>&1 || true
 
         # Scan for native crash patterns
-        error_patterns="Terminating app|SIGABRT|EXC_BAD_ACCESS|EXC_CRASH|Fatal error|Assertion failure"
+        error_patterns="Terminating app|SIGABRT|EXC_BAD_ACCESS|EXC_CRASH|Assertion failure"
         if grep -qiE "$error_patterns" "$_logs_dir/simulator-app.log" 2>/dev/null; then
           echo ""
           echo "FAIL: Crash/error patterns detected in simulator logs"

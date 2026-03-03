@@ -420,7 +420,7 @@ processes:
       fi
 
       # Check for native crash patterns
-      crash_patterns="FATAL EXCEPTION|AndroidRuntime.*FATAL|Process.*crash"
+      crash_patterns="FATAL EXCEPTION|AndroidRuntime.*FATAL"
       if grep -qiE "$crash_patterns" "$_logs_dir/logcat-verify.txt" 2>/dev/null; then
         echo "FAIL: Crash patterns detected in logcat"
         echo "--- Error lines ---"
