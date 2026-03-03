@@ -328,6 +328,16 @@ case "$command_name" in
     if [ "$skipped" -gt 0 ]; then
       echo "  ⚠ Skipped:   $skipped"
     fi
+
+    # In strict mode (pure shell / CI), fail if any devices were skipped
+    if [ "$skipped" -gt 0 ]; then
+      if [ "${DEVBOX_PURE_SHELL:-}" = "1" ] || [ "${IOS_STRICT_SYNC:-}" = "1" ]; then
+        echo ""
+        echo "ERROR: $skipped device(s) skipped due to missing runtimes (strict mode)" >&2
+        echo "       Install missing runtimes or update device definitions" >&2
+        exit 1
+      fi
+    fi
     exit 0
     ;;
 
