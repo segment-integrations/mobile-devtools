@@ -97,8 +97,7 @@ jobs:
       - name: Select pinned Xcode (max only)
         if: matrix.device == 'max'
         run: |
-          # Pin to stable Xcode version (26.2 = default on macos-26 runner)
-          XCODE_VERSION="26.2"
+          XCODE_VERSION=$(jq -r '.env.IOS_XCODE_VERSION' plugins/ios/plugin.json)
           XCODE_APP=$(ls -d /Applications/Xcode_${XCODE_VERSION}*.app 2>/dev/null | head -1)
           if [ -z "$XCODE_APP" ]; then
             XCODE_APP="/Applications/Xcode.app"
@@ -192,8 +191,7 @@ jobs:
       - name: Select pinned Xcode (iOS max only)
         if: matrix.platform == 'ios' && matrix.device == 'max'
         run: |
-          # Pin to stable Xcode version (26.2 = default on macos-26 runner)
-          XCODE_VERSION="26.2"
+          XCODE_VERSION=$(jq -r '.env.IOS_XCODE_VERSION' plugins/ios/plugin.json)
           XCODE_APP=$(ls -d /Applications/Xcode_${XCODE_VERSION}*.app 2>/dev/null | head -1)
           if [ -z "$XCODE_APP" ]; then
             XCODE_APP="/Applications/Xcode.app"

@@ -11,6 +11,7 @@
     "IOS_DEFAULT_RUNTIME": "",
     "IOS_DEVELOPER_DIR": "",
     "IOS_DOWNLOAD_RUNTIME": "1",
+    "IOS_XCODE_VERSION": "26.2",
     "IOS_APP_ARTIFACT": "",
     "IOS_APP_SCHEME": "",
     "IOS_APP_PROJECT": "",

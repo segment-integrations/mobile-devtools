@@ -39,6 +39,7 @@ Configure the plugin by setting environment variables in `devbox.json` or `plugi
 
 ### Xcode Settings
 - `IOS_DEVELOPER_DIR` — Xcode developer directory path (empty = auto-detect)
+- `IOS_XCODE_VERSION` — Pinned Xcode version for CI workflows (default: "26.2"). CI workflow steps read this value via `jq` to select the correct Xcode on GitHub-hosted runners. Not used at runtime by the plugin itself.
 - `IOS_XCODE_ENV_PATH` — Additional PATH entries for Xcode tools
 - `IOS_DOWNLOAD_RUNTIME` — Auto-download missing runtimes (1=yes, 0=no; default: 1)
 
