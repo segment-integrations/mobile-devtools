@@ -18,34 +18,24 @@ processes:
       _step_dir="reports/steps"
       mkdir -p "$_step_dir"
 
-      . ${ANDROID_RUNTIME_DIR}/scripts/init/setup.sh
+      bash ${ANDROID_RUNTIME_DIR}/scripts/user/setup.sh
 
-      # Fallback: detect from adb in PATH
-      if [ -z "${ANDROID_SDK_ROOT:-}" ]; then
-        adb_path="$(command -v adb 2>/dev/null || true)"
-        if [ -n "$adb_path" ]; then
-          sdk_candidate="$(cd "$(dirname "$adb_path")/.." && pwd)"
-          if [ -d "$sdk_candidate/platform-tools" ]; then
-            ANDROID_SDK_ROOT="$sdk_candidate"
-            export ANDROID_SDK_ROOT ANDROID_HOME="$ANDROID_SDK_ROOT"
-          fi
-        fi
-      fi
-
-      mkdir -p "${ANDROID_RUNTIME_DIR}/.state"
-      echo "${ANDROID_SDK_ROOT:-}" > "${ANDROID_RUNTIME_DIR}/.state/sdk_root"
-
+      # Source iOS init for sibling processes that need iOS environment
       if [ -n "${IOS_SCRIPTS_DIR:-}" ] && [ -f "${IOS_SCRIPTS_DIR}/init/setup.sh" ]; then
         . "${IOS_SCRIPTS_DIR}/init/setup.sh"
       fi
-      echo "✅ iOS environment ready"
 
-      if [ -n "${ANDROID_SDK_ROOT:-}" ]; then
-        echo "✅ Android SDK ready: ${ANDROID_SDK_ROOT}"
-        echo "pass" > "$_step_dir/$_step.status"
+      # Verify state file was written
+      if [ -f "${ANDROID_RUNTIME_DIR}/.state/sdk_root" ]; then
+        sdk_root="$(cat "${ANDROID_RUNTIME_DIR}/.state/sdk_root")"
+        if [ -n "$sdk_root" ]; then
+          echo "pass" > "$_step_dir/$_step.status"
+        else
+          printf 'fail\nANDROID_SDK_ROOT not set after setup\n' > "$_step_dir/$_step.status"
+          exit 1
+        fi
       else
-        echo "❌ Android SDK setup failed: ANDROID_SDK_ROOT not set" >&2
-        printf 'fail\nANDROID_SDK_ROOT not set after setup\n' > "$_step_dir/$_step.status"
+        printf 'fail\nSetup did not write state file\n' > "$_step_dir/$_step.status"
         exit 1
       fi
     availability:
@@ -100,6 +90,12 @@ processes:
         ANDROID_SDK_ROOT="$(cat "${ANDROID_RUNTIME_DIR}/.state/sdk_root")"
         ANDROID_HOME="$ANDROID_SDK_ROOT"
         export ANDROID_SDK_ROOT ANDROID_HOME
+      fi
+
+      if [ -z "${ANDROID_SDK_ROOT:-}" ]; then
+        echo "ERROR: ANDROID_SDK_ROOT empty after reading state file" >&2
+        printf 'fail\nANDROID_SDK_ROOT empty - setup may have failed\n' > "$_step_dir/$_step.status"
+        exit 1
       fi
 
       # Source Metro environment so build knows correct port
@@ -197,6 +193,7 @@ processes:
   # Phase 4b: Verify Android emulator ready
   verify-emulator-ready:
     command: |
+      set -e
       _step="emulator-boot"
       _step_dir="reports/steps"
       mkdir -p "$_step_dir"
@@ -262,6 +259,7 @@ processes:
   # Phase 4d: Verify iOS simulator ready
   verify-simulator-ready:
     command: |
+      set -e
       _step="simulator-boot"
       _step_dir="reports/steps"
       mkdir -p "$_step_dir"
@@ -429,6 +427,7 @@ processes:
   # Phase 7a: Verify Android app
   verify-android-running:
     command: |
+      set -e
       _step="verify-android"
       _step_dir="reports/steps"
       mkdir -p "$_step_dir"
@@ -499,6 +498,7 @@ processes:
   # Phase 7b: Verify iOS app (parallel with Android)
   verify-ios-running:
     command: |
+      set -e
       _step="verify-ios"
       _step_dir="reports/steps"
       mkdir -p "$_step_dir"
@@ -561,7 +561,7 @@ processes:
       export REPO_ROOT="$(cd ../.. && pwd)"
       . "$REPO_ROOT/plugins/tests/test-framework.sh"
       log_test "React Native All Platforms E2E Test Suite"
-      e2e_report_steps || true
+      e2e_report_steps setup-sdk build-node build-android install-pods build-ios emulator-boot simulator-boot deploy-android deploy-ios verify-android verify-ios || true
       test_summary "rn-all-e2e"
     depends_on:
       cleanup:

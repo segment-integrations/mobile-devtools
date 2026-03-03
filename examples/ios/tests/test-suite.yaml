@@ -12,18 +12,20 @@ processes:
   # Phase 0: Setup - ensure iOS environment is ready
   setup-sdk:
     command: |
+      set -e
       _step="setup-sdk"
       _step_dir="reports/steps"
       mkdir -p "$_step_dir"
 
-      if [ -n "${IOS_SCRIPTS_DIR:-}" ] && [ -f "${IOS_SCRIPTS_DIR}/init/setup.sh" ]; then
+      if [ -n "${IOS_SCRIPTS_DIR:-}" ] && [ -f "${IOS_SCRIPTS_DIR}/user/setup.sh" ]; then
+        bash "${IOS_SCRIPTS_DIR}/user/setup.sh"
+      elif [ -n "${IOS_SCRIPTS_DIR:-}" ] && [ -f "${IOS_SCRIPTS_DIR}/init/setup.sh" ]; then
         if ! . "${IOS_SCRIPTS_DIR}/init/setup.sh"; then
-          echo "❌ iOS setup failed" >&2
+          echo "❌ [ERROR] iOS setup failed" >&2
           printf 'fail\niOS init/setup.sh failed\n' > "$_step_dir/$_step.status"
           exit 1
         fi
       fi
-      echo "✅ iOS environment ready"
       echo "pass" > "$_step_dir/$_step.status"
     availability:
       restart: "no"
@@ -130,6 +132,7 @@ processes:
   # Phase 5: Verify app is running (liveness check)
   verify-app-running:
     command: |
+      set -e
       _step="verify-app"
       _step_dir="reports/steps"
       mkdir -p "$_step_dir"
@@ -172,7 +175,7 @@ processes:
       export REPO_ROOT="$(cd ../.. && pwd)"
       . "$REPO_ROOT/plugins/tests/test-framework.sh"
       log_test "iOS E2E Test Suite"
-      e2e_report_steps || true
+      e2e_report_steps setup-sdk build-app deploy-app verify-app || true
       test_summary "ios-e2e"
     depends_on:
       cleanup:

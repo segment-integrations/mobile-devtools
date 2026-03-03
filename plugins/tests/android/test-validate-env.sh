@@ -35,14 +35,14 @@ assert_success "[ $exit_code -eq 0 ]" "setup should exit with 0"
 
 start_test "ANDROID_SDK_ROOT is set"
 sdk_root=$(run_pure 'echo $ANDROID_SDK_ROOT')
-assert_success "[ -n '$sdk_root' ]" "ANDROID_SDK_ROOT should be set"
+assert_not_empty "$sdk_root" "ANDROID_SDK_ROOT should be set"
 
 start_test "ANDROID_SDK_ROOT directory exists"
 assert_success "run_pure 'test -d \"\$ANDROID_SDK_ROOT\"'" "directory should exist"
 
 start_test "ANDROID_HOME matches ANDROID_SDK_ROOT"
 home=$(run_pure 'echo $ANDROID_HOME')
-assert_success "[ '$home' = '$sdk_root' ]" "ANDROID_HOME should match ANDROID_SDK_ROOT"
+assert_equal "$sdk_root" "$home" "ANDROID_HOME should match ANDROID_SDK_ROOT"
 
 start_test "ANDROID_AVD_HOME is set and writable"
 assert_success "run_pure 'test -n \"\$ANDROID_AVD_HOME\" && test -w \"\$ANDROID_AVD_HOME\"'" "AVD home should be writable"
@@ -95,7 +95,7 @@ assert_success "run_pure 'ls \"\$ANDROID_DEVICES_DIR\"/*.json >/dev/null 2>&1'" 
 
 start_test "setup respects ANDROID_SKIP_SETUP=1"
 output=$(cd "$android_example" && devbox run --pure -e ANDROID_SKIP_SETUP=1 setup 2>&1)
-assert_success "echo '$output' | grep -q 'Skipping Android setup'" "should skip when flag is set"
+assert_contains "$output" "Skipping Android setup" "should skip when flag is set"
 
 # ============================================================================
 # Test: Idempotency

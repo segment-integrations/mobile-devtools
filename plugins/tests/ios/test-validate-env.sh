@@ -76,7 +76,7 @@ assert_success "run_pure 'command -v ios.sh'" "ios.sh should be available"
 
 start_test "setup respects IOS_SKIP_SETUP=1"
 output=$(cd "$ios_example" && devbox run --pure -e IOS_SKIP_SETUP=1 setup 2>&1)
-assert_success "echo '$output' | grep -q 'Skipping iOS setup'" "should skip when flag is set"
+assert_contains "$output" "Skipping iOS setup" "should skip when flag is set"
 
 # ============================================================================
 # Test: Idempotency

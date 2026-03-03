@@ -7,16 +7,16 @@ set -eu
 
 # Skip if ANDROID_SKIP_SETUP=1
 if [ "${ANDROID_SKIP_SETUP:-0}" = "1" ]; then
-  echo "⏭️  Skipping Android setup (ANDROID_SKIP_SETUP=1)"
+  echo "⏭️  [SKIP] Skipping Android setup (ANDROID_SKIP_SETUP=1)"
   exit 0
 fi
 
-echo "🔧 Setting up Android environment..."
+echo "🔧 [SETUP] Setting up Android environment..."
 
 # If ANDROID_SDK_ROOT is already set and valid (e.g. from devbox init_hook),
 # skip re-evaluation. This avoids redundant Nix flake builds in subprocesses.
 if [ -n "${ANDROID_SDK_ROOT:-}" ] && [ -d "${ANDROID_SDK_ROOT}" ]; then
-  echo "✅ Android SDK ready: ${ANDROID_SDK_ROOT}"
+  echo "✅ [OK] Android SDK: ${ANDROID_SDK_ROOT}"
 else
   # SDK not yet resolved. Try evaluating the Nix flake directly with
   # visible error output (init/setup.sh suppresses errors for non-blocking init).
@@ -32,7 +32,7 @@ else
   flake_output="${ANDROID_SDK_FLAKE_OUTPUT:-android-sdk}"
 
   if [ -n "$flake_root" ] && command -v nix >/dev/null 2>&1; then
-    echo "🔍 Evaluating Android SDK from Nix flake..."
+    echo "🔍 [INFO] Evaluating Android SDK from Nix flake..."
     echo "   This may take a few minutes on first run"
 
     sdk_out=$(
@@ -51,7 +51,7 @@ else
 
     # Show nix build output if SDK resolution failed (helps debug CI)
     if [ -z "${ANDROID_SDK_ROOT:-}" ] && [ -n "${sdk_out:-}" ]; then
-      echo "⚠️  Nix build output:" >&2
+      echo "⚠️  [WARN] Nix build output:" >&2
       echo "$sdk_out" | tail -20 >&2
     fi
   fi
@@ -63,28 +63,46 @@ else
     fi
   fi
 
+  # Fallback: detect from adb in PATH
+  if [ -z "${ANDROID_SDK_ROOT:-}" ]; then
+    adb_path="$(command -v adb 2>/dev/null || true)"
+    if [ -n "$adb_path" ]; then
+      sdk_candidate="$(cd "$(dirname "$adb_path")/.." && pwd)"
+      if [ -d "$sdk_candidate/platform-tools" ]; then
+        ANDROID_SDK_ROOT="$sdk_candidate"
+        export ANDROID_SDK_ROOT ANDROID_HOME="$ANDROID_SDK_ROOT"
+      fi
+    fi
+  fi
+
   # Final verification
   if [ -z "${ANDROID_SDK_ROOT:-}" ]; then
-    echo "❌ Android SDK setup failed: ANDROID_SDK_ROOT not set" >&2
+    echo "❌ [ERROR] Android SDK setup failed: ANDROID_SDK_ROOT not set" >&2
     echo "   Ensure the Nix flake at ${flake_root:-unknown} evaluates correctly." >&2
     exit 1
   fi
 
   if [ ! -d "${ANDROID_SDK_ROOT}" ]; then
-    echo "❌ Android SDK setup failed: ANDROID_SDK_ROOT directory does not exist: ${ANDROID_SDK_ROOT}" >&2
+    echo "❌ [ERROR] Android SDK setup failed: ANDROID_SDK_ROOT directory does not exist: ${ANDROID_SDK_ROOT}" >&2
     exit 1
   fi
 
-  echo "✅ Android SDK ready: ${ANDROID_SDK_ROOT}"
+  echo "✅ [OK] Android SDK: ${ANDROID_SDK_ROOT}"
+fi
+
+# Write SDK root to shared state file (for process-compose sibling processes)
+if [ -n "${ANDROID_RUNTIME_DIR:-}" ]; then
+  mkdir -p "${ANDROID_RUNTIME_DIR}/.state"
+  echo "${ANDROID_SDK_ROOT}" > "${ANDROID_RUNTIME_DIR}/.state/sdk_root"
 fi
 
 # Verify essential tools are in PATH
 if ! command -v adb >/dev/null 2>&1; then
-  echo "⚠️  Warning: adb not in PATH" >&2
+  echo "⚠️  [WARN] adb not in PATH" >&2
 fi
 
 if ! command -v emulator >/dev/null 2>&1; then
-  echo "⚠️  Warning: emulator not in PATH" >&2
+  echo "⚠️  [WARN] emulator not in PATH" >&2
 fi
 
-echo "✅ Android setup complete"
+echo "✅ [OK] Android setup complete"

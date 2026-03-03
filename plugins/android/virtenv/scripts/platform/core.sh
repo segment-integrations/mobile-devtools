@@ -95,7 +95,7 @@ resolve_flake_sdk_root() {
 
   # Show progress message (only once per session)
   if [ -z "${ANDROID_NIX_EVAL_SHOWN:-}" ]; then
-    echo "🔍 Evaluating Android SDK from Nix flake..." >&2
+    echo "🔍 [INFO] Evaluating Android SDK from Nix flake..." >&2
     echo "   This may take a few minutes on first run" >&2
     export ANDROID_NIX_EVAL_SHOWN=1
   fi
@@ -104,11 +104,7 @@ resolve_flake_sdk_root() {
   # Capture stderr so failures are visible instead of silently swallowed
   [ -n "${ANDROID_DEBUG_SETUP:-}" ] && echo "[CORE-$$] Building SDK: path:${root}#${output}" >&2
   _nix_stderr=""
-  if [ -d "${TMPDIR:-/tmp}" ]; then
-    _nix_stderr_file="${TMPDIR:-/tmp}/android-nix-build-$$.stderr"
-  else
-    _nix_stderr_file="/tmp/android-nix-build-$$.stderr"
-  fi
+  _nix_stderr_file="$(mktemp "${TMPDIR:-/tmp}/android-nix-build-XXXXXX.stderr")"
   sdk_out=$(
     nix --extra-experimental-features 'nix-command flakes' \
       build "path:${root}#${output}" --no-link --print-out-paths 2>"$_nix_stderr_file"

@@ -17,30 +17,19 @@ processes:
       _step_dir="reports/steps"
       mkdir -p "$_step_dir"
 
-      . ${ANDROID_RUNTIME_DIR}/scripts/init/setup.sh
+      bash ${ANDROID_RUNTIME_DIR}/scripts/user/setup.sh
 
-      # Fallback: detect from adb in PATH
-      if [ -z "${ANDROID_SDK_ROOT:-}" ]; then
-        adb_path="$(command -v adb 2>/dev/null || true)"
-        if [ -n "$adb_path" ]; then
-          sdk_candidate="$(cd "$(dirname "$adb_path")/.." && pwd)"
-          if [ -d "$sdk_candidate/platform-tools" ]; then
-            ANDROID_SDK_ROOT="$sdk_candidate"
-            export ANDROID_SDK_ROOT ANDROID_HOME="$ANDROID_SDK_ROOT"
-          fi
+      # Verify state file was written
+      if [ -f "${ANDROID_RUNTIME_DIR}/.state/sdk_root" ]; then
+        sdk_root="$(cat "${ANDROID_RUNTIME_DIR}/.state/sdk_root")"
+        if [ -n "$sdk_root" ]; then
+          echo "pass" > "$_step_dir/$_step.status"
+        else
+          printf 'fail\nANDROID_SDK_ROOT not set after setup\n' > "$_step_dir/$_step.status"
+          exit 1
         fi
-      fi
-
-      # Write SDK root to shared file for sibling processes
-      mkdir -p "${ANDROID_RUNTIME_DIR}/.state"
-      echo "${ANDROID_SDK_ROOT:-}" > "${ANDROID_RUNTIME_DIR}/.state/sdk_root"
-
-      if [ -n "${ANDROID_SDK_ROOT:-}" ]; then
-        echo "✅ Android SDK ready: ${ANDROID_SDK_ROOT}"
-        echo "pass" > "$_step_dir/$_step.status"
       else
-        echo "❌ Android SDK setup failed: ANDROID_SDK_ROOT not set" >&2
-        printf 'fail\nANDROID_SDK_ROOT not set after setup\n' > "$_step_dir/$_step.status"
+        printf 'fail\nSetup did not write state file\n' > "$_step_dir/$_step.status"
         exit 1
       fi
     availability:
@@ -63,6 +52,12 @@ processes:
         ANDROID_SDK_ROOT="$(cat "${ANDROID_RUNTIME_DIR}/.state/sdk_root")"
         ANDROID_HOME="$ANDROID_SDK_ROOT"
         export ANDROID_SDK_ROOT ANDROID_HOME
+      fi
+
+      if [ -z "${ANDROID_SDK_ROOT:-}" ]; then
+        echo "ERROR: ANDROID_SDK_ROOT empty after reading state file" >&2
+        printf 'fail\nANDROID_SDK_ROOT empty - setup may have failed\n' > "$_step_dir/$_step.status"
+        exit 1
       fi
 
       gradle assembleDebug
@@ -116,6 +111,7 @@ processes:
   # Phase 3: Deploy app - depends on both build and emulator being ready
   deploy-app:
     command: |
+      set -e
       _step="deploy-app"
       _step_dir="reports/steps"
       _logs_dir="reports/logs"
@@ -132,8 +128,10 @@ processes:
       echo ""
 
       # Deploy (allow failure so we can capture diagnostics)
+      set +e
       deploy_exit=0
       android.sh deploy || deploy_exit=$?
+      set -e
 
       if [ "$deploy_exit" -ne 0 ]; then
         echo ""
@@ -258,7 +256,7 @@ processes:
       export REPO_ROOT="$(cd ../.. && pwd)"
       . "$REPO_ROOT/plugins/tests/test-framework.sh"
       log_test "Android E2E Test Suite"
-      e2e_report_steps || true
+      e2e_report_steps setup-sdk build-app deploy-app || true
       test_summary "android-e2e"
     depends_on:
       cleanup-app:

@@ -5,7 +5,7 @@
 
 set -eu
 
-echo "🔧 Setting up React Native environment..."
+echo "🔧 [SETUP] Setting up React Native environment..."
 
 # Track if any setup was performed
 setup_performed=0
@@ -16,10 +16,10 @@ if [ "${ANDROID_SKIP_SETUP:-0}" != "1" ]; then
     bash "${ANDROID_SCRIPTS_DIR}/user/setup.sh"
     setup_performed=1
   else
-    echo "⚠️  Android plugin not found (ANDROID_SCRIPTS_DIR not set)"
+    echo "⚠️  [WARN] Android plugin not found (ANDROID_SCRIPTS_DIR not set)"
   fi
 else
-  echo "⏭️  Skipping Android setup (ANDROID_SKIP_SETUP=1)"
+  echo "⏭️  [SKIP] Skipping Android setup (ANDROID_SKIP_SETUP=1)"
 fi
 
 # Setup iOS (unless skipped or not on macOS)
@@ -29,26 +29,26 @@ if [ "${IOS_SKIP_SETUP:-0}" != "1" ]; then
       bash "${IOS_SCRIPTS_DIR}/user/setup.sh"
       setup_performed=1
     else
-      echo "⚠️  iOS plugin not found (IOS_SCRIPTS_DIR not set)"
+      echo "⚠️  [WARN] iOS plugin not found (IOS_SCRIPTS_DIR not set)"
     fi
   else
-    echo "⏭️  Skipping iOS setup (not macOS)"
+    echo "⏭️  [SKIP] Skipping iOS setup (not macOS)"
   fi
 else
-  echo "⏭️  Skipping iOS setup (IOS_SKIP_SETUP=1)"
+  echo "⏭️  [SKIP] Skipping iOS setup (IOS_SKIP_SETUP=1)"
 fi
 
 # Verify Node.js is available (required for React Native)
 if ! command -v node >/dev/null 2>&1; then
-  echo "⚠️  Warning: Node.js not found (required for React Native)" >&2
+  echo "⚠️  [WARN] Node.js not found (required for React Native)" >&2
 fi
 
 if ! command -v npm >/dev/null 2>&1; then
-  echo "⚠️  Warning: npm not found (required for React Native)" >&2
+  echo "⚠️  [WARN] npm not found (required for React Native)" >&2
 fi
 
 if [ "$setup_performed" -eq 0 ]; then
-  echo "⚠️  No platforms were set up (all skipped)"
+  echo "⚠️  [WARN] No platforms were set up (all skipped)"
 fi
 
-echo "✅ React Native setup complete"
+echo "✅ [OK] React Native setup complete"

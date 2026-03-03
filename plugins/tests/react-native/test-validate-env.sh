@@ -58,7 +58,7 @@ assert_success "run_pure 'command -v metro.sh'" "metro.sh should be available"
 
 start_test "ANDROID_SDK_ROOT is set"
 sdk_root=$(run_pure 'echo $ANDROID_SDK_ROOT')
-assert_success "[ -n '$sdk_root' ]" "ANDROID_SDK_ROOT should be set"
+assert_not_empty "$sdk_root" "ANDROID_SDK_ROOT should be set"
 
 start_test "adb is in PATH"
 assert_success "run_pure 'command -v adb'" "adb should be available"
@@ -87,15 +87,15 @@ fi
 
 start_test "ANDROID_SKIP_SETUP=1 skips Android"
 output=$(cd "$rn_example" && devbox run --pure -e ANDROID_SKIP_SETUP=1 setup 2>&1)
-assert_success "echo '$output' | grep -q 'Skipping Android setup'" "should skip Android"
+assert_contains "$output" "Skipping Android setup" "should skip Android"
 
 start_test "IOS_SKIP_SETUP=1 skips iOS"
 output=$(cd "$rn_example" && devbox run --pure -e IOS_SKIP_SETUP=1 setup 2>&1)
-assert_success "echo '$output' | grep -q 'Skipping iOS setup'" "should skip iOS"
+assert_contains "$output" "Skipping iOS setup" "should skip iOS"
 
 start_test "Both platforms can be skipped (web mode)"
 output=$(cd "$rn_example" && devbox run --pure -e ANDROID_SKIP_SETUP=1 -e IOS_SKIP_SETUP=1 setup 2>&1)
-assert_success "echo '$output' | grep -q 'No platforms were set up'" "should skip both"
+assert_contains "$output" "No platforms were set up" "should skip both"
 
 # ============================================================================
 # Test: Idempotency

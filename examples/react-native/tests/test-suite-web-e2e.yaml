@@ -167,7 +167,7 @@ processes:
       export REPO_ROOT="$(cd ../.. && pwd)"
       . "$REPO_ROOT/plugins/tests/test-framework.sh"
       log_test "React Native Web E2E Test Suite"
-      e2e_report_steps || true
+      e2e_report_steps build-node build-web verify-web || true
       test_summary "rn-web-e2e"
     depends_on:
       cleanup:
