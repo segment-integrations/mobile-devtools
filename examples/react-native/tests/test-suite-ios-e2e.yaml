@@ -253,44 +253,108 @@ processes:
     availability:
       restart: "no"
 
-  # Phase 7: Verify app is running
+  # Phase 7: Verify app is running, healthy, and survives soak period
   verify-app-running:
     command: |
       set -e
       _step="verify-app"
       _step_dir="reports/steps"
-      mkdir -p "$_step_dir"
+      _logs_dir="reports/logs"
+      mkdir -p "$_step_dir" "$_logs_dir"
+
+      UDID=$(cat "${IOS_RUNTIME_DIR:-/tmp}/rn-ios-e2e/simulator-udid.txt" 2>/dev/null || cat "${IOS_RUNTIME_DIR:-/tmp}/${SUITE_NAME:-rn-ios-e2e}/simulator-udid.txt" 2>/dev/null || true)
 
       echo "Waiting for app to start..."
 
       max_attempts=15
       attempt=0
       while [ $attempt -lt $max_attempts ]; do
-        # Check if app process is running using built-in command
-        if ! ios.sh app status; then
-          attempt=$((attempt + 1))
-          echo "  Attempt $attempt/$max_attempts: App not running yet..."
-          sleep 2
-          continue
+        if ios.sh app status; then
+          break
         fi
-
-        # Success: app is running
-        echo "App is running"
-        echo "pass" > "$_step_dir/$_step.status"
-        exit 0
+        attempt=$((attempt + 1))
+        echo "  Attempt $attempt/$max_attempts: App not running yet..."
+        sleep 2
       done
 
-      printf 'fail\nApp did not start within timeout\n' > "$_step_dir/$_step.status"
-      exit 1
+      # Initial liveness check
+      if ! ios.sh app status; then
+        echo "FAIL: App is not running"
+        if [ -n "$UDID" ]; then
+          xcrun simctl spawn "$UDID" log show --predicate 'eventMessage contains "crash" OR eventMessage contains "fatal" OR eventMessage contains "terminate"' --last 5m --style compact > "$_logs_dir/simulator-crash.log" 2>&1 || true
+          echo "Simulator crash logs: $_logs_dir/simulator-crash.log"
+        fi
+        printf 'fail\nApp not found in running processes\n' > "$_step_dir/$_step.status"
+        exit 1
+      fi
+
+      # Soak period — verify app survives for 10 seconds
+      echo "App process is running, starting soak period (10s)..."
+      sleep 10
+
+      if ! ios.sh app status; then
+        echo "FAIL: App crashed during soak period"
+        if [ -n "$UDID" ]; then
+          xcrun simctl spawn "$UDID" log show --predicate 'eventMessage contains "crash" OR eventMessage contains "fatal" OR eventMessage contains "terminate"' --last 5m --style compact > "$_logs_dir/simulator-crash.log" 2>&1 || true
+          echo "Simulator crash logs: $_logs_dir/simulator-crash.log"
+        fi
+        printf 'fail\nApp crashed during soak period\n' > "$_step_dir/$_step.status"
+        exit 1
+      fi
+
+      # Capture simulator logs for analysis
+      if [ -n "$UDID" ]; then
+        xcrun simctl spawn "$UDID" log show --last 2m --style compact > "$_logs_dir/simulator-app.log" 2>&1 || true
+
+        # Scan for native crash patterns
+        error_patterns="Terminating app|SIGABRT|EXC_BAD_ACCESS|EXC_CRASH|Fatal error|Assertion failure"
+        if grep -qiE "$error_patterns" "$_logs_dir/simulator-app.log" 2>/dev/null; then
+          echo ""
+          echo "FAIL: Crash/error patterns detected in simulator logs"
+          echo "--- Error lines ---"
+          grep -iE "$error_patterns" "$_logs_dir/simulator-app.log" | head -20
+          echo "---"
+          echo "Full logs: $_logs_dir/simulator-app.log"
+          printf 'fail\nCrash patterns detected in simulator logs\n' > "$_step_dir/$_step.status"
+          exit 1
+        fi
+
+        # Scan for React Native specific errors
+        rn_error_patterns="RCTFatal|Unhandled JS Exception|Unable to load script|Could not connect to development server|RedBoxError"
+        if grep -qiE "$rn_error_patterns" "$_logs_dir/simulator-app.log" 2>/dev/null; then
+          echo ""
+          echo "FAIL: React Native error detected in simulator logs"
+          echo "--- Error lines ---"
+          grep -iE "$rn_error_patterns" "$_logs_dir/simulator-app.log" | head -20
+          echo "---"
+          echo "Full logs: $_logs_dir/simulator-app.log"
+          printf 'fail\nReact Native error detected in simulator logs\n' > "$_step_dir/$_step.status"
+          exit 1
+        fi
+      fi
+
+      echo "pass" > "$_step_dir/$_step.status"
+      echo "App verified healthy (process alive, no crashes detected)"
+      [ -f "$_logs_dir/simulator-app.log" ] && echo "App logs: $_logs_dir/simulator-app.log"
     depends_on:
       deploy-ios:
         condition: process_completed_successfully
     availability:
       restart: "no"
 
-  # Cleanup - runs after verify completes
+  # Cleanup - capture final logs, then stop everything in pure mode
   cleanup:
     command: |
+      _logs_dir="reports/logs"
+      mkdir -p "$_logs_dir"
+
+      # Capture final simulator logs before teardown
+      UDID=$(cat "${IOS_RUNTIME_DIR:-/tmp}/rn-ios-e2e/simulator-udid.txt" 2>/dev/null || cat "${IOS_RUNTIME_DIR:-/tmp}/${SUITE_NAME:-rn-ios-e2e}/simulator-udid.txt" 2>/dev/null || true)
+      if [ -n "$UDID" ]; then
+        xcrun simctl spawn "$UDID" log show --last 5m --style compact > "$_logs_dir/simulator-final.log" 2>&1 || true
+        echo "Final simulator logs: $_logs_dir/simulator-final.log"
+      fi
+
       if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
         echo "Cleaning up (pure mode)..."
         metro.sh stop ios || true

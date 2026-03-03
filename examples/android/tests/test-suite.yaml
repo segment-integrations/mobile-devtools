@@ -238,24 +238,56 @@ processes:
       while [ $attempt -lt $max_attempts ]; do
         if android.sh app status; then
           echo "App is running (verified after ${attempt}s)"
-          # Save logcat snapshot on success too
-          adb -s "$serial" logcat -d > "$_logs_dir/logcat-deploy-success.txt" 2>&1 || true
-          echo "pass" > "$_step_dir/$_step.status"
-          exit 0
+          break
         fi
         attempt=$((attempt + 1))
         echo "  Attempt $attempt/$max_attempts..."
         sleep 2
       done
 
-      # App not stable after deploy
-      echo ""
-      echo "=== App not stable after deploy - capturing diagnostics ==="
-      adb -s "$serial" logcat -d -s AndroidRuntime:E 2>&1 | tail -30 || true
-      adb -s "$serial" logcat -d > "$_logs_dir/logcat-deploy-unstable.txt" 2>&1 || true
+      if [ $attempt -ge $max_attempts ]; then
+        echo ""
+        echo "=== App not stable after deploy - capturing diagnostics ==="
+        adb -s "$serial" logcat -d -s AndroidRuntime:E 2>&1 | tail -30 || true
+        adb -s "$serial" logcat -d > "$_logs_dir/logcat-deploy-unstable.txt" 2>&1 || true
+        echo "Logcat saved to: $_logs_dir/logcat-deploy-unstable.txt"
+        printf 'fail\nApp did not stay running within timeout\n' > "$_step_dir/$_step.status"
+        exit 1
+      fi
 
-      printf 'fail\nApp did not stay running within timeout\n' > "$_step_dir/$_step.status"
-      exit 1
+      # Soak period — verify app survives for 10 seconds
+      echo "App process confirmed, starting soak period (10s)..."
+      sleep 10
+
+      if ! android.sh app status; then
+        echo "FAIL: App crashed during soak period"
+        adb -s "$serial" logcat -d > "$_logs_dir/logcat-soak-crash.txt" 2>&1 || true
+        adb -s "$serial" logcat -d -s AndroidRuntime:E > "$_logs_dir/logcat-crash-fatal.txt" 2>&1 || true
+        echo "Logcat saved to: $_logs_dir/logcat-soak-crash.txt"
+        echo "Crash logs: $_logs_dir/logcat-crash-fatal.txt"
+        printf 'fail\nApp crashed during soak period\n' > "$_step_dir/$_step.status"
+        exit 1
+      fi
+
+      # Always save logcat snapshot for analysis
+      adb -s "$serial" logcat -d > "$_logs_dir/logcat-final.txt" 2>&1 || true
+
+      # Scan for crash patterns in logcat
+      crash_patterns="FATAL EXCEPTION|AndroidRuntime.*FATAL|Process.*crash"
+      if grep -qiE "$crash_patterns" "$_logs_dir/logcat-final.txt" 2>/dev/null; then
+        echo ""
+        echo "FAIL: Crash patterns detected in logcat"
+        echo "--- Error lines ---"
+        grep -iE "$crash_patterns" "$_logs_dir/logcat-final.txt" | tail -20
+        echo "---"
+        echo "Full logcat: $_logs_dir/logcat-final.txt"
+        printf 'fail\nCrash patterns detected in logcat\n' > "$_step_dir/$_step.status"
+        exit 1
+      fi
+
+      echo "pass" > "$_step_dir/$_step.status"
+      echo "App verified healthy (process alive, no crashes detected)"
+      echo "Logcat saved to: $_logs_dir/logcat-final.txt"
     depends_on:
       build-app:
         condition: process_completed_successfully
@@ -264,9 +296,17 @@ processes:
     availability:
       restart: "no"
 
-  # Cleanup - stop everything in pure mode, keep running in dev mode
+  # Cleanup - capture final logs, then stop everything in pure mode
   cleanup-app:
     command: |
+      _logs_dir="reports/logs"
+      mkdir -p "$_logs_dir"
+
+      # Capture final logcat before teardown
+      serial="${ANDROID_EMULATOR_SERIAL:-emulator-${EMU_PORT:-5554}}"
+      adb -s "$serial" logcat -d > "$_logs_dir/logcat-cleanup.txt" 2>&1 || true
+      echo "Final logcat: $_logs_dir/logcat-cleanup.txt"
+
       if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
         echo "Cleaning up (pure mode)..."
         android.sh app stop || true

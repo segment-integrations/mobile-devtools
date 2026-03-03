@@ -424,13 +424,14 @@ processes:
     availability:
       restart: "no"
 
-  # Phase 7a: Verify Android app
+  # Phase 7a: Verify Android app is running, healthy, and survives soak
   verify-android-running:
     command: |
       set -e
       _step="verify-android"
       _step_dir="reports/steps"
-      mkdir -p "$_step_dir"
+      _logs_dir="reports/logs"
+      mkdir -p "$_step_dir" "$_logs_dir"
 
       echo "Waiting for Android app to start..."
 
@@ -448,86 +449,203 @@ processes:
       max_attempts=20
       attempt=0
       while [ $attempt -lt $max_attempts ]; do
-        if ! android.sh app status; then
-          attempt=$((attempt + 1))
-          echo "  Attempt $attempt/$max_attempts: App not running yet..."
-          sleep 2
-          continue
-        fi
-
-        echo "  App process is running, waiting 5 seconds for startup..."
-        sleep 5
-
-        echo "  Checking logs for errors..."
-
-        # Get recent logs from ALL tags (not just ReactNative), more lines
-        log_output=$(adb -s "$serial" logcat -d -t 500 2>/dev/null || true)
-
-        # Check for Metro connection errors (these appear in red box)
-        if echo "$log_output" | grep -qi "unable.*load.*script\|could.*not.*connect.*metro\|connection.*refused.*8081\|packaged.*correctly.*for.*release"; then
-          echo "ERROR: App cannot connect to Metro bundler:" >&2
-          echo "$log_output" | grep -iE "unable|load|script|connect|metro|refused|8081|packaged|release|bundle" | tail -30 >&2
-          echo "" >&2
-          echo "Full recent logs:" >&2
-          echo "$log_output" | tail -50 >&2
-          printf 'fail\nApp cannot connect to Metro bundler\n' > "$_step_dir/$_step.status"
-          exit 1
-        fi
-
-        # Check for other fatal errors
-        if echo "$log_output" | grep -qi "fatal.*error\|exception.*error"; then
-          echo "ERROR: App encountered fatal errors:" >&2
-          echo "$log_output" | grep -iE "fatal|exception" | tail -20 >&2
-          printf 'fail\nApp encountered fatal errors\n' > "$_step_dir/$_step.status"
-          exit 1
-        fi
-
-        echo "Android app is running and connected to Metro"
-        echo "pass" > "$_step_dir/$_step.status"
-        exit 0
-      done
-
-      printf 'fail\nAndroid app did not start within timeout\n' > "$_step_dir/$_step.status"
-      exit 1
-    depends_on:
-      deploy-android:
-        condition: process_completed_successfully
-    availability:
-      restart: "no"
-
-  # Phase 7b: Verify iOS app (parallel with Android)
-  verify-ios-running:
-    command: |
-      set -e
-      _step="verify-ios"
-      _step_dir="reports/steps"
-      mkdir -p "$_step_dir"
-
-      echo "Waiting for iOS app to start..."
-      max_attempts=15
-      attempt=0
-      while [ $attempt -lt $max_attempts ]; do
-        if ios.sh app status; then
-          echo "iOS app is running"
-          echo "pass" > "$_step_dir/$_step.status"
-          exit 0
+        if android.sh app status; then
+          break
         fi
         attempt=$((attempt + 1))
         echo "  Attempt $attempt/$max_attempts: App not running yet..."
         sleep 2
       done
 
-      printf 'fail\niOS app did not start within timeout\n' > "$_step_dir/$_step.status"
-      exit 1
+      # Initial liveness check
+      if ! android.sh app status; then
+        echo "FAIL: Android app is not running"
+        adb -s "$serial" logcat -d > "$_logs_dir/logcat-android-verify-failure.txt" 2>&1 || true
+        adb -s "$serial" logcat -d -s AndroidRuntime:E > "$_logs_dir/logcat-android-crash-fatal.txt" 2>&1 || true
+        echo "Logcat saved to: $_logs_dir/logcat-android-verify-failure.txt"
+        echo "Crash logs: $_logs_dir/logcat-android-crash-fatal.txt"
+        printf 'fail\nAndroid app not found in running processes\n' > "$_step_dir/$_step.status"
+        exit 1
+      fi
+
+      echo "  App process is running, waiting 5 seconds for startup..."
+      sleep 5
+
+      echo "  Checking logs for errors..."
+
+      # Save logcat snapshot to file
+      adb -s "$serial" logcat -d > "$_logs_dir/logcat-android-verify.txt" 2>&1 || true
+
+      # Check for Metro connection errors
+      metro_patterns="unable.*load.*script|could.*not.*connect.*metro|connection.*refused.*8081|packaged.*correctly.*for.*release"
+      if grep -qiE "$metro_patterns" "$_logs_dir/logcat-android-verify.txt" 2>/dev/null; then
+        echo "FAIL: App cannot connect to Metro bundler"
+        echo "--- Error lines ---"
+        grep -iE "unable|load|script|connect|metro|refused|8081|packaged|release|bundle" "$_logs_dir/logcat-android-verify.txt" | tail -30
+        echo "---"
+        echo "Full logcat: $_logs_dir/logcat-android-verify.txt"
+        printf 'fail\nAndroid app cannot connect to Metro bundler\n' > "$_step_dir/$_step.status"
+        exit 1
+      fi
+
+      # Check for native crash patterns
+      crash_patterns="FATAL EXCEPTION|AndroidRuntime.*FATAL|Process.*crash"
+      if grep -qiE "$crash_patterns" "$_logs_dir/logcat-android-verify.txt" 2>/dev/null; then
+        echo "FAIL: Crash patterns detected in logcat"
+        echo "--- Error lines ---"
+        grep -iE "$crash_patterns" "$_logs_dir/logcat-android-verify.txt" | tail -20
+        echo "---"
+        echo "Full logcat: $_logs_dir/logcat-android-verify.txt"
+        printf 'fail\nCrash patterns detected in Android logcat\n' > "$_step_dir/$_step.status"
+        exit 1
+      fi
+
+      # Check for React Native JS errors
+      rn_patterns="ReactNativeJS.*Error|Unhandled JS Exception|RedBoxError"
+      if grep -qiE "$rn_patterns" "$_logs_dir/logcat-android-verify.txt" 2>/dev/null; then
+        echo "FAIL: React Native JS error detected"
+        echo "--- Error lines ---"
+        grep -iE "$rn_patterns" "$_logs_dir/logcat-android-verify.txt" | tail -20
+        echo "---"
+        echo "Full logcat: $_logs_dir/logcat-android-verify.txt"
+        printf 'fail\nReact Native JS error detected on Android\n' > "$_step_dir/$_step.status"
+        exit 1
+      fi
+
+      # Soak period — verify app survives for 10 seconds
+      echo "Android app confirmed, starting soak period (10s)..."
+      sleep 10
+
+      if ! android.sh app status; then
+        echo "FAIL: Android app crashed during soak period"
+        adb -s "$serial" logcat -d > "$_logs_dir/logcat-android-soak-crash.txt" 2>&1 || true
+        echo "Logcat saved to: $_logs_dir/logcat-android-soak-crash.txt"
+        printf 'fail\nAndroid app crashed during soak period\n' > "$_step_dir/$_step.status"
+        exit 1
+      fi
+
+      echo "Android app verified healthy (process alive, no crashes detected)"
+      echo "Logcat saved to: $_logs_dir/logcat-android-verify.txt"
+      echo "pass" > "$_step_dir/$_step.status"
+    depends_on:
+      deploy-android:
+        condition: process_completed_successfully
+    availability:
+      restart: "no"
+
+  # Phase 7b: Verify iOS app is running, healthy, and survives soak (parallel with Android)
+  verify-ios-running:
+    command: |
+      set -e
+      _step="verify-ios"
+      _step_dir="reports/steps"
+      _logs_dir="reports/logs"
+      mkdir -p "$_step_dir" "$_logs_dir"
+
+      UDID=$(cat "${IOS_RUNTIME_DIR:-/tmp}/rn-all-e2e/simulator-udid.txt" 2>/dev/null || cat "${IOS_RUNTIME_DIR:-/tmp}/${SUITE_NAME:-rn-all-e2e}/simulator-udid.txt" 2>/dev/null || true)
+
+      echo "Waiting for iOS app to start..."
+      max_attempts=15
+      attempt=0
+      while [ $attempt -lt $max_attempts ]; do
+        if ios.sh app status; then
+          break
+        fi
+        attempt=$((attempt + 1))
+        echo "  Attempt $attempt/$max_attempts: App not running yet..."
+        sleep 2
+      done
+
+      # Initial liveness check
+      if ! ios.sh app status; then
+        echo "FAIL: iOS app is not running"
+        if [ -n "$UDID" ]; then
+          xcrun simctl spawn "$UDID" log show --predicate 'eventMessage contains "crash" OR eventMessage contains "fatal" OR eventMessage contains "terminate"' --last 5m --style compact > "$_logs_dir/simulator-crash.log" 2>&1 || true
+          echo "Simulator crash logs: $_logs_dir/simulator-crash.log"
+        fi
+        printf 'fail\niOS app not found in running processes\n' > "$_step_dir/$_step.status"
+        exit 1
+      fi
+
+      # Soak period — verify app survives for 10 seconds
+      echo "iOS app process is running, starting soak period (10s)..."
+      sleep 10
+
+      if ! ios.sh app status; then
+        echo "FAIL: iOS app crashed during soak period"
+        if [ -n "$UDID" ]; then
+          xcrun simctl spawn "$UDID" log show --predicate 'eventMessage contains "crash" OR eventMessage contains "fatal" OR eventMessage contains "terminate"' --last 5m --style compact > "$_logs_dir/simulator-crash.log" 2>&1 || true
+          echo "Simulator crash logs: $_logs_dir/simulator-crash.log"
+        fi
+        printf 'fail\niOS app crashed during soak period\n' > "$_step_dir/$_step.status"
+        exit 1
+      fi
+
+      # Capture simulator logs for analysis
+      if [ -n "$UDID" ]; then
+        xcrun simctl spawn "$UDID" log show --last 2m --style compact > "$_logs_dir/simulator-app.log" 2>&1 || true
+
+        # Scan for native crash patterns
+        error_patterns="Terminating app|SIGABRT|EXC_BAD_ACCESS|EXC_CRASH|Fatal error|Assertion failure"
+        if grep -qiE "$error_patterns" "$_logs_dir/simulator-app.log" 2>/dev/null; then
+          echo ""
+          echo "FAIL: Crash/error patterns detected in simulator logs"
+          echo "--- Error lines ---"
+          grep -iE "$error_patterns" "$_logs_dir/simulator-app.log" | head -20
+          echo "---"
+          echo "Full logs: $_logs_dir/simulator-app.log"
+          printf 'fail\nCrash patterns detected in iOS simulator logs\n' > "$_step_dir/$_step.status"
+          exit 1
+        fi
+
+        # Scan for React Native specific errors
+        rn_error_patterns="RCTFatal|Unhandled JS Exception|Unable to load script|Could not connect to development server|RedBoxError"
+        if grep -qiE "$rn_error_patterns" "$_logs_dir/simulator-app.log" 2>/dev/null; then
+          echo ""
+          echo "FAIL: React Native error detected in simulator logs"
+          echo "--- Error lines ---"
+          grep -iE "$rn_error_patterns" "$_logs_dir/simulator-app.log" | head -20
+          echo "---"
+          echo "Full logs: $_logs_dir/simulator-app.log"
+          printf 'fail\nReact Native error detected in iOS simulator logs\n' > "$_step_dir/$_step.status"
+          exit 1
+        fi
+      fi
+
+      echo "iOS app verified healthy (process alive, no crashes detected)"
+      [ -f "$_logs_dir/simulator-app.log" ] && echo "App logs: $_logs_dir/simulator-app.log"
+      echo "pass" > "$_step_dir/$_step.status"
     depends_on:
       deploy-ios:
         condition: process_completed_successfully
     availability:
       restart: "no"
 
-  # Cleanup - runs when both platforms complete
+  # Cleanup - capture final logs, then stop everything in pure mode
   cleanup:
     command: |
+      _logs_dir="reports/logs"
+      mkdir -p "$_logs_dir"
+
+      # Capture final Android logcat before teardown
+      serial=""
+      state_dir="${ANDROID_RUNTIME_DIR:-.devbox/virtenv}/${SUITE_NAME:-default}"
+      if [ -f "$state_dir/emulator-serial.txt" ]; then
+        serial="$(cat "$state_dir/emulator-serial.txt")"
+      fi
+      if [ -z "$serial" ]; then
+        serial="emulator-${EMU_PORT:-5554}"
+      fi
+      adb -s "$serial" logcat -d > "$_logs_dir/logcat-android-cleanup.txt" 2>&1 || true
+      echo "Final Android logcat: $_logs_dir/logcat-android-cleanup.txt"
+
+      # Capture final iOS simulator logs before teardown
+      UDID=$(cat "${IOS_RUNTIME_DIR:-/tmp}/rn-all-e2e/simulator-udid.txt" 2>/dev/null || cat "${IOS_RUNTIME_DIR:-/tmp}/${SUITE_NAME:-rn-all-e2e}/simulator-udid.txt" 2>/dev/null || true)
+      if [ -n "$UDID" ]; then
+        xcrun simctl spawn "$UDID" log show --last 5m --style compact > "$_logs_dir/simulator-final.log" 2>&1 || true
+        echo "Final iOS simulator logs: $_logs_dir/simulator-final.log"
+      fi
+
       if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
         echo "Cleaning up (pure mode)..."
         metro.sh stop all || true

@@ -280,6 +280,25 @@ e2e_report_steps() {
     done
   fi
 
+  # List available diagnostic logs when there are failures
+  if [ "$any_failure" -eq 1 ]; then
+    local logs_dir="reports/logs"
+    local has_logs=0
+    for logfile in "$logs_dir"/*.log "$logs_dir"/*.txt; do
+      [ -f "$logfile" ] || continue
+      local size
+      size=$(wc -c < "$logfile" | tr -d ' ')
+      if [ "$size" -gt 0 ]; then
+        if [ "$has_logs" -eq 0 ]; then
+          echo ""
+          echo "  Diagnostic logs:"
+          has_logs=1
+        fi
+        echo "    $logfile (${size} bytes)"
+      fi
+    done
+  fi
+
   rm -rf "$steps_dir"
   return $any_failure
 }
