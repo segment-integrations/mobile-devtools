@@ -108,6 +108,38 @@ processes:
       success_threshold: 1
       failure_threshold: 60
 
+  # Phase 2c: Verify emulator ready (timeout safety net)
+  verify-emulator-ready:
+    command: |
+      set -e
+      _step="emulator-boot"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+
+      # Wait a moment for launch to start
+      sleep 5
+
+      echo "Verifying emulator is ready..."
+      max_wait=300
+      elapsed=0
+      while ! android.sh emulator ready 2>/dev/null; do
+        sleep 3
+        elapsed=$((elapsed + 3))
+        echo "  Waiting for emulator... ${elapsed}s/${max_wait}s"
+        if [ $elapsed -ge $max_wait ]; then
+          printf 'fail\nTimed out after %ds waiting for emulator to boot\n' "$max_wait" > "$_step_dir/$_step.status"
+          exit 1
+        fi
+      done
+      echo "Emulator ready"
+
+      echo "pass" > "$_step_dir/$_step.status"
+    depends_on:
+      sync-avds:
+        condition: process_completed_successfully
+    availability:
+      restart: "no"
+
   # Phase 3: Deploy app - depends on both build and emulator being ready
   deploy-app:
     command: |
@@ -227,8 +259,8 @@ processes:
     depends_on:
       build-app:
         condition: process_completed_successfully
-      android-emulator:
-        condition: process_healthy
+      verify-emulator-ready:
+        condition: process_completed_successfully
     availability:
       restart: "no"
 
@@ -256,7 +288,7 @@ processes:
       export REPO_ROOT="$(cd ../.. && pwd)"
       . "$REPO_ROOT/plugins/tests/test-framework.sh"
       log_test "Android E2E Test Suite"
-      e2e_report_steps setup-sdk build-app deploy-app || true
+      e2e_report_steps setup-sdk build-app emulator-boot deploy-app || true
       test_summary "android-e2e"
     depends_on:
       cleanup-app:
