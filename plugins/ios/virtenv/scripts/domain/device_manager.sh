@@ -231,14 +231,7 @@ ios_ensure_device_from_definition() {
   fi
 
   # Resolve runtime strictly (don't fallback)
-  choice="$(resolve_runtime_strict "$runtime" 2>&1 || true)"
-  if [ -z "$choice" ]; then
-    echo "  ⚠ Runtime iOS $runtime not available, skipping $name"
-    return 3
-  fi
-
-  # Check if choice contains error message (resolve_runtime_strict failed)
-  if echo "$choice" | grep -q "not found"; then
+  if ! choice="$(resolve_runtime_strict "$runtime")"; then
     echo "  ⚠ Runtime iOS $runtime not available, skipping $name"
     return 3
   fi

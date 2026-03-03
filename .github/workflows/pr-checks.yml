@@ -103,18 +103,18 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Select stable Xcode
+      - name: Select pinned Xcode
         run: |
-          STABLE=$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -v beta | sort -V | tail -1)
-          if [ -z "$STABLE" ]; then
-            STABLE=$(ls -d /Applications/Xcode.app 2>/dev/null || true)
+          # Pin to stable Xcode version (26.2 = default on macos-26 runner)
+          XCODE_VERSION="26.2"
+          XCODE_APP=$(ls -d /Applications/Xcode_${XCODE_VERSION}*.app 2>/dev/null | head -1)
+          if [ -z "$XCODE_APP" ]; then
+            XCODE_APP="/Applications/Xcode.app"
           fi
-          if [ -n "$STABLE" ]; then
-            echo "Selecting: $STABLE"
-            sudo xcode-select -s "$STABLE/Contents/Developer"
-          fi
+          echo "Selecting: $XCODE_APP"
+          sudo xcode-select -s "$XCODE_APP/Contents/Developer"
           xcodebuild -version
-          xcrun --sdk iphonesimulator --show-sdk-version
+          xcrun simctl list runtimes | grep -i ios
 
       - name: Setup CocoaPods cache
         uses: actions/cache@v4
@@ -147,7 +147,7 @@ jobs:
           TEST_TIMEOUT: 300
           IOS_DEFAULT_DEVICE: max
           TEST_TUI: false
-        run: devbox run --pure -e SIM_HEADLESS=1 test:e2e
+        run: devbox run --pure -e SIM_HEADLESS=1 -e IOS_DEVICES=max test:e2e
 
       - name: Upload reports and logs
         if: always()
@@ -206,19 +206,19 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: Select stable Xcode (iOS only)
+      - name: Select pinned Xcode (iOS only)
         if: matrix.platform == 'ios'
         run: |
-          STABLE=$(ls -d /Applications/Xcode_*.app 2>/dev/null | grep -v beta | sort -V | tail -1)
-          if [ -z "$STABLE" ]; then
-            STABLE=$(ls -d /Applications/Xcode.app 2>/dev/null || true)
+          # Pin to stable Xcode version (26.2 = default on macos-26 runner)
+          XCODE_VERSION="26.2"
+          XCODE_APP=$(ls -d /Applications/Xcode_${XCODE_VERSION}*.app 2>/dev/null | head -1)
+          if [ -z "$XCODE_APP" ]; then
+            XCODE_APP="/Applications/Xcode.app"
           fi
-          if [ -n "$STABLE" ]; then
-            echo "Selecting: $STABLE"
-            sudo xcode-select -s "$STABLE/Contents/Developer"
-          fi
+          echo "Selecting: $XCODE_APP"
+          sudo xcode-select -s "$XCODE_APP/Contents/Developer"
           xcodebuild -version
-          xcrun --sdk iphonesimulator --show-sdk-version
+          xcrun simctl list runtimes | grep -i ios
 
       - name: Setup CocoaPods cache (iOS only)
         if: matrix.platform == 'ios'
@@ -261,7 +261,7 @@ jobs:
           if [ "${{ matrix.platform }}" = "android" ]; then
             devbox run --pure -e IOS_SKIP_SETUP=1 -e EMU_HEADLESS=1 -e ANDROID_DEVICES=max test:e2e:android
           elif [ "${{ matrix.platform }}" = "ios" ]; then
-            devbox run --pure -e ANDROID_SKIP_SETUP=1 -e SIM_HEADLESS=1 test:e2e:ios
+            devbox run --pure -e ANDROID_SKIP_SETUP=1 -e SIM_HEADLESS=1 -e IOS_DEVICES=max test:e2e:ios
           elif [ "${{ matrix.platform }}" = "web" ]; then
             devbox run --pure -e ANDROID_SKIP_SETUP=1 -e IOS_SKIP_SETUP=1 test:e2e:web
           fi

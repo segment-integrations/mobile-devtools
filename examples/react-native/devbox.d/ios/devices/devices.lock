@@ -1,13 +1,13 @@
 {
   "devices": [
     {
-      "name": "iPhone 13",
-      "runtime": "15.4"
+      "name": "iPhone 17",
+      "runtime": "26.2"
     },
     {
-      "name": "iPhone 17",
-      "runtime": "26.3"
+      "name": "iPhone 13",
+      "runtime": "15.4"
     }
   ],
-  "checksum": "54ab6a585049437d6dc6dc378751ae46e406ce2e5c147452b7f52cfe0910bc4f"
+  "checksum": "4d5276f203d7ad62860bfc067f76194df53be449d4aa8a3b2d069855ec1f3232"
 }
