@@ -28,11 +28,11 @@ processes:
     availability:
       restart: "no"
 
-  # Phase 1: Build app (depends on SDK setup)
+  # Phase 1: Build app (depends on simulator so runtime is installed)
   build-app:
     depends_on:
-      setup-sdk:
-        condition: process_completed_successfully
+      ios-simulator:
+        condition: process_healthy
     command: |
       set -e
       _step="build-app"

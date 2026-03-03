@@ -178,7 +178,7 @@ processes:
       success_threshold: 1
       failure_threshold: 12
 
-  # Phase 6a: Build iOS app (depends on port allocation, NOT metro running)
+  # Phase 6a: Build iOS app (depends on simulator so runtime is installed)
   build-ios:
     command: |
       set -e
@@ -222,6 +222,8 @@ processes:
         condition: process_completed_successfully
       allocate-metro-port:
         condition: process_completed_successfully
+      launch-simulator:
+        condition: process_healthy
     availability:
       restart: "no"
 
