@@ -216,18 +216,16 @@ processes:
   # Phase 6: Deploy app
   deploy-android:
     command: |
-      set -e
       _step="deploy"
       _step_dir="reports/steps"
-      mkdir -p "$_step_dir"
-      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+      _logs_dir="reports/logs"
+      mkdir -p "$_step_dir" "$_logs_dir"
 
       # Source Metro environment so React Native uses correct port
       . ${REACT_NATIVE_VIRTENV}/metro/env-android.sh
       echo "Metro port: $METRO_PORT"
 
       # Setup ADB reverse port forwarding so app can reach Metro
-      # React Native apps connect to localhost:8081 by default, forward to actual Metro port
       serial=""
       state_dir="${ANDROID_RUNTIME_DIR:-.devbox/virtenv}/${SUITE_NAME:-default}"
       if [ -f "$state_dir/emulator-serial.txt" ]; then
@@ -249,10 +247,104 @@ processes:
       echo "Verifying port forwarding..."
       adb -s "$serial" reverse --list
 
-      # Deploy using android.sh (APK already built by build-android)
-      android.sh deploy
+      # Capture emulator state before deploy
+      echo ""
+      echo "=== Pre-deploy emulator state ==="
+      echo "Serial: $serial"
+      adb -s "$serial" get-state 2>&1 || echo "WARNING: adb get-state failed"
+      echo "Emulator uptime:"
+      adb -s "$serial" shell uptime 2>&1 || echo "WARNING: uptime failed"
+      echo ""
 
-      echo "pass" > "$_step_dir/$_step.status"
+      # Deploy (allow failure so we can capture diagnostics)
+      deploy_exit=0
+      android.sh deploy || deploy_exit=$?
+
+      if [ "$deploy_exit" -ne 0 ]; then
+        echo ""
+        echo "=== Deploy failed (exit $deploy_exit) - capturing diagnostics ==="
+        echo ""
+
+        # Check emulator is still responsive
+        echo "--- Emulator responsiveness ---"
+        adb -s "$serial" get-state 2>&1 || echo "ERROR: Emulator not responding to adb"
+        echo ""
+
+        # Check if the app package is installed
+        echo "--- Installed packages matching app ---"
+        adb -s "$serial" shell pm list packages 2>/dev/null | grep -i "devbox\|example\|reactnative" || echo "(none found)"
+        echo ""
+
+        # Try launching manually and capture am start output
+        echo "--- Manual am start attempt ---"
+        adb -s "$serial" shell am start -n "com.devboxreactnativeexample/.MainActivity" 2>&1 || true
+        sleep 3
+        echo ""
+
+        # Check for the process
+        echo "--- Process check (pidof) ---"
+        pid=$(adb -s "$serial" shell pidof com.devboxreactnativeexample 2>&1 || true)
+        if [ -n "$pid" ]; then
+          echo "Process IS running: pid=$pid"
+          echo "(The deploy script's check may have been too early)"
+        else
+          echo "Process NOT running"
+          echo ""
+          echo "--- Checking for recent crashes ---"
+          adb -s "$serial" shell "dumpsys activity processes | grep -A5 'com.devboxreactnativeexample'" 2>&1 || true
+        fi
+        echo ""
+
+        echo "--- Crash/fatal logcat ---"
+        adb -s "$serial" logcat -d -s AndroidRuntime:E 2>&1 | tail -30 || true
+        echo ""
+
+        # Save full logcat to reports
+        echo "Saving full logcat to $_logs_dir/logcat-deploy-failure.txt"
+        adb -s "$serial" logcat -d > "$_logs_dir/logcat-deploy-failure.txt" 2>&1 || true
+
+        # Save device info
+        echo "Saving device info to $_logs_dir/device-info.txt"
+        {
+          echo "=== Device Properties ==="
+          adb -s "$serial" shell getprop 2>&1 || true
+          echo ""
+          echo "=== Memory Info ==="
+          adb -s "$serial" shell cat /proc/meminfo 2>&1 | head -20 || true
+          echo ""
+          echo "=== Disk Space ==="
+          adb -s "$serial" shell df -h 2>&1 || true
+        } > "$_logs_dir/device-info.txt" 2>&1
+
+        printf 'fail\nDeploy failed with exit code %d\n' "$deploy_exit" > "$_step_dir/$_step.status"
+        exit 1
+      fi
+
+      # Deploy succeeded - verify app stays running
+      echo ""
+      echo "Waiting for app to stabilize..."
+      max_attempts=10
+      attempt=0
+      while [ $attempt -lt $max_attempts ]; do
+        if android.sh app status; then
+          echo "App is running (verified after ${attempt}s)"
+          adb -s "$serial" logcat -d > "$_logs_dir/logcat-deploy-success.txt" 2>&1 || true
+          echo "pass" > "$_step_dir/$_step.status"
+          exit 0
+        fi
+        attempt=$((attempt + 1))
+        echo "  Attempt $attempt/$max_attempts..."
+        sleep 2
+      done
+
+      # App not stable after deploy
+      echo ""
+      echo "=== App not stable after deploy - capturing diagnostics ==="
+      adb -s "$serial" logcat -d -s AndroidRuntime:E 2>&1 | tail -30 || true
+      adb -s "$serial" logcat -d > "$_logs_dir/logcat-deploy-unstable.txt" 2>&1 || true
+
+      printf 'fail\nApp did not stay running within timeout\n' > "$_step_dir/$_step.status"
+      exit 1
     depends_on:
       build-android:
         condition: process_completed_successfully
