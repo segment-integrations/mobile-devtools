@@ -1,4 +1,4 @@
-# Devbox Plugins for Mobile Development
+# Mobile Devtools & Plugins for Devbox
 
 Reproducible, project-local development environments for Android, iOS, and React Native for [Devbox](https://www.jetify.com/devbox).
 
