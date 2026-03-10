@@ -44,7 +44,7 @@ jobs:
           sudo udevadm trigger --name-match=kvm
 
       - name: Setup Gradle cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.gradle/caches
@@ -108,7 +108,7 @@ jobs:
           xcrun simctl list runtimes | grep -i ios
 
       - name: Setup CocoaPods cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cocoapods/repos
@@ -118,7 +118,7 @@ jobs:
             ${{ runner.os }}-pods-
 
       - name: Setup Xcode build cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/Library/Developer/Xcode/DerivedData
@@ -210,7 +210,7 @@ jobs:
 
       - name: Setup Gradle cache (Android only)
         if: matrix.platform == 'android'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.gradle/caches
@@ -221,7 +221,7 @@ jobs:
 
       - name: Setup CocoaPods cache (iOS only)
         if: matrix.platform == 'ios'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cocoapods/repos
@@ -232,7 +232,7 @@ jobs:
 
       - name: Setup Xcode build cache (iOS only)
         if: matrix.platform == 'ios'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/Library/Developer/Xcode/DerivedData
