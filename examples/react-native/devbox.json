@@ -8,6 +8,7 @@
   ],
   "env": {
     "IOS_APP_SCHEME": "ReactNativeExample",
+    "IOS_APP_ARTIFACT": "${IOS_DERIVED_DATA_PATH}/Build/Products/${IOS_BUILD_CONFIG}-iphonesimulator/${IOS_APP_SCHEME}.app",
     "IOS_APP_BUNDLE_ID": "org.reactjs.native.example.ReactNativeExample",
     "ANDROID_APP_ID": "com.reactnativeexample",
     "ANDROID_APP_APK": "android/app/build/outputs/apk/debug/app-debug.apk",
