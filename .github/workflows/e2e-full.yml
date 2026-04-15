@@ -54,7 +54,7 @@ jobs:
             ${{ runner.os }}-gradle-
 
       - name: Install Devbox
-        uses: jetify-com/devbox-install-action@v0.14.0
+        uses: jetify-com/devbox-install-action@v0.15.0
         with:
           enable-cache: true
 
@@ -127,7 +127,7 @@ jobs:
             ${{ runner.os }}-xcode-
 
       - name: Install Devbox
-        uses: jetify-com/devbox-install-action@v0.14.0
+        uses: jetify-com/devbox-install-action@v0.15.0
         with:
           enable-cache: true
 
@@ -241,7 +241,7 @@ jobs:
             ${{ runner.os }}-xcode-
 
       - name: Install Devbox
-        uses: jetify-com/devbox-install-action@v0.14.0
+        uses: jetify-com/devbox-install-action@v0.15.0
         with:
           enable-cache: true
 
