@@ -32,6 +32,7 @@ Commands:
   deploy [apk_path]                Install and launch app on running emulator
   devices <command> [args]         Manage device definitions
   info                             Display resolved SDK information
+  doctor                           Diagnose environment and check for SDK version mismatches
   config <command>                 Manage configuration
   emulator start [device]          Start Android emulator
   emulator stop                    Stop running emulator
@@ -47,6 +48,7 @@ Examples:
   android.sh devices list
   android.sh devices create pixel_api28 --api 28 --device pixel
   android.sh info
+  android.sh doctor
   android.sh config show
   android.sh emulator start max
   android.sh emulator stop
@@ -225,6 +227,72 @@ case "$command_name" in
       echo "ERROR: android_show_summary function not available" >&2
       exit 1
     fi
+    ;;
+
+  # --------------------------------------------------------------------------
+  # doctor - Diagnose Android environment and project configuration
+  # --------------------------------------------------------------------------
+  doctor)
+    ensure_lib_loaded
+
+    echo "🔍 Android Environment Check"
+    echo "=============================="
+    echo ""
+
+    # Check SDK
+    if [ -n "${ANDROID_SDK_ROOT:-}" ] && [ -d "$ANDROID_SDK_ROOT" ]; then
+      echo "✓ ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
+    else
+      echo "✗ ANDROID_SDK_ROOT not found or not a directory"
+    fi
+
+    # Check tools in PATH
+    echo ""
+    echo "Tools availability:"
+    for tool in adb emulator sdkmanager avdmanager; do
+      if command -v "$tool" >/dev/null 2>&1; then
+        echo "  ✓ $tool: $(command -v "$tool")"
+      else
+        echo "  ✗ $tool: not found in PATH"
+      fi
+    done
+
+    # Check versions
+    echo ""
+    echo "Plugin-provided SDK versions:"
+    echo "  ANDROID_COMPILE_SDK: ${ANDROID_COMPILE_SDK:-35}"
+    echo "  ANDROID_TARGET_SDK: ${ANDROID_TARGET_SDK:-35}"
+    echo "  ANDROID_BUILD_TOOLS_VERSION: ${ANDROID_BUILD_TOOLS_VERSION:-35.0.0}"
+    echo "  ANDROID_NDK_VERSION: ${ANDROID_NDK_VERSION:-27.0.12077973}"
+    echo "  ANDROID_MAX_API: ${ANDROID_MAX_API:-}"
+
+    # Check build.gradle if it exists
+    echo ""
+    if [ -f "android/build.gradle" ]; then
+      echo "Project android/build.gradle detected:"
+      echo ""
+      # Show SDK-related config
+      if grep -E "(compileSdkVersion|targetSdkVersion|buildToolsVersion)" android/build.gradle >/dev/null 2>&1; then
+        grep -E "(compileSdkVersion|targetSdkVersion|buildToolsVersion)" android/build.gradle | head -5
+      else
+        echo "  (No SDK version config found)"
+      fi
+      echo ""
+
+      # Run validation
+      validate_script="${scripts_dir}/domain/validate.sh"
+      if [ -f "$validate_script" ]; then
+        # shellcheck source=/dev/null
+        . "$validate_script"
+        android_validate_build_config
+      fi
+    else
+      echo "⚠️  No android/build.gradle found in current directory"
+      echo "   Run this command from your project root"
+    fi
+
+    echo ""
+    echo "Run 'android.sh info' for detailed SDK information"
     ;;
 
   # --------------------------------------------------------------------------

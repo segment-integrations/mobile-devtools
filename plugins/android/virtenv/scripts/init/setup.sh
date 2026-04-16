@@ -70,6 +70,7 @@ if [ -n "${ANDROID_SCRIPTS_DIR:-}" ] && [ -f "${ANDROID_SCRIPTS_DIR}/platform/co
     [ -n "${ANDROID_DEBUG_SETUP:-}" ] && echo "[SETUP-$$] Running validation..." >&2
     . "${ANDROID_SCRIPTS_DIR}/domain/validate.sh"
     android_validate_sdk || true
+    android_validate_build_config || true
     [ -n "${ANDROID_DEBUG_SETUP:-}" ] && echo "[SETUP-$$] Validation complete" >&2
   fi
 

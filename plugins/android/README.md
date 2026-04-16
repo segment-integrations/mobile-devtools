@@ -30,6 +30,79 @@ devbox run reset-emu
 
 `start-android` starts the emulator, builds the app (via `build-android`), and installs/launches the APK matched by `ANDROID_APP_APK`.
 
+## Configuring SDK Versions
+
+The plugin provides sensible defaults (API 35, build-tools 35.0.0), but you can configure SDK versions to match your project needs.
+
+### Option 1: Use Plugin Defaults (Recommended)
+
+Update your `android/build.gradle` to read from environment variables:
+
+```gradle
+buildscript {
+    ext {
+        def compileSdkEnv = System.getenv("ANDROID_COMPILE_SDK") ?: System.getenv("ANDROID_MAX_API") ?: "35"
+        def targetSdkEnv = System.getenv("ANDROID_TARGET_SDK") ?: System.getenv("ANDROID_MAX_API") ?: "35"
+        buildToolsVersion = System.getenv("ANDROID_BUILD_TOOLS_VERSION") ?: "35.0.0"
+        
+        compileSdkVersion = compileSdkEnv.toInteger()
+        targetSdkVersion = targetSdkEnv.toInteger()
+        
+        def ndkVersionEnv = System.getenv("ANDROID_NDK_VERSION")
+        if (ndkVersionEnv) {
+            ndkVersion = ndkVersionEnv
+        }
+    }
+}
+```
+
+This approach ensures your build always uses the SDK versions provided by the plugin.
+
+### Option 2: Override Plugin Defaults
+
+Set in your `devbox.json`:
+
+```json
+{
+  "include": ["github:segment-integrations/mobile-devtools?dir=plugins/android"],
+  "env": {
+    "ANDROID_MAX_API": "33",
+    "ANDROID_BUILD_TOOLS_VERSION": "33.0.0"
+  }
+}
+```
+
+Then regenerate the device lock file:
+```bash
+devbox run android.sh devices eval
+```
+
+### Troubleshooting SDK Version Mismatches
+
+If your `android/build.gradle` has hardcoded SDK versions that don't match the plugin, you'll see build failures like:
+
+```
+Failed to install the following SDK components:
+  platforms;android-33 Android SDK Platform 33
+The SDK directory is not writable (/nix/store/...)
+```
+
+**Diagnosis:**
+
+Run the doctor command to check for mismatches:
+```bash
+devbox run android.sh doctor
+```
+
+The doctor will:
+- Show which SDK versions the plugin provides
+- Detect hardcoded versions in your build.gradle
+- Provide specific fix instructions
+
+**Why this happens:**
+
+The Android SDK is provided via the Nix store (immutable), so Gradle cannot download additional SDK versions. Your build.gradle must use the SDK versions that the plugin provides.
+
 ## Reference
 
 See `devbox/plugins/android/REFERENCE.md` for the full command and config reference.
@@ -83,12 +156,13 @@ devbox run build-android-debug  # Build with full debug output
 devbox run gradle-clean         # Clean build artifacts
 ```
 
-Config commands:
+Config and diagnostic commands:
 ```sh
 devbox run android.sh config show
 devbox run android.sh config set ANDROID_DEFAULT_DEVICE=max
 devbox run android.sh config reset
 devbox run android.sh info      # Show resolved SDK info
+devbox run android.sh doctor    # Diagnose SDK version mismatches
 ```
 
 ## Environment variables
