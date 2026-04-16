@@ -202,9 +202,10 @@ processes:
       . ${REACT_NATIVE_VIRTENV}/metro/env-ios.sh
       echo "Metro port: $METRO_PORT"
 
-      # Set up DerivedData path
-      DERIVED_DATA="${DEVBOX_PROJECT_ROOT:-.}/.devbox/virtenv/ios/DerivedData"
+      # Set up DerivedData path (use IOS_DERIVED_DATA_PATH from iOS plugin)
+      DERIVED_DATA="${IOS_DERIVED_DATA_PATH}"
       mkdir -p "$DERIVED_DATA"
+      echo "DerivedData path: $DERIVED_DATA"
 
       # Build with xcodebuild
       cd ios
