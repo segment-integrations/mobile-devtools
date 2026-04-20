@@ -73,34 +73,40 @@ android_hash_fix_download_and_compute() {
   return 0
 }
 
-android_hash_fix_update_android_json() {
+android_hash_fix_update_hash_overrides() {
   local url="$1"
   local new_hash="$2"
-  local android_json="${ANDROID_CONFIG_DIR}/android.json"
-
-  if [ ! -f "$android_json" ]; then
-    echo "android.json not found at $android_json" >&2
-    return 1
-  fi
+  local hash_overrides_file="${ANDROID_CONFIG_DIR}/hash-overrides.json"
 
   # Create override key from URL (replace / with -)
   local override_key
   override_key=$(echo "$url" | sed 's|https://||; s|/|-|g')
 
-  # Update android.json with hash override
+  # Create or update hash-overrides.json
   local temp_json
   temp_json=$(mktemp)
 
-  if ! jq --arg key "$override_key" --arg hash "$new_hash" \
-    '.hash_overrides = (.hash_overrides // {}) | .hash_overrides[$key] = $hash' \
-    "$android_json" > "$temp_json"; then
-    echo "Failed to update android.json" >&2
-    rm -f "$temp_json"
-    return 1
+  if [ -f "$hash_overrides_file" ]; then
+    # Update existing file
+    if ! jq --arg key "$override_key" --arg hash "$new_hash" \
+      '.[$key] = $hash' \
+      "$hash_overrides_file" > "$temp_json"; then
+      echo "Failed to update $hash_overrides_file" >&2
+      rm -f "$temp_json"
+      return 1
+    fi
+  else
+    # Create new file
+    if ! jq -n --arg key "$override_key" --arg hash "$new_hash" \
+      '{($key): $hash}' > "$temp_json"; then
+      echo "Failed to create $hash_overrides_file" >&2
+      rm -f "$temp_json"
+      return 1
+    fi
   fi
 
-  mv "$temp_json" "$android_json"
-  echo "Updated $android_json with hash override for $url" >&2
+  mv "$temp_json" "$hash_overrides_file"
+  echo "Updated $hash_overrides_file with hash override for $url" >&2
   echo "  Override key: $override_key" >&2
   echo "  New hash: $new_hash" >&2
 
@@ -178,24 +184,32 @@ android_hash_fix_auto() {
     echo "📝 Updating android.json with hash override..." >&2
   fi
 
-  # Update android.json
-  if ! android_hash_fix_update_android_json "$HASH_MISMATCH_URL" "$computed_hash" 2>/dev/null; then
+  # Update hash-overrides.json
+  if ! android_hash_fix_update_hash_overrides "$HASH_MISMATCH_URL" "$computed_hash" 2>/dev/null; then
     if [ "$verbose" = "1" ]; then
-      echo "Failed to update android.json" >&2
+      echo "Failed to update hash-overrides.json" >&2
     fi
     return 1
   fi
 
   if [ "$verbose" = "1" ]; then
     echo "" >&2
-    echo "✅ Hash override added to android.json" >&2
+    echo "✅ Hash override added to hash-overrides.json" >&2
+    echo "" >&2
+    echo "IMPORTANT: Commit this file to preserve reproducibility!" >&2
+    echo "" >&2
+    echo "  git add devbox.d/*/hash-overrides.json" >&2
+    echo "  git commit -m \"fix(android): add hash override for $filename\"" >&2
+    echo "" >&2
+    echo "This ensures everyone on your team gets the fix automatically." >&2
+    echo "The override is temporary and can be removed when nixpkgs is updated." >&2
     echo "" >&2
     echo "Next steps:" >&2
     echo "  1. Run 'devbox shell' again to rebuild with corrected hash" >&2
-    echo "  2. The fix is local and will work until nixpkgs is updated upstream" >&2
+    echo "  2. Commit hash-overrides.json to your repository" >&2
     echo "" >&2
   else
-    echo "✓ Hash updated in android.json" >&2
+    echo "✓ Hash override saved to hash-overrides.json" >&2
   fi
 
   return 0

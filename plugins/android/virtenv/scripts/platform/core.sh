@@ -133,7 +133,10 @@ resolve_flake_sdk_root() {
           echo "✅ Hash mismatch fixed!" >&2
           echo "" >&2
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
-          echo "Please run 'devbox shell' again to rebuild with the fix." >&2
+          echo "1. Run 'devbox shell' again to rebuild with the fix" >&2
+          echo "2. Commit hash-overrides.json to preserve reproducibility:" >&2
+          echo "   git add devbox.d/*/hash-overrides.json" >&2
+          echo "   git commit -m \"fix(android): add SDK hash override\"" >&2
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
           echo "" >&2
         else

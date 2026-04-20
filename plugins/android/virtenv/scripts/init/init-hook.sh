@@ -81,6 +81,19 @@ echo "$json_obj" | jq '.' > "$GENERATED_CONFIG" 2>&1 || {
   exit 1
 }
 
+# Merge hash-overrides.json if it exists (for reproducible hash mismatch fixes)
+HASH_OVERRIDES_FILE="${ANDROID_CONFIG_DIR}/hash-overrides.json"
+if [ -f "$HASH_OVERRIDES_FILE" ]; then
+  TEMP_CONFIG=$(mktemp)
+  if jq --slurpfile overrides "$HASH_OVERRIDES_FILE" \
+    '.hash_overrides = $overrides[0]' \
+    "$GENERATED_CONFIG" > "$TEMP_CONFIG" 2>/dev/null; then
+    mv "$TEMP_CONFIG" "$GENERATED_CONFIG"
+  else
+    rm -f "$TEMP_CONFIG"
+  fi
+fi
+
 # ============================================================================
 # Generate devices.lock from ANDROID_DEVICES env var
 # ============================================================================
