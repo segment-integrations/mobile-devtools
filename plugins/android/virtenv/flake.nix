@@ -71,6 +71,12 @@
         cmakeVersion = getVar "ANDROID_CMAKE_VERSION";
       };
 
+      # Hash overrides for when Google updates files on their servers
+      # These can be set in android.json to work around nixpkgs hash mismatches
+      hashOverrides = if builtins.hasAttr "hash_overrides" versionData
+        then versionData.hash_overrides
+        else {};
+
       forAllSystems =
         f:
         builtins.listToAttrs (

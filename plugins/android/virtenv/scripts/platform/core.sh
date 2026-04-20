@@ -98,7 +98,7 @@ resolve_flake_sdk_root() {
   # Capture stderr so failures are visible instead of silently swallowed
   [ -n "${ANDROID_DEBUG_SETUP:-}" ] && echo "[CORE-$$] Building SDK: path:${root}#${output}" >&2
   _nix_stderr=""
-  _nix_stderr_file="$(mktemp "${TMPDIR:-/tmp}/android-nix-build-XXXXXX.stderr")"
+  _nix_stderr_file="${TMPDIR:-/tmp}/android-nix-build-$$.stderr"
   sdk_out=$(
     nix --extra-experimental-features 'nix-command flakes' \
       build "path:${root}#${output}" --no-link --print-out-paths --show-trace 2>"$_nix_stderr_file"
@@ -106,7 +106,7 @@ resolve_flake_sdk_root() {
   _nix_stderr=""
   if [ -f "$_nix_stderr_file" ]; then
     _nix_stderr=$(cat "$_nix_stderr_file" 2>/dev/null || true)
-    rm -f "$_nix_stderr_file" 2>/dev/null || true
+    # Keep the stderr file for hash-fix script, don't delete it yet
   fi
   [ -n "${ANDROID_DEBUG_SETUP:-}" ] && echo "[CORE-$$] nix build returned: ${sdk_out:-(empty)}" >&2
 
@@ -124,7 +124,14 @@ resolve_flake_sdk_root() {
       echo "This usually means Google updated Android SDK files on their servers" >&2
       echo "without changing version numbers, causing nixpkgs hashes to be outdated." >&2
       echo "" >&2
-      echo "WORKAROUND OPTIONS:" >&2
+      echo "AUTOMATIC FIX AVAILABLE:" >&2
+      echo "" >&2
+      echo "Run 'devbox run android:hash-fix' to automatically:" >&2
+      echo "  - Download the file and compute correct hash" >&2
+      echo "  - Update android.json with hash override" >&2
+      echo "  - Then run 'devbox shell' again to rebuild" >&2
+      echo "" >&2
+      echo "MANUAL WORKAROUND OPTIONS:" >&2
       echo "" >&2
       echo "1. Use Android Studio SDK (recommended for local development):" >&2
       echo "   Add to your devbox.json:" >&2
@@ -138,11 +145,12 @@ resolve_flake_sdk_root() {
       echo "" >&2
       echo "3. Run tests on Linux (x86_64) where SDK builds more reliably" >&2
       echo "" >&2
-      echo "To verify if this is a hash mismatch, run:" >&2
-      echo "  nix build path:$(pwd)/.devbox/virtenv/*/android#android-sdk 2>&1 | grep hash" >&2
-      echo "" >&2
+      echo "Error log saved to: $_nix_stderr_file" >&2
       echo "See: https://github.com/NixOS/nixpkgs/issues?q=android+hash+mismatch" >&2
       echo "" >&2
+    else
+      # Not a hash mismatch, can delete the stderr file
+      rm -f "$_nix_stderr_file" 2>/dev/null || true
     fi
     echo "WARNING: Android SDK Nix flake evaluation failed:" >&2
     # Show last 15 lines of stderr (skip noisy download progress)
