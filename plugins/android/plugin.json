@@ -68,6 +68,9 @@
       "setup": [
         "bash {{ .Virtenv }}/scripts/user/setup.sh"
       ],
+      "android:sync": [
+        "android.sh devices sync"
+      ],
       "android:devices:eval": [
         "ANDROID_SDK_REQUIRED=0 android.sh devices eval"
       ],

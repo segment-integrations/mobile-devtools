@@ -494,16 +494,6 @@ case "$command_name" in
 
     mv "$temp_lock_file" "$lock_file_path"
 
-    # Update Android flake lock automatically if devices changed
-    if [ "$checksum_changed" = true ]; then
-      flake_dir="${config_dir}"
-      if [ -f "${flake_dir}/flake.nix" ] && [ -f "${flake_dir}/flake.lock" ]; then
-        if command -v nix >/dev/null 2>&1; then
-          (cd "${flake_dir}" && nix flake update 2>&1 | grep -v "^warning:" || true) >/dev/null
-        fi
-      fi
-    fi
-
     # Print summary
     device_count="$(jq '.devices | length' "$lock_file_path")"
     api_list="$(jq -r '.devices | map(.api) | join(",")' "$lock_file_path")"
@@ -511,15 +501,58 @@ case "$command_name" in
     ;;
 
   # --------------------------------------------------------------------------
-  # Sync: Ensure AVDs match device definitions
+  # Sync: Generate android.lock and devices.lock, ensure AVDs match
   # --------------------------------------------------------------------------
   sync)
+    echo "Syncing Android configuration..."
+    echo "================================================"
+
+    # Step 1: Generate android.lock from env vars
+    android_lock_file="${config_dir}/android.lock"
+    android_lock_tmp="${android_lock_file}.tmp"
+
+    # Extract relevant Android env vars and create lock file
+    jq -n \
+      --arg build_tools "${ANDROID_BUILD_TOOLS_VERSION:-36.1.0}" \
+      --arg cmdline_tools "${ANDROID_CMDLINE_TOOLS_VERSION:-19.0}" \
+      --arg compile_sdk "${ANDROID_COMPILE_SDK:-36}" \
+      --arg target_sdk "${ANDROID_TARGET_SDK:-36}" \
+      --arg system_image_tag "${ANDROID_SYSTEM_IMAGE_TAG:-google_apis}" \
+      --arg include_ndk "${ANDROID_INCLUDE_NDK:-false}" \
+      --arg ndk_version "${ANDROID_NDK_VERSION:-27.0.12077973}" \
+      --arg include_cmake "${ANDROID_INCLUDE_CMAKE:-false}" \
+      --arg cmake_version "${ANDROID_CMAKE_VERSION:-3.22.1}" \
+      '{
+        ANDROID_BUILD_TOOLS_VERSION: $build_tools,
+        ANDROID_CMDLINE_TOOLS_VERSION: $cmdline_tools,
+        ANDROID_COMPILE_SDK: ($compile_sdk | tonumber),
+        ANDROID_TARGET_SDK: ($target_sdk | tonumber),
+        ANDROID_SYSTEM_IMAGE_TAG: $system_image_tag,
+        ANDROID_INCLUDE_NDK: ($include_ndk | test("true|1|yes|on"; "i")),
+        ANDROID_NDK_VERSION: $ndk_version,
+        ANDROID_INCLUDE_CMAKE: ($include_cmake | test("true|1|yes|on"; "i")),
+        ANDROID_CMAKE_VERSION: $cmake_version
+      }' > "$android_lock_tmp"
+
+    mv "$android_lock_tmp" "$android_lock_file"
+    echo "✓ Generated android.lock"
+
+    # Step 2: Regenerate devices.lock
+    echo ""
+    echo "Evaluating device definitions..."
+    # Call eval command to regenerate devices.lock
+    DEVICES_CMD="eval" "$0" || {
+      echo "ERROR: Failed to generate devices.lock" >&2
+      exit 1
+    }
+
+    echo ""
+    echo "Syncing AVDs with device definitions..."
     # AVD management functions are already loaded from avd_manager.sh at the top of this script
 
     # Check if devices.lock exists
     if [ ! -f "$lock_file_path" ]; then
       echo "ERROR: devices.lock not found at $lock_file_path" >&2
-      echo "       Run 'devices.sh eval' first or ensure ANDROID_DEVICES is set" >&2
       exit 1
     fi
 
