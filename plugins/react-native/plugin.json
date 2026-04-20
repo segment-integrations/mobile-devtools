@@ -26,9 +26,9 @@
     "ANDROID_COMPILE_SDK": "35",
     "ANDROID_TARGET_SDK": "35",
     "ANDROID_BUILD_TOOLS_VERSION": "35.0.0",
-    "ANDROID_INCLUDE_NDK": "false",
+    "ANDROID_INCLUDE_NDK": "true",
     "ANDROID_NDK_VERSION": "27.0.12077973",
-    "ANDROID_INCLUDE_CMAKE": "false",
+    "ANDROID_INCLUDE_CMAKE": "true",
     "ANDROID_CMAKE_VERSION": "3.22.1"
   },
   "create_files": {
