@@ -119,35 +119,49 @@ resolve_flake_sdk_root() {
   if [ -n "$_nix_stderr" ]; then
     # Check for hash mismatch or dependency failures (often caused by hash mismatches)
     if echo "$_nix_stderr" | grep -qE "(hash mismatch in fixed-output derivation|Cannot build.*android-sdk.*Reason: 1 dependency failed)"; then
-      echo "⚠️  KNOWN ISSUE: Android SDK build failed (likely hash mismatch)" >&2
       echo "" >&2
-      echo "This usually means Google updated Android SDK files on their servers" >&2
-      echo "without changing version numbers, causing nixpkgs hashes to be outdated." >&2
+      echo "⚠️  Android SDK hash mismatch detected" >&2
       echo "" >&2
-      echo "AUTOMATIC FIX AVAILABLE:" >&2
+      echo "Google updated files on their servers without changing version numbers." >&2
+      echo "Fixing automatically..." >&2
       echo "" >&2
-      echo "Run 'devbox run android:hash-fix' to automatically:" >&2
-      echo "  - Download the file and compute correct hash" >&2
-      echo "  - Update android.json with hash override" >&2
-      echo "  - Then run 'devbox shell' again to rebuild" >&2
-      echo "" >&2
-      echo "MANUAL WORKAROUND OPTIONS:" >&2
-      echo "" >&2
-      echo "1. Use Android Studio SDK (recommended for local development):" >&2
-      echo "   Add to your devbox.json:" >&2
-      echo '   "env": {' >&2
-      echo '     "ANDROID_LOCAL_SDK": "1",' >&2
-      echo '     "ANDROID_SDK_ROOT": "/Users/YOU/Library/Android/sdk"' >&2
-      echo '   }' >&2
-      echo "" >&2
-      echo "2. Update nixpkgs to get latest Android SDK hashes:" >&2
-      echo "   cd devbox.d/*/android/ && nix flake update" >&2
-      echo "" >&2
-      echo "3. Run tests on Linux (x86_64) where SDK builds more reliably" >&2
-      echo "" >&2
-      echo "Error log saved to: $_nix_stderr_file" >&2
-      echo "See: https://github.com/NixOS/nixpkgs/issues?q=android+hash+mismatch" >&2
-      echo "" >&2
+
+      # Try to automatically fix the hash mismatch
+      if [ -n "${ANDROID_SCRIPTS_DIR:-}" ] && [ -f "${ANDROID_SCRIPTS_DIR}/domain/hash-fix.sh" ]; then
+        if bash "${ANDROID_SCRIPTS_DIR}/domain/hash-fix.sh" auto "$_nix_stderr_file" 2>&1; then
+          echo "" >&2
+          echo "✅ Hash mismatch fixed!" >&2
+          echo "" >&2
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
+          echo "Please run 'devbox shell' again to rebuild with the fix." >&2
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
+          echo "" >&2
+        else
+          echo "" >&2
+          echo "⚠️  Automatic fix failed. Manual workarounds:" >&2
+          echo "" >&2
+          echo "1. Use Android Studio SDK:" >&2
+          echo "   Add to devbox.json:" >&2
+          echo '     "env": {' >&2
+          echo '       "ANDROID_LOCAL_SDK": "1",' >&2
+          echo '       "ANDROID_SDK_ROOT": "/Users/YOU/Library/Android/sdk"' >&2
+          echo '     }' >&2
+          echo "" >&2
+          echo "2. Update nixpkgs: cd devbox.d/*/android/ && nix flake update" >&2
+          echo "" >&2
+          echo "3. Run on Linux x86_64 where SDK builds more reliably" >&2
+          echo "" >&2
+          echo "See: https://github.com/NixOS/nixpkgs/issues?q=android+hash+mismatch" >&2
+          echo "" >&2
+        fi
+      else
+        echo "⚠️  Hash fix script not found. Manual fix:" >&2
+        echo "   devbox run android:hash-fix" >&2
+        echo "" >&2
+      fi
+
+      # Clean up the stderr file after hash-fix has used it
+      rm -f "$_nix_stderr_file" 2>/dev/null || true
     else
       # Not a hash mismatch, can delete the stderr file
       rm -f "$_nix_stderr_file" 2>/dev/null || true

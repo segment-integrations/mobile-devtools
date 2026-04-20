@@ -109,6 +109,7 @@ android_hash_fix_update_android_json() {
 
 android_hash_fix_auto() {
   local nix_error_log="${1:-}"
+  local verbose="${ANDROID_HASH_FIX_VERBOSE:-0}"
 
   # If no log file specified, find the latest android-nix-build error log
   if [ -z "$nix_error_log" ] || [ ! -f "$nix_error_log" ]; then
@@ -121,15 +122,19 @@ android_hash_fix_auto() {
       echo "Please try running 'devbox shell' first to trigger the hash mismatch error." >&2
       return 1
     fi
-    echo "Found error log: $nix_error_log" >&2
-    echo "" >&2
+    if [ "$verbose" = "1" ]; then
+      echo "Found error log: $nix_error_log" >&2
+      echo "" >&2
+    fi
   fi
 
   local nix_stderr
   nix_stderr=$(cat "$nix_error_log")
 
-  echo "🔍 Analyzing hash mismatch..." >&2
-  echo "" >&2
+  if [ "$verbose" = "1" ]; then
+    echo "🔍 Analyzing hash mismatch..." >&2
+    echo "" >&2
+  fi
 
   # Detect mismatch
   local mismatch_info
@@ -145,35 +150,53 @@ android_hash_fix_auto() {
     return 1
   fi
 
-  echo "📦 File with mismatch: $HASH_MISMATCH_URL" >&2
-  echo "   Expected: $HASH_MISMATCH_EXPECTED" >&2
-  echo "   Got:      $HASH_MISMATCH_ACTUAL" >&2
-  echo "" >&2
+  # Extract filename from URL for display
+  local filename
+  filename=$(basename "$HASH_MISMATCH_URL")
+
+  if [ "$verbose" = "1" ]; then
+    echo "📦 File with mismatch: $HASH_MISMATCH_URL" >&2
+    echo "   Expected: $HASH_MISMATCH_EXPECTED" >&2
+    echo "   Got:      $HASH_MISMATCH_ACTUAL" >&2
+    echo "" >&2
+    echo "⬇️  Downloading file to verify hash..." >&2
+  else
+    echo "🔍 Detected mismatch in: $filename" >&2
+    echo "⬇️  Downloading and verifying..." >&2
+  fi
 
   # Download and compute actual hash
-  echo "⬇️  Downloading file to verify hash..." >&2
   local computed_hash
-  if ! computed_hash=$(android_hash_fix_download_and_compute "$HASH_MISMATCH_URL"); then
+  if ! computed_hash=$(android_hash_fix_download_and_compute "$HASH_MISMATCH_URL" 2>/dev/null); then
     echo "Failed to download and compute hash" >&2
     return 1
   fi
 
-  echo "✓ Computed hash: $computed_hash" >&2
-  echo "" >&2
+  if [ "$verbose" = "1" ]; then
+    echo "✓ Computed hash: $computed_hash" >&2
+    echo "" >&2
+    echo "📝 Updating android.json with hash override..." >&2
+  fi
 
   # Update android.json
-  echo "📝 Updating android.json with hash override..." >&2
-  if ! android_hash_fix_update_android_json "$HASH_MISMATCH_URL" "$computed_hash"; then
+  if ! android_hash_fix_update_android_json "$HASH_MISMATCH_URL" "$computed_hash" 2>/dev/null; then
+    if [ "$verbose" = "1" ]; then
+      echo "Failed to update android.json" >&2
+    fi
     return 1
   fi
 
-  echo "" >&2
-  echo "✅ Hash override added to android.json" >&2
-  echo "" >&2
-  echo "Next steps:" >&2
-  echo "  1. Run 'devbox shell' again to rebuild with corrected hash" >&2
-  echo "  2. The fix is local and will work until nixpkgs is updated upstream" >&2
-  echo "" >&2
+  if [ "$verbose" = "1" ]; then
+    echo "" >&2
+    echo "✅ Hash override added to android.json" >&2
+    echo "" >&2
+    echo "Next steps:" >&2
+    echo "  1. Run 'devbox shell' again to rebuild with corrected hash" >&2
+    echo "  2. The fix is local and will work until nixpkgs is updated upstream" >&2
+    echo "" >&2
+  else
+    echo "✓ Hash updated in android.json" >&2
+  fi
 
   return 0
 }
