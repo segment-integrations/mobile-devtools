@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env sh
 # Android Plugin - Core SDK and Environment Setup
 # Extracted from env.sh to eliminate circular dependencies
 
@@ -72,10 +72,19 @@ resolve_flake_sdk_root() {
     # Flake is in the config directory (devbox.d/) where device configs live
     if [ -n "${ANDROID_CONFIG_DIR:-}" ] && [ -d "${ANDROID_CONFIG_DIR}" ]; then
       root="${ANDROID_CONFIG_DIR}"
+    elif [ -n "${ANDROID_RUNTIME_DIR:-}" ] && [ -d "${ANDROID_RUNTIME_DIR}" ]; then
+      root="${ANDROID_RUNTIME_DIR}"
+    elif [ -n "${ANDROID_SCRIPTS_DIR:-}" ] && [ -d "${ANDROID_SCRIPTS_DIR}" ]; then
+      # Fallback: flake in same directory as scripts (virtenv) - deprecated
+      root="$(dirname "${ANDROID_SCRIPTS_DIR}")"
+    elif [ -n "${DEVBOX_PROJECT_ROOT:-}" ] && [ -d "${DEVBOX_PROJECT_ROOT}/.devbox/virtenv/android" ]; then
+      root="${DEVBOX_PROJECT_ROOT}/.devbox/virtenv/android"
+    elif [ -n "${DEVBOX_PROJECT_DIR:-}" ] && [ -d "${DEVBOX_PROJECT_DIR}/.devbox/virtenv/android" ]; then
+      root="${DEVBOX_PROJECT_DIR}/.devbox/virtenv/android"
+    elif [ -n "${DEVBOX_WD:-}" ] && [ -d "${DEVBOX_WD}/.devbox/virtenv/android" ]; then
+      root="${DEVBOX_WD}/.devbox/virtenv/android"
     else
-      echo "[ERROR] Failed to resolve flake SDK root directory" >&2
-      echo "        ANDROID_CONFIG_DIR not set or directory does not exist" >&2
-      return 1
+      root="./.devbox/virtenv/android"
     fi
     ANDROID_SDK_FLAKE_PATH="$root"
     export ANDROID_SDK_FLAKE_PATH
@@ -98,59 +107,31 @@ resolve_flake_sdk_root() {
   # Capture stderr so failures are visible instead of silently swallowed
   [ -n "${ANDROID_DEBUG_SETUP:-}" ] && echo "[CORE-$$] Building SDK: path:${root}#${output}" >&2
   _nix_stderr=""
-  _nix_stderr_file=$(mktemp "${TMPDIR:-/tmp}/android-nix-build-XXXXXX.stderr")
+  _nix_stderr_file="$(mktemp "${TMPDIR:-/tmp}/android-nix-build-XXXXXX.stderr")"
   sdk_out=$(
     nix --extra-experimental-features 'nix-command flakes' \
-      build "path:${root}#${output}" --no-link --print-out-paths --show-trace 2>"$_nix_stderr_file"
+      build "path:${root}#${output}" --no-link --print-out-paths 2>"$_nix_stderr_file"
   ) || true
   _nix_stderr=""
   if [ -f "$_nix_stderr_file" ]; then
     _nix_stderr=$(cat "$_nix_stderr_file" 2>/dev/null || true)
+    rm -f "$_nix_stderr_file" 2>/dev/null || true
   fi
   [ -n "${ANDROID_DEBUG_SETUP:-}" ] && echo "[CORE-$$] nix build returned: ${sdk_out:-(empty)}" >&2
 
   if [ -n "${sdk_out:-}" ] && [ -d "$sdk_out/libexec/android-sdk" ]; then
-    rm -f "$_nix_stderr_file"
     printf '%s\n' "$sdk_out/libexec/android-sdk"
     return 0
   fi
 
   # Nix build failed - show the error so it's not a silent failure
   if [ -n "$_nix_stderr" ]; then
-    # Check for hash mismatch or dependency failures (often caused by hash mismatches)
-    if echo "$_nix_stderr" | grep -qE "(hash mismatch in fixed-output derivation|Cannot build.*android-sdk.*Reason: 1 dependency failed)"; then
-      echo "" >&2
-      echo "⚠️  Android SDK hash mismatch detected" >&2
-      echo "" >&2
-      echo "Google updated files on their servers without changing version numbers." >&2
-      echo "" >&2
-
-      # Suggest manual hash override
-      echo "💡 To fix this hash mismatch:" >&2
-      echo "" >&2
-      echo "1. Extract URL from the error above" >&2
-      echo "2. Download file and compute SHA1: shasum <file> or sha1sum <file>" >&2
-      echo "3. Run: android.sh hash update <url> <sha1-hex>" >&2
-      echo "4. Commit android.lock:" >&2
-      echo "   git add devbox.d/*/android.lock" >&2
-      echo "   git commit -m 'fix(android): add hash override'" >&2
-      echo "5. Re-run: devbox shell" >&2
-      echo "" >&2
-      echo "Example:" >&2
-      echo "  curl -O https://dl.google.com/android/repository/platform-tools_r37.0.0-darwin.zip" >&2
-      echo "  shasum platform-tools_r37.0.0-darwin.zip  # Get SHA1 hash" >&2
-      echo "  android.sh hash update https://dl.google.com/android/repository/platform-tools_r37.0.0-darwin.zip 8c4c926d0ca192376b2a04b0318484724319e67c" >&2
-      echo "" >&2
-      # Cleanup
-      rm -f "$_nix_stderr_file" 2>/dev/null || true
-    fi
     echo "WARNING: Android SDK Nix flake evaluation failed:" >&2
     # Show last 15 lines of stderr (skip noisy download progress)
     printf '%s\n' "$_nix_stderr" | tail -15 >&2
   elif [ -z "${sdk_out:-}" ]; then
     echo "WARNING: Android SDK Nix flake evaluation returned empty output" >&2
   fi
-  rm -f "$_nix_stderr_file"
   return 1
 }
 
