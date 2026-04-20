@@ -1,16 +1,39 @@
 # Android Devbox Plugin
 
-This plugin pins Android user data (AVDs, emulator configs, adb keys) to the project virtenv so
-shells are pure and do not touch global `~/.android` state.
+This plugin provides reproducible Android development environments by:
+- Pinning Android user data (AVDs, emulator configs, adb keys) to the project virtenv
+- Managing Android SDK versions through Nix
+- Version controlling Android configuration via lock files
 
-Runtime scripts live in the virtenv (`.devbox/virtenv/android/scripts`) and are added to PATH when
-the plugin activates.
+## Architecture: Env Vars → Lock Files → Reproducible Builds
 
-Configuration is managed via environment variables in `plugin.json`. The plugin automatically generates
-a JSON file in the virtenv for Nix flake evaluation. Set env vars to configure SDK versions, default
-device selection, or enable `ANDROID_LOCAL_SDK`.
+The plugin uses a **two-stage configuration model**:
 
-The Android SDK flake lives under `devbox.d/<plugin-name>/` (e.g., `devbox.d/segment-integrations.mobile-devtools.android/`) and exposes `android-sdk` outputs. The `flake.lock` file in this directory pins nixpkgs and should be committed.
+1. **Configuration (env vars in `devbox.json`)** - Easy to edit, defines desired state
+2. **Lock files (in `devbox.d/`)** - Committed to git, ensures team-wide reproducibility
+
+### Configuration Files
+
+```
+devbox.d/segment-integrations.mobile-devtools.android/
+├── flake.nix          # Nix template (from plugin, committed)
+├── flake.lock         # Pins nixpkgs version (committed)
+├── android.lock       # Pins Android SDK config (committed)
+└── devices/
+    ├── devices.lock   # Pins device definitions (committed)
+    ├── min.json       # Device configs (committed)
+    └── max.json
+```
+
+**Why lock files?**
+- `flake.lock` → Ensures everyone uses the same nixpkgs (same Android package versions)
+- `android.lock` → Makes Android SDK changes reviewable in PRs
+- `devices.lock` → Pins which devices/APIs are used for testing
+
+**Why not just env vars?**
+- Env vars are easy to change but invisible in diffs
+- Lock files make configuration changes explicit and reviewable
+- Prevents "works on my machine" when team members have different configs
 
 ## Quickstart
 
@@ -72,10 +95,103 @@ Set in your `devbox.json`:
 }
 ```
 
-Then regenerate the device lock file:
+Then sync the configuration:
 ```bash
-devbox run android.sh devices eval
+devbox run android:sync
 ```
+
+## How to Update Android SDK Versions
+
+The Android SDK configuration uses a **two-stage model**: env vars → lock files.
+
+### Step 1: Edit Environment Variables
+
+Change Android SDK settings in your `devbox.json`:
+
+```json
+{
+  "env": {
+    "ANDROID_BUILD_TOOLS_VERSION": "36.1.0",
+    "ANDROID_COMPILE_SDK": "35",
+    "ANDROID_TARGET_SDK": "35",
+    "ANDROID_SYSTEM_IMAGE_TAG": "google_apis"
+  }
+}
+```
+
+At this point, **the changes are NOT applied yet**. The old `android.lock` is still in effect.
+
+### Step 2: Sync Configuration
+
+Run the sync command to generate lock files:
+
+```sh
+devbox run android:sync
+```
+
+This command:
+1. Generates `android.lock` from your env vars (pins Android SDK config)
+2. Regenerates `devices.lock` from device JSON files (pins device APIs)
+3. Syncs AVDs to match device definitions
+
+### Step 3: Review and Commit
+
+```sh
+git diff devbox.d/       # Review what changed in lock files
+git add devbox.json devbox.d/
+git commit -m "chore: update Android SDK to API 35"
+```
+
+### Why This Two-Stage Model?
+
+**Reproducibility**: Lock files ensure everyone on the team uses identical Android SDK versions, even if plugin versions differ.
+
+**Reviewability**: Android SDK changes are visible in PRs. Reviewers can see:
+- Which SDK versions changed
+- Which device APIs were added/removed
+- Whether nixpkgs was updated
+
+**Explicit Updates**: Changing env vars doesn't immediately affect builds. You must explicitly sync, preventing accidental misconfigurations.
+
+### Drift Detection
+
+If env vars don't match the lock file, you'll see a warning on `devbox shell`:
+
+```
+⚠️  WARNING: Android configuration has changed but lock file is outdated.
+
+Environment variables don't match android.lock:
+  ANDROID_BUILD_TOOLS_VERSION: "36.1.0" (env) vs "35.0.0" (lock)
+
+To apply changes:
+  devbox run android:sync
+
+To revert changes:
+  Edit devbox.json to match the lock file
+```
+
+This prevents deploying with mismatched configurations.
+
+## Updating nixpkgs
+
+The `flake.lock` pins which version of nixpkgs provides Android packages. Update it separately from Android SDK versions:
+
+```sh
+cd devbox.d/segment-integrations.mobile-devtools.android/
+nix flake update
+```
+
+This updates nixpkgs to the latest, which may provide:
+- Newer Android SDK package versions
+- Bug fixes in Nix Android packaging
+- Security updates
+
+**When to update nixpkgs:**
+- Android SDK packages fail to build
+- You need a newer package version not available in current nixpkgs
+- Regular maintenance (e.g., monthly)
+
+**Don't conflate**: Updating Android SDK config (env vars) vs updating nixpkgs (flake.lock) are separate concerns.
 
 ### Troubleshooting SDK Version Mismatches
 
@@ -124,9 +240,7 @@ The flake evaluates all device APIs by default. To restrict it, set `ANDROID_DEV
 ```json
 {"env": {"ANDROID_DEVICES": "max"}}
 ```
-Use `devbox run android.sh devices select max` to update this value.
-
-**Note:** The Android flake (`devbox.d/<plugin>/flake.nix` and `flake.lock`) is automatically updated when device definitions change. The `flake.lock` pins nixpkgs and should be committed to version control for reproducible builds.
+Use `devbox run android.sh devices select max` to update this value, then run `devbox run android:sync` to apply.
 
 ## Commands
 
@@ -140,13 +254,14 @@ devbox run reset-emu-device max # Reset a specific device
 
 Device management:
 ```sh
+devbox run android:sync                       # Sync all config (android.lock + devices.lock + AVDs)
 devbox run android.sh devices list
 devbox run android.sh devices create pixel_api28 --api 28 --device pixel --tag google_apis
 devbox run android.sh devices update pixel_api28 --api 29
 devbox run android.sh devices delete pixel_api28
-devbox run android.sh devices select max min  # Select specific devices
-devbox run android.sh devices reset           # Reset to all devices
-devbox run android.sh devices eval            # Generate devices.lock
+devbox run android.sh devices select max min  # Select specific devices (then run android:sync)
+devbox run android.sh devices reset           # Reset to all devices (then run android:sync)
+devbox run android.sh devices eval            # Generate devices.lock only (use android:sync instead)
 ```
 
 Build commands:
