@@ -101,7 +101,7 @@ resolve_flake_sdk_root() {
   _nix_stderr_file="$(mktemp "${TMPDIR:-/tmp}/android-nix-build-XXXXXX.stderr")"
   sdk_out=$(
     nix --extra-experimental-features 'nix-command flakes' \
-      build "path:${root}#${output}" --no-link --print-out-paths 2>"$_nix_stderr_file"
+      build "path:${root}#${output}" --no-link --print-out-paths --show-trace 2>"$_nix_stderr_file"
   ) || true
   _nix_stderr=""
   if [ -f "$_nix_stderr_file" ]; then
@@ -117,6 +117,33 @@ resolve_flake_sdk_root() {
 
   # Nix build failed - show the error so it's not a silent failure
   if [ -n "$_nix_stderr" ]; then
+    # Check for hash mismatch or dependency failures (often caused by hash mismatches)
+    if echo "$_nix_stderr" | grep -qE "(hash mismatch in fixed-output derivation|Cannot build.*android-sdk.*Reason: 1 dependency failed)"; then
+      echo "⚠️  KNOWN ISSUE: Android SDK build failed (likely hash mismatch)" >&2
+      echo "" >&2
+      echo "This usually means Google updated Android SDK files on their servers" >&2
+      echo "without changing version numbers, causing nixpkgs hashes to be outdated." >&2
+      echo "" >&2
+      echo "WORKAROUND OPTIONS:" >&2
+      echo "" >&2
+      echo "1. Use Android Studio SDK (recommended for local development):" >&2
+      echo "   Add to your devbox.json:" >&2
+      echo '   "env": {' >&2
+      echo '     "ANDROID_LOCAL_SDK": "1",' >&2
+      echo '     "ANDROID_SDK_ROOT": "/Users/YOU/Library/Android/sdk"' >&2
+      echo '   }' >&2
+      echo "" >&2
+      echo "2. Update nixpkgs to get latest Android SDK hashes:" >&2
+      echo "   cd devbox.d/*/android/ && nix flake update" >&2
+      echo "" >&2
+      echo "3. Run tests on Linux (x86_64) where SDK builds more reliably" >&2
+      echo "" >&2
+      echo "To verify if this is a hash mismatch, run:" >&2
+      echo "  nix build path:$(pwd)/.devbox/virtenv/*/android#android-sdk 2>&1 | grep hash" >&2
+      echo "" >&2
+      echo "See: https://github.com/NixOS/nixpkgs/issues?q=android+hash+mismatch" >&2
+      echo "" >&2
+    fi
     echo "WARNING: Android SDK Nix flake evaluation failed:" >&2
     # Show last 15 lines of stderr (skip noisy download progress)
     printf '%s\n' "$_nix_stderr" | tail -15 >&2
