@@ -316,7 +316,7 @@ android_sync_avds() {
   # Create temp files for each device definition
   local temp_dir
   temp_dir="$(mktemp -d)"
-  trap 'rm -rf "$temp_dir"' EXIT
+  trap 'rm -rf "$temp_dir"' RETURN  # Use RETURN for function-scope cleanup
 
   # Extract each device from lock file and sync
   local device_index=0
