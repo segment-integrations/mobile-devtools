@@ -4,6 +4,11 @@
 
 set -eu
 
+# Source drift detection if available
+if [ -n "${ANDROID_SCRIPTS_DIR:-}" ] && [ -f "${ANDROID_SCRIPTS_DIR}/platform/drift.sh" ]; then
+  . "${ANDROID_SCRIPTS_DIR}/platform/drift.sh"
+fi
+
 echo 'Android Environment Check'
 echo '========================='
 echo ''
@@ -81,39 +86,19 @@ if [ ! -f "$android_lock" ]; then
   echo "  Run: devbox run android:sync"
 elif ! command -v jq >/dev/null 2>&1; then
   echo "  ⚠ jq not available, cannot check drift"
-else
-  drift_detected=false
-  drift_details=""
+elif command -v android_check_config_drift >/dev/null 2>&1; then
+  # Use shared drift detection function
+  android_check_config_drift
 
-  # Compare each env var with android.lock
-  for var in ANDROID_BUILD_TOOLS_VERSION ANDROID_CMDLINE_TOOLS_VERSION ANDROID_COMPILE_SDK ANDROID_TARGET_SDK ANDROID_SYSTEM_IMAGE_TAG ANDROID_INCLUDE_NDK ANDROID_NDK_VERSION ANDROID_INCLUDE_CMAKE ANDROID_CMAKE_VERSION; do
-    env_val="${!var:-}"
-    lock_val="$(jq -r ".${var} // empty" "$android_lock" 2>/dev/null || echo "")"
-
-    # Normalize boolean values for comparison
-    if [ "$var" = "ANDROID_INCLUDE_NDK" ] || [ "$var" = "ANDROID_INCLUDE_CMAKE" ]; then
-      case "$env_val" in
-        1|true|TRUE|yes|YES|on|ON) env_val="true" ;;
-        *) env_val="false" ;;
-      esac
-    fi
-
-    # Skip if lock value is empty (field doesn't exist in lock)
-    [ -z "$lock_val" ] && continue
-
-    if [ "$env_val" != "$lock_val" ]; then
-      drift_detected=true
-      drift_details="${drift_details}    ${var}: \"${env_val}\" (env) vs \"${lock_val}\" (lock)\n"
-    fi
-  done
-
-  if [ "$drift_detected" = true ]; then
+  if [ "${ANDROID_DRIFT_DETECTED}" = true ]; then
     echo "  ⚠ Configuration drift detected:"
-    printf "$drift_details"
+    printf '%s' "${ANDROID_DRIFT_DETAILS}"
     echo ""
     echo "  Fix: devbox run android:sync"
   else
     echo "  ✓ Env vars match android.lock"
   fi
+else
+  echo "  ⚠ Cannot check drift (drift detection not available)"
 fi
 echo ''

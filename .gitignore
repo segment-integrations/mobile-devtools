@@ -32,3 +32,4 @@ examples/*/reports/
 examples/*/test-results/
 plugins/*/tests/reports/
 plugins/*/tests/test-results/
+notes/

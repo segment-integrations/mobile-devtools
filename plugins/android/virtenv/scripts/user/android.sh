@@ -475,14 +475,6 @@ case "$command_name" in
           serial="$(cat "$state_dir/emulator-serial.txt")"
         fi
 
-        # Fallback to legacy location
-        if [ -z "$serial" ]; then
-          runtime_dir="${ANDROID_RUNTIME_DIR:-${ANDROID_USER_HOME:-}}"
-          if [ -n "$runtime_dir" ] && [ -f "$runtime_dir/emulator-serial.txt" ]; then
-            serial="$(cat "$runtime_dir/emulator-serial.txt")"
-          fi
-        fi
-
         if [ -z "$serial" ]; then
           exit 1
         fi
@@ -534,13 +526,6 @@ case "$command_name" in
         app_id=""
         if [ -f "$state_dir/app-id.txt" ]; then
           app_id="$(cat "$state_dir/app-id.txt")"
-        fi
-        # Fallback to legacy location
-        if [ -z "$app_id" ]; then
-          runtime_dir="${ANDROID_RUNTIME_DIR:-${ANDROID_USER_HOME:-}}"
-          if [ -n "$runtime_dir" ] && [ -f "$runtime_dir/app-id.txt" ]; then
-            app_id="$(cat "$runtime_dir/app-id.txt")"
-          fi
         fi
         if [ -z "$app_id" ]; then
           exit 1

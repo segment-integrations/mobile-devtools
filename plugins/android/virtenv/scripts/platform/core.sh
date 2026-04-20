@@ -72,19 +72,10 @@ resolve_flake_sdk_root() {
     # Flake is in the config directory (devbox.d/) where device configs live
     if [ -n "${ANDROID_CONFIG_DIR:-}" ] && [ -d "${ANDROID_CONFIG_DIR}" ]; then
       root="${ANDROID_CONFIG_DIR}"
-    elif [ -n "${ANDROID_RUNTIME_DIR:-}" ] && [ -d "${ANDROID_RUNTIME_DIR}" ]; then
-      root="${ANDROID_RUNTIME_DIR}"
-    elif [ -n "${ANDROID_SCRIPTS_DIR:-}" ] && [ -d "${ANDROID_SCRIPTS_DIR}" ]; then
-      # Fallback: flake in same directory as scripts (virtenv) - deprecated
-      root="$(dirname "${ANDROID_SCRIPTS_DIR}")"
-    elif [ -n "${DEVBOX_PROJECT_ROOT:-}" ] && [ -d "${DEVBOX_PROJECT_ROOT}/.devbox/virtenv/android" ]; then
-      root="${DEVBOX_PROJECT_ROOT}/.devbox/virtenv/android"
-    elif [ -n "${DEVBOX_PROJECT_DIR:-}" ] && [ -d "${DEVBOX_PROJECT_DIR}/.devbox/virtenv/android" ]; then
-      root="${DEVBOX_PROJECT_DIR}/.devbox/virtenv/android"
-    elif [ -n "${DEVBOX_WD:-}" ] && [ -d "${DEVBOX_WD}/.devbox/virtenv/android" ]; then
-      root="${DEVBOX_WD}/.devbox/virtenv/android"
     else
-      root="./.devbox/virtenv/android"
+      echo "[ERROR] Failed to resolve flake SDK root directory" >&2
+      echo "        ANDROID_CONFIG_DIR not set or directory does not exist" >&2
+      return 1
     fi
     ANDROID_SDK_FLAKE_PATH="$root"
     export ANDROID_SDK_FLAKE_PATH

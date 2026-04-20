@@ -498,11 +498,6 @@ android_emulator_ready() {
     _serial="$(cat "$_state_dir/emulator-serial.txt")"
   fi
 
-  # Fallback to legacy location
-  if [ -z "$_serial" ] && [ -n "$_runtime_dir" ] && [ -f "$_runtime_dir/emulator-serial.txt" ]; then
-    _serial="$(cat "$_runtime_dir/emulator-serial.txt")"
-  fi
-
   if [ -z "$_serial" ]; then
     return 1
   fi
