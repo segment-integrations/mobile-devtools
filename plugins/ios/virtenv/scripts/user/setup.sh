@@ -48,6 +48,6 @@ echo "✅ [OK] iOS environment ready"
 echo "✅ [OK] iOS setup complete"
 
 # Run lightweight doctor check
-if [ -n "${IOS_SCRIPTS_DIR:-}" ] && [ -f "${IOS_SCRIPTS_DIR}/user/doctor-init.sh" ]; then
-  bash "${IOS_SCRIPTS_DIR}/user/doctor-init.sh" 2>&1
+if [ -n "${IOS_SCRIPTS_DIR:-}" ] && [ -f "${IOS_SCRIPTS_DIR}/init/doctor.sh" ]; then
+  bash "${IOS_SCRIPTS_DIR}/init/doctor.sh" 2>&1
 fi

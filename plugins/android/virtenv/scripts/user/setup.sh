@@ -99,6 +99,6 @@ fi
 echo "✅ [OK] Android setup complete"
 
 # Run lightweight doctor check
-if [ -n "${ANDROID_SCRIPTS_DIR:-}" ] && [ -f "${ANDROID_SCRIPTS_DIR}/user/doctor-init.sh" ]; then
-  bash "${ANDROID_SCRIPTS_DIR}/user/doctor-init.sh" 2>&1
+if [ -n "${ANDROID_SCRIPTS_DIR:-}" ] && [ -f "${ANDROID_SCRIPTS_DIR}/init/doctor.sh" ]; then
+  bash "${ANDROID_SCRIPTS_DIR}/init/doctor.sh" 2>&1
 fi

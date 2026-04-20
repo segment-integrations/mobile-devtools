@@ -54,9 +54,9 @@
     "{{ .Virtenv }}/scripts/user/devices.sh": "virtenv/scripts/user/devices.sh",
     "{{ .Virtenv }}/scripts/user/setup.sh": "virtenv/scripts/user/setup.sh",
     "{{ .Virtenv }}/scripts/user/doctor.sh": "virtenv/scripts/user/doctor.sh",
-    "{{ .Virtenv }}/scripts/user/doctor-init.sh": "virtenv/scripts/user/doctor-init.sh",
     "{{ .Virtenv }}/scripts/init/init-hook.sh": "virtenv/scripts/init/init-hook.sh",
     "{{ .Virtenv }}/scripts/init/setup.sh": "virtenv/scripts/init/setup.sh",
+    "{{ .Virtenv }}/scripts/init/doctor.sh": "virtenv/scripts/init/doctor.sh",
     "{{ .DevboxDir }}/flake.nix": "virtenv/flake.nix",
     "{{ .DevboxDir }}/devices/min.json": "config/devices/min.json",
     "{{ .DevboxDir }}/devices/max.json": "config/devices/max.json"
