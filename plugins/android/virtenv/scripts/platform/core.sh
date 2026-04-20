@@ -69,10 +69,13 @@ resolve_flake_sdk_root() {
 
   root="${ANDROID_SDK_FLAKE_PATH:-}"
   if [ -z "$root" ]; then
-    if [ -n "${ANDROID_RUNTIME_DIR:-}" ] && [ -d "${ANDROID_RUNTIME_DIR}" ]; then
+    # Flake is in the config directory (devbox.d/) where device configs live
+    if [ -n "${ANDROID_CONFIG_DIR:-}" ] && [ -d "${ANDROID_CONFIG_DIR}" ]; then
+      root="${ANDROID_CONFIG_DIR}"
+    elif [ -n "${ANDROID_RUNTIME_DIR:-}" ] && [ -d "${ANDROID_RUNTIME_DIR}" ]; then
       root="${ANDROID_RUNTIME_DIR}"
     elif [ -n "${ANDROID_SCRIPTS_DIR:-}" ] && [ -d "${ANDROID_SCRIPTS_DIR}" ]; then
-      # Flake is in same directory as scripts (virtenv)
+      # Fallback: flake in same directory as scripts (virtenv) - deprecated
       root="$(dirname "${ANDROID_SCRIPTS_DIR}")"
     elif [ -n "${DEVBOX_PROJECT_ROOT:-}" ] && [ -d "${DEVBOX_PROJECT_ROOT}/.devbox/virtenv/android" ]; then
       root="${DEVBOX_PROJECT_ROOT}/.devbox/virtenv/android"

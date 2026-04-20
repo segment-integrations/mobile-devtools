@@ -10,7 +10,7 @@ Configuration is managed via environment variables in `plugin.json`. The plugin 
 a JSON file in the virtenv for Nix flake evaluation. Set env vars to configure SDK versions, default
 device selection, or enable `ANDROID_LOCAL_SDK`.
 
-The Android SDK flake lives under `devbox.d/android/` and exposes `android-sdk*` outputs.
+The Android SDK flake lives under `devbox.d/<plugin-name>/` (e.g., `devbox.d/segment-integrations.mobile-devtools.android/`) and exposes `android-sdk` outputs. The `flake.lock` file in this directory pins nixpkgs and should be committed.
 
 ## Quickstart
 
@@ -126,7 +126,7 @@ The flake evaluates all device APIs by default. To restrict it, set `ANDROID_DEV
 ```
 Use `devbox run android.sh devices select max` to update this value.
 
-**Note:** The Android flake lock is automatically updated when device definitions change, ensuring system images stay in sync.
+**Note:** The Android flake (`devbox.d/<plugin>/flake.nix` and `flake.lock`) is automatically updated when device definitions change. The `flake.lock` pins nixpkgs and should be committed to version control for reproducible builds.
 
 ## Commands
 

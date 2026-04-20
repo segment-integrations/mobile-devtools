@@ -55,7 +55,7 @@
     "{{ .Virtenv }}/scripts/user/setup.sh": "virtenv/scripts/user/setup.sh",
     "{{ .Virtenv }}/scripts/init/init-hook.sh": "virtenv/scripts/init/init-hook.sh",
     "{{ .Virtenv }}/scripts/init/setup.sh": "virtenv/scripts/init/setup.sh",
-    "{{ .Virtenv }}/flake.nix": "virtenv/flake.nix",
+    "{{ .DevboxDir }}/flake.nix": "virtenv/flake.nix",
     "{{ .DevboxDir }}/devices/min.json": "config/devices/min.json",
     "{{ .DevboxDir }}/devices/max.json": "config/devices/max.json"
   },
