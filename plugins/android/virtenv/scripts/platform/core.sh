@@ -98,7 +98,8 @@ resolve_flake_sdk_root() {
   # Capture stderr so failures are visible instead of silently swallowed
   [ -n "${ANDROID_DEBUG_SETUP:-}" ] && echo "[CORE-$$] Building SDK: path:${root}#${output}" >&2
   _nix_stderr=""
-  _nix_stderr_file="${TMPDIR:-/tmp}/android-nix-build-$$.stderr"
+  _nix_stderr_file=$(mktemp "${TMPDIR:-/tmp}/android-nix-build-XXXXXX.stderr")
+  trap 'rm -f "$_nix_stderr_file"' RETURN
   sdk_out=$(
     nix --extra-experimental-features 'nix-command flakes' \
       build "path:${root}#${output}" --no-link --print-out-paths --show-trace 2>"$_nix_stderr_file"
@@ -106,7 +107,7 @@ resolve_flake_sdk_root() {
   _nix_stderr=""
   if [ -f "$_nix_stderr_file" ]; then
     _nix_stderr=$(cat "$_nix_stderr_file" 2>/dev/null || true)
-    # Keep the stderr file for hash-fix script, don't delete it yet
+    # Keep the stderr file for hash-fix script initially, trap will clean up on return
   fi
   [ -n "${ANDROID_DEBUG_SETUP:-}" ] && echo "[CORE-$$] nix build returned: ${sdk_out:-(empty)}" >&2
 
@@ -127,6 +128,8 @@ resolve_flake_sdk_root() {
       echo "" >&2
 
       # Try to automatically fix the hash mismatch
+      # Disable trap temporarily so hash-fix can read the stderr file
+      trap - RETURN
       if [ -n "${ANDROID_SCRIPTS_DIR:-}" ] && [ -f "${ANDROID_SCRIPTS_DIR}/domain/hash-fix.sh" ]; then
         if bash "${ANDROID_SCRIPTS_DIR}/domain/hash-fix.sh" auto "$_nix_stderr_file" 2>&1; then
           echo "" >&2
@@ -162,11 +165,7 @@ resolve_flake_sdk_root() {
         echo "   devbox run android:hash-fix" >&2
         echo "" >&2
       fi
-
-      # Clean up the stderr file after hash-fix has used it
-      rm -f "$_nix_stderr_file" 2>/dev/null || true
-    else
-      # Not a hash mismatch, can delete the stderr file
+      # Manual cleanup after hash-fix
       rm -f "$_nix_stderr_file" 2>/dev/null || true
     fi
     echo "WARNING: Android SDK Nix flake evaluation failed:" >&2
