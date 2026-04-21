@@ -58,6 +58,9 @@ jobs:
         with:
           enable-cache: true
 
+      - name: Rewrite plugin URLs to local
+        run: bash scripts/dev/rewrite-plugin-urls.sh --to-local examples/
+
       - name: Run Android E2E test
         working-directory: examples/android
         env:
@@ -130,6 +133,9 @@ jobs:
         uses: jetify-com/devbox-install-action@v0.15.0
         with:
           enable-cache: true
+
+      - name: Rewrite plugin URLs to local
+        run: bash scripts/dev/rewrite-plugin-urls.sh --to-local examples/
 
       - name: Run iOS E2E test
         working-directory: examples/ios
@@ -244,6 +250,9 @@ jobs:
         uses: jetify-com/devbox-install-action@v0.15.0
         with:
           enable-cache: true
+
+      - name: Rewrite plugin URLs to local
+        run: bash scripts/dev/rewrite-plugin-urls.sh --to-local examples/
 
       - name: Run React Native E2E test
         working-directory: examples/react-native
