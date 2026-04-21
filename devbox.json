@@ -74,6 +74,9 @@
       "sync": [
         "echo 'Syncing example projects with latest plugins...'",
         "echo ''",
+        "echo 'Rewriting plugin URLs to local paths...'",
+        "bash scripts/dev/rewrite-plugin-urls.sh --to-local examples/",
+        "echo ''",
         "echo '1/3 Android...'",
         "(cd examples/android && rm -rf .devbox devbox.d devbox.lock && devbox install)",
         "echo '    Generating device lock file...'",
@@ -193,6 +196,11 @@
       ],
       "bump": [
         "bash scripts/bump.sh \"${@}\""
+      ],
+      "restore-plugin-urls": [
+        "echo 'Restoring plugin URLs to GitHub format...'",
+        "bash scripts/dev/rewrite-plugin-urls.sh --to-github examples/",
+        "echo '✓ Plugin URLs restored to GitHub format'"
       ],
       "test:fast": [
         "echo 'Running fast tests (lint + unit + integration in parallel)...'",
