@@ -313,6 +313,35 @@ android_sync_avds() {
 
   echo "================================================"
 
+  # Show available devices for filtering transparency
+  if [ "${#selected_devices[@]}" -gt 0 ]; then
+    echo "Filter: ANDROID_DEVICES=${ANDROID_DEVICES}"
+    echo ""
+    echo "Available devices in lock file:"
+    local idx=0
+    local missing_filename=false
+    while [ "$idx" -lt "$device_count" ]; do
+      local temp_json="$(jq -c ".devices[$idx]" "$lock_file_path")"
+      local d_filename="$(echo "$temp_json" | jq -r '.filename // empty')"
+      local d_name="$(echo "$temp_json" | jq -r '.name // empty')"
+      local d_api="$(echo "$temp_json" | jq -r '.api // empty')"
+      if [ -n "$d_filename" ]; then
+        echo "  - $d_filename (name: $d_name, API $d_api)"
+      else
+        echo "  - [MISSING FILENAME] (name: $d_name, API $d_api)"
+        missing_filename=true
+      fi
+      idx=$((idx + 1))
+    done
+    echo ""
+
+    if [ "$missing_filename" = true ]; then
+      echo "ERROR: Lock file missing filename metadata (old format)" >&2
+      echo "       Regenerate with: devbox run android.sh devices eval" >&2
+      return 1
+    fi
+  fi
+
   # Counters for summary
   local matched=0
   local recreated=0
@@ -331,15 +360,16 @@ android_sync_avds() {
     local device_json="$temp_dir/device_${device_index}.json"
     jq -c ".devices[$device_index]" "$lock_file_path" > "$device_json"
 
-    # Get device name for filtering
-    local device_name
-    device_name="$(jq -r '.name // empty' "$device_json")"
+    # Get device identifier for filtering (filename only)
+    local device_filename
+    device_filename="$(jq -r '.filename // empty' "$device_json")"
 
     # Filter devices based on ANDROID_DEVICES if set
     if [ "${#selected_devices[@]}" -gt 0 ]; then
       local should_sync=false
       for selected in "${selected_devices[@]}"; do
-        if [ "$device_name" = "$selected" ]; then
+        # Match against filename only (e.g., "min", "max")
+        if [ "$device_filename" = "$selected" ]; then
           should_sync=true
           break
         fi
@@ -367,6 +397,19 @@ android_sync_avds() {
   done
 
   echo "================================================"
+
+  # Check if filtering resulted in zero devices being processed
+  local total_processed=$((matched + recreated + created + skipped))
+  if [ "${#selected_devices[@]}" -gt 0 ] && [ "$total_processed" -eq 0 ]; then
+    echo ""
+    echo "ERROR: No devices match ANDROID_DEVICES filter: ${ANDROID_DEVICES}" >&2
+    echo "       All $filtered device(s) were filtered out" >&2
+    echo ""
+    echo "HINT: Filter matches device filename (e.g., min, max)" >&2
+    echo "      Check available devices listed above" >&2
+    return 1
+  fi
+
   echo "Sync complete:"
   echo "  ✓ Matched:   $matched"
   if [ "$recreated" -gt 0 ]; then
@@ -376,7 +419,7 @@ android_sync_avds() {
     echo "  ➕ Created:   $created"
   fi
   if [ "$skipped" -gt 0 ]; then
-    echo "  ⚠ Skipped:   $skipped"
+    echo "  ⚠ Skipped:   $skipped (missing system images)"
   fi
   if [ "$filtered" -gt 0 ]; then
     echo "  ⊗ Filtered:  $filtered (ANDROID_DEVICES=${ANDROID_DEVICES})"
@@ -387,6 +430,7 @@ android_sync_avds() {
     if [ "${DEVBOX_PURE_SHELL:-}" = "1" ] || [ "${ANDROID_STRICT_SYNC:-}" = "1" ]; then
       echo ""
       echo "ERROR: $skipped device(s) skipped due to missing system images (strict mode)" >&2
+      echo "       This is different from filtering - system images need to be downloaded" >&2
       echo "       Re-enter devbox shell to download system images or update device definitions" >&2
       return 1
     fi
@@ -624,11 +668,12 @@ case "$command_name" in
       exit 1
     fi
 
-    # Build JSON array of device information (include all fields + file path)
+    # Build JSON array of device information (include all fields + file metadata)
     devices_json="$(
       for device_file in $device_files; do
-        jq -c --arg path "$device_file" \
-          '. + {file: $path}' \
+        device_basename="$(basename "$device_file" .json)"
+        jq -c --arg path "$device_file" --arg filename "$device_basename" \
+          '. + {file: $path, filename: $filename}' \
           "$device_file"
       done | jq -s '.'
     )"
@@ -656,7 +701,7 @@ case "$command_name" in
       checksum_changed=true
     fi
 
-    # Generate lock file with full device configs (strip the .file field we added)
+    # Generate lock file with full device configs (strip .file path, keep .filename for filtering)
     temp_lock_file="${lock_file_path}.tmp"
     printf '%s\n' "$devices_json" | jq \
       --arg cs "$checksum" \

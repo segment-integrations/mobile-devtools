@@ -87,14 +87,31 @@ processes:
       echo "[ANDROID-EMULATOR] Starting emulator..."
       device="${ANDROID_DEFAULT_DEVICE:-max}"
 
+      # Capture emulator start result for better error reporting
+      start_exit=0
       if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
         echo "Starting fresh Android emulator (pure mode): $device"
-        android.sh emulator start --pure "$device"
+        android.sh emulator start --pure "$device" || start_exit=$?
       else
         echo "Starting Android emulator: $device"
         unset ANDROID_EMULATOR_FOREGROUND
-        android.sh emulator start "$device"
+        android.sh emulator start "$device" || start_exit=$?
       fi
+
+      if [ "$start_exit" -ne 0 ]; then
+        echo ""
+        echo "ERROR: Emulator start command failed with exit code $start_exit" >&2
+        echo ""
+        echo "Common causes:" >&2
+        echo "  - Device '$device' not found (check ANDROID_DEVICES filter)" >&2
+        echo "  - AVD creation failed (check sync-avds logs)" >&2
+        echo "  - System image not available for device" >&2
+        echo ""
+        echo "Available AVDs:" >&2
+        avdmanager list avd 2>/dev/null || echo "(avdmanager not available)"
+        exit "$start_exit"
+      fi
+
       # Keep process alive for readiness probe (process-compose services pattern)
       tail -f /dev/null
     availability:
@@ -120,9 +137,52 @@ processes:
       sleep 5
 
       echo "Verifying emulator is ready..."
+
+      # Early failure detection: Check if emulator process exists
+      echo "Checking if emulator process started..."
+      initial_wait=30
+      elapsed=0
+      emulator_process_found=false
+
+      while [ $elapsed -lt $initial_wait ]; do
+        if pgrep -f "emulator.*-avd" >/dev/null 2>&1; then
+          emulator_process_found=true
+          echo "✓ Emulator process detected"
+          break
+        fi
+        sleep 2
+        elapsed=$((elapsed + 2))
+        echo "  Waiting for emulator process... ${elapsed}s/${initial_wait}s"
+      done
+
+      if [ "$emulator_process_found" = false ]; then
+        echo ""
+        echo "ERROR: Emulator process not found after ${initial_wait}s" >&2
+        echo ""
+        echo "This usually means:" >&2
+        echo "  1. Device filtering removed all devices (check sync-avds logs)" >&2
+        echo "  2. Emulator startup command failed (check android-emulator logs)" >&2
+        echo "  3. System images not available for selected device" >&2
+        echo ""
+        echo "Check process-compose logs above for error details" >&2
+        printf 'fail\nEmulator process never started - check filtering and device availability\n' > "$_step_dir/$_step.status"
+        exit 1
+      fi
+
+      # Now wait for emulator to be fully booted and ready
+      echo ""
+      echo "Emulator process running, waiting for device to be ready..."
       max_wait=300
       elapsed=0
       while ! android.sh emulator ready 2>/dev/null; do
+        # Recheck that emulator process is still running
+        if ! pgrep -f "emulator.*-avd" >/dev/null 2>&1; then
+          echo ""
+          echo "ERROR: Emulator process terminated unexpectedly" >&2
+          printf 'fail\nEmulator process crashed during boot\n' > "$_step_dir/$_step.status"
+          exit 1
+        fi
+
         sleep 3
         elapsed=$((elapsed + 3))
         echo "  Waiting for emulator... ${elapsed}s/${max_wait}s"

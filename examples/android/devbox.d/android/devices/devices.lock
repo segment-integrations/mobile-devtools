@@ -4,14 +4,16 @@
       "name": "medium_phone_api36",
       "api": 36,
       "device": "medium_phone",
-      "tag": "google_apis"
+      "tag": "google_apis",
+      "filename": "max"
     },
     {
-      "name": "pixel_api21",
-      "api": 21,
+      "name": "pixel_api24",
+      "api": 24,
       "device": "pixel",
-      "tag": "google_apis"
+      "tag": "google_apis",
+      "filename": "min"
     }
   ],
-  "checksum": "8df4d3393b61fbbb08e45cf8762f95c521316938e514527916e4fce88a849d57"
+  "checksum": "9c9adf202cb494e4d6554d790fab9455481658cf70e7d0a0abcdb0ae9824ddc0"
 }
