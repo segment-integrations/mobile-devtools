@@ -1,4 +1,32 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli), demonstrating the mobile-devtools React Native plugin for Devbox.
+
+## Plugin Configuration
+
+This example uses a **local path include** for development and testing within this repository:
+
+```json
+{
+  "include": [
+    "path:../../plugins/react-native/plugin.json"
+  ]
+}
+```
+
+### Using This Example Outside This Repository
+
+If you copy this example to use as a template for your own project, you need to change the plugin include to use the GitHub URL instead:
+
+```json
+{
+  "include": [
+    "github:segment-integrations/mobile-devtools?dir=plugins/react-native&ref=main"
+  ]
+}
+```
+
+The local path (`path:../../plugins/react-native/plugin.json`) only works within the mobile-devtools repository structure. When used outside this repo, Devbox won't be able to find the plugin files.
+
+For more information about the React Native plugin, see the [React Native Plugin Reference](../../plugins/react-native/REFERENCE.md).
 
 # Getting Started
 
