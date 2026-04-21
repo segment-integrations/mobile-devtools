@@ -352,7 +352,6 @@ android_sync_avds() {
   # Create temp files for each device definition
   local temp_dir
   temp_dir="$(mktemp -d)"
-  trap 'rm -rf "$temp_dir"' RETURN  # Use RETURN for function-scope cleanup
 
   # Extract each device from lock file and sync
   local device_index=0
@@ -407,6 +406,7 @@ android_sync_avds() {
     echo ""
     echo "HINT: Filter matches device filename (e.g., min, max)" >&2
     echo "      Check available devices listed above" >&2
+    rm -rf "$temp_dir"
     return 1
   fi
 
@@ -432,10 +432,12 @@ android_sync_avds() {
       echo "ERROR: $skipped device(s) skipped due to missing system images (strict mode)" >&2
       echo "       This is different from filtering - system images need to be downloaded" >&2
       echo "       Re-enter devbox shell to download system images or update device definitions" >&2
+      rm -rf "$temp_dir"
       return 1
     fi
   fi
 
+  rm -rf "$temp_dir"
   return 0
 }
 
