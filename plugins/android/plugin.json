@@ -50,7 +50,6 @@
     "{{ .Virtenv }}/scripts/domain/emulator.sh": "virtenv/scripts/domain/emulator.sh",
     "{{ .Virtenv }}/scripts/domain/deploy.sh": "virtenv/scripts/domain/deploy.sh",
     "{{ .Virtenv }}/scripts/domain/validate.sh": "virtenv/scripts/domain/validate.sh",
-    "{{ .Virtenv }}/scripts/domain/hash-fix.sh": "virtenv/scripts/domain/hash-fix.sh",
     "{{ .Virtenv }}/scripts/user/android.sh": "virtenv/scripts/user/android.sh",
     "{{ .Virtenv }}/scripts/user/config.sh": "virtenv/scripts/user/config.sh",
     "{{ .Virtenv }}/scripts/user/devices.sh": "virtenv/scripts/user/devices.sh",
@@ -77,9 +76,6 @@
       ],
       "android:devices:eval": [
         "ANDROID_SDK_REQUIRED=0 android.sh devices eval"
-      ],
-      "android:hash-fix": [
-        "ANDROID_HASH_FIX_VERBOSE=1 bash {{ .Virtenv }}/scripts/domain/hash-fix.sh auto"
       ],
       "start:emu": [
         "android.sh emulator start \"${1:-}\""
