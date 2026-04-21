@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # React Native Plugin - Core Utilities
 
 set -e

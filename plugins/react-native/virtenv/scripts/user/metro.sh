@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # React Native Metro Bundler CLI
 # Manages Metro bundler lifecycle for test suites and development
 

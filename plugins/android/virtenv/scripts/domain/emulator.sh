@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # Android Plugin - Emulator Lifecycle Management
 # See SCRIPTS.md for detailed documentation
 
@@ -496,11 +496,6 @@ android_emulator_ready() {
   _serial=""
   if [ -f "$_state_dir/emulator-serial.txt" ]; then
     _serial="$(cat "$_state_dir/emulator-serial.txt")"
-  fi
-
-  # Fallback to legacy location
-  if [ -z "$_serial" ] && [ -n "$_runtime_dir" ] && [ -f "$_runtime_dir/emulator-serial.txt" ]; then
-    _serial="$(cat "$_runtime_dir/emulator-serial.txt")"
   fi
 
   if [ -z "$_serial" ]; then

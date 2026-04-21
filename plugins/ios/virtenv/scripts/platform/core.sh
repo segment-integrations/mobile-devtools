@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # iOS Plugin - Core Xcode and Environment Setup
 # Extracted from env.sh to eliminate circular dependencies
 
