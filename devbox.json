@@ -6,7 +6,8 @@
     "nodejs":          "latest",
     "treefmt":         "latest",
     "gh":              "latest",
-    "claude-code":     "latest"
+    "claude-code":     "latest",
+    "rustup":          "latest"
   },
   "env": {
     "REPORTS_DIR":      "reports",
