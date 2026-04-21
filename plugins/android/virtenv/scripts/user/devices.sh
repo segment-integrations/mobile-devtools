@@ -257,28 +257,56 @@ android_generate_android_lock() {
 
   # Extract relevant Android env vars and create lock file
   # Convert boolean env vars (accepts: true/1/yes/on, case-insensitive)
-  jq -n \
-    --arg build_tools "${ANDROID_BUILD_TOOLS_VERSION:-36.1.0}" \
-    --arg cmdline_tools "${ANDROID_CMDLINE_TOOLS_VERSION:-19.0}" \
-    --arg compile_sdk "${ANDROID_COMPILE_SDK:-36}" \
-    --arg target_sdk "${ANDROID_TARGET_SDK:-36}" \
-    --arg system_image_tag "${ANDROID_SYSTEM_IMAGE_TAG:-google_apis}" \
-    --arg include_ndk "${ANDROID_INCLUDE_NDK:-false}" \
-    --arg ndk_version "${ANDROID_NDK_VERSION:-27.0.12077973}" \
-    --arg include_cmake "${ANDROID_INCLUDE_CMAKE:-false}" \
-    --arg cmake_version "${ANDROID_CMAKE_VERSION:-3.22.1}" \
-    --argjson hash_overrides "$hash_overrides_json" \
-    '{
-      ANDROID_BUILD_TOOLS_VERSION: $build_tools,
-      ANDROID_CMDLINE_TOOLS_VERSION: $cmdline_tools,
-      ANDROID_COMPILE_SDK: ($compile_sdk | tonumber),
-      ANDROID_TARGET_SDK: ($target_sdk | tonumber),
-      ANDROID_SYSTEM_IMAGE_TAG: $system_image_tag,
-      ANDROID_INCLUDE_NDK: ($include_ndk | test("true|1|yes|on"; "i")),
-      ANDROID_NDK_VERSION: $ndk_version,
-      ANDROID_INCLUDE_CMAKE: ($include_cmake | test("true|1|yes|on"; "i")),
-      ANDROID_CMAKE_VERSION: $cmake_version
-    } + (if ($hash_overrides | length) > 0 then {hash_overrides: $hash_overrides} else {})' > "$android_lock_tmp"
+  # Only include hash_overrides field if it has content
+  if [ "$hash_overrides_json" = "{}" ]; then
+    # No hash overrides - standard lock file
+    jq -n \
+      --arg build_tools "${ANDROID_BUILD_TOOLS_VERSION:-36.1.0}" \
+      --arg cmdline_tools "${ANDROID_CMDLINE_TOOLS_VERSION:-19.0}" \
+      --arg compile_sdk "${ANDROID_COMPILE_SDK:-36}" \
+      --arg target_sdk "${ANDROID_TARGET_SDK:-36}" \
+      --arg system_image_tag "${ANDROID_SYSTEM_IMAGE_TAG:-google_apis}" \
+      --arg include_ndk "${ANDROID_INCLUDE_NDK:-false}" \
+      --arg ndk_version "${ANDROID_NDK_VERSION:-27.0.12077973}" \
+      --arg include_cmake "${ANDROID_INCLUDE_CMAKE:-false}" \
+      --arg cmake_version "${ANDROID_CMAKE_VERSION:-3.22.1}" \
+      '{
+        ANDROID_BUILD_TOOLS_VERSION: $build_tools,
+        ANDROID_CMDLINE_TOOLS_VERSION: $cmdline_tools,
+        ANDROID_COMPILE_SDK: ($compile_sdk | tonumber),
+        ANDROID_TARGET_SDK: ($target_sdk | tonumber),
+        ANDROID_SYSTEM_IMAGE_TAG: $system_image_tag,
+        ANDROID_INCLUDE_NDK: ($include_ndk | test("true|1|yes|on"; "i")),
+        ANDROID_NDK_VERSION: $ndk_version,
+        ANDROID_INCLUDE_CMAKE: ($include_cmake | test("true|1|yes|on"; "i")),
+        ANDROID_CMAKE_VERSION: $cmake_version
+      }' > "$android_lock_tmp"
+  else
+    # Has hash overrides - include them
+    jq -n \
+      --arg build_tools "${ANDROID_BUILD_TOOLS_VERSION:-36.1.0}" \
+      --arg cmdline_tools "${ANDROID_CMDLINE_TOOLS_VERSION:-19.0}" \
+      --arg compile_sdk "${ANDROID_COMPILE_SDK:-36}" \
+      --arg target_sdk "${ANDROID_TARGET_SDK:-36}" \
+      --arg system_image_tag "${ANDROID_SYSTEM_IMAGE_TAG:-google_apis}" \
+      --arg include_ndk "${ANDROID_INCLUDE_NDK:-false}" \
+      --arg ndk_version "${ANDROID_NDK_VERSION:-27.0.12077973}" \
+      --arg include_cmake "${ANDROID_INCLUDE_CMAKE:-false}" \
+      --arg cmake_version "${ANDROID_CMAKE_VERSION:-3.22.1}" \
+      --argjson hash_overrides "$hash_overrides_json" \
+      '{
+        ANDROID_BUILD_TOOLS_VERSION: $build_tools,
+        ANDROID_CMDLINE_TOOLS_VERSION: $cmdline_tools,
+        ANDROID_COMPILE_SDK: ($compile_sdk | tonumber),
+        ANDROID_TARGET_SDK: ($target_sdk | tonumber),
+        ANDROID_SYSTEM_IMAGE_TAG: $system_image_tag,
+        ANDROID_INCLUDE_NDK: ($include_ndk | test("true|1|yes|on"; "i")),
+        ANDROID_NDK_VERSION: $ndk_version,
+        ANDROID_INCLUDE_CMAKE: ($include_cmake | test("true|1|yes|on"; "i")),
+        ANDROID_CMAKE_VERSION: $cmake_version,
+        hash_overrides: $hash_overrides
+      }' > "$android_lock_tmp"
+  fi
 
   mv "$android_lock_tmp" "$android_lock_file"
   echo "✓ Generated android.lock"
