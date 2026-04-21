@@ -138,26 +138,26 @@ processes:
 
       echo "Verifying emulator is ready..."
 
-      # Early failure detection: Check if emulator process exists
-      echo "Checking if emulator process started..."
+      # Early failure detection: Check if emulator is ready via adb
+      echo "Checking if emulator started (via adb)..."
       initial_wait=30
       elapsed=0
-      emulator_process_found=false
+      emulator_ready=false
 
       while [ $elapsed -lt $initial_wait ]; do
-        if pgrep -f "emulator.*-avd" >/dev/null 2>&1; then
-          emulator_process_found=true
-          echo "✓ Emulator process detected"
+        if android.sh emulator ready >/dev/null 2>&1; then
+          emulator_ready=true
+          echo "✓ Emulator detected via adb"
           break
         fi
         sleep 2
         elapsed=$((elapsed + 2))
-        echo "  Waiting for emulator process... ${elapsed}s/${initial_wait}s"
+        echo "  Waiting for emulator... ${elapsed}s/${initial_wait}s"
       done
 
-      if [ "$emulator_process_found" = false ]; then
+      if [ "$emulator_ready" = false ]; then
         echo ""
-        echo "ERROR: Emulator process not found after ${initial_wait}s" >&2
+        echo "ERROR: Emulator not detected via adb after ${initial_wait}s" >&2
         echo ""
         echo "This usually means:" >&2
         echo "  1. Device filtering removed all devices (check sync-avds logs)" >&2
@@ -165,7 +165,7 @@ processes:
         echo "  3. System images not available for selected device" >&2
         echo ""
         echo "Check process-compose logs above for error details" >&2
-        printf 'fail\nEmulator process never started - check filtering and device availability\n' > "$_step_dir/$_step.status"
+        printf 'fail\nEmulator not detected - check filtering and device availability\n' > "$_step_dir/$_step.status"
         exit 1
       fi
 
