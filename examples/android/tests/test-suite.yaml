@@ -175,10 +175,10 @@ processes:
       max_wait=300
       elapsed=0
       while ! android.sh emulator ready 2>/dev/null; do
-        # Recheck that emulator process is still running
-        if ! pgrep -f "emulator.*-avd" >/dev/null 2>&1; then
+        # Recheck that emulator is still visible to adb (crash detection)
+        if ! adb devices 2>/dev/null | grep -q "emulator-"; then
           echo ""
-          echo "ERROR: Emulator process terminated unexpectedly" >&2
+          echo "ERROR: Emulator no longer visible to adb (crashed or terminated)" >&2
           printf 'fail\nEmulator process crashed during boot\n' > "$_step_dir/$_step.status"
           exit 1
         fi
