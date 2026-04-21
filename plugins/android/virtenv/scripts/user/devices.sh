@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # Android Plugin - Device Management CLI
 #
 # This script manages Android device definitions stored in devbox.d/android/devices/
@@ -223,6 +223,223 @@ else
   echo "       Install jq or ensure nix is available" >&2
   exit 1
 fi
+
+# ============================================================================
+# Sync Helper Functions
+# ============================================================================
+
+# Generate android.lock from environment variables
+# Creates/updates android.lock with current Android SDK configuration from env vars
+android_generate_android_lock() {
+  local android_lock_file="${config_dir}/android.lock"
+  local android_lock_tmp="${android_lock_file}.tmp"
+
+  # Extract relevant Android env vars and create lock file
+  # Convert boolean env vars (accepts: true/1/yes/on, case-insensitive)
+  jq -n \
+    --arg build_tools "${ANDROID_BUILD_TOOLS_VERSION:-36.1.0}" \
+    --arg cmdline_tools "${ANDROID_CMDLINE_TOOLS_VERSION:-19.0}" \
+    --arg compile_sdk "${ANDROID_COMPILE_SDK:-36}" \
+    --arg target_sdk "${ANDROID_TARGET_SDK:-36}" \
+    --arg system_image_tag "${ANDROID_SYSTEM_IMAGE_TAG:-google_apis}" \
+    --arg include_ndk "${ANDROID_INCLUDE_NDK:-false}" \
+    --arg ndk_version "${ANDROID_NDK_VERSION:-27.0.12077973}" \
+    --arg include_cmake "${ANDROID_INCLUDE_CMAKE:-false}" \
+    --arg cmake_version "${ANDROID_CMAKE_VERSION:-3.22.1}" \
+    '{
+      ANDROID_BUILD_TOOLS_VERSION: $build_tools,
+      ANDROID_CMDLINE_TOOLS_VERSION: $cmdline_tools,
+      ANDROID_COMPILE_SDK: ($compile_sdk | tonumber),
+      ANDROID_TARGET_SDK: ($target_sdk | tonumber),
+      ANDROID_SYSTEM_IMAGE_TAG: $system_image_tag,
+      ANDROID_INCLUDE_NDK: ($include_ndk | test("true|1|yes|on"; "i")),
+      ANDROID_NDK_VERSION: $ndk_version,
+      ANDROID_INCLUDE_CMAKE: ($include_cmake | test("true|1|yes|on"; "i")),
+      ANDROID_CMAKE_VERSION: $cmake_version
+    }' > "$android_lock_tmp"
+
+  mv "$android_lock_tmp" "$android_lock_file"
+  echo "✓ Generated android.lock"
+}
+
+# Regenerate devices.lock from device definitions
+# Calls the eval command to regenerate devices.lock
+android_regenerate_devices_lock() {
+  local script_path="$0"
+
+  echo ""
+  echo "Evaluating device definitions..."
+
+  # Call eval command to regenerate devices.lock
+  DEVICES_CMD="eval" "$script_path" || {
+    echo "ERROR: Failed to generate devices.lock" >&2
+    return 1
+  }
+
+  return 0
+}
+
+# Sync AVDs with device definitions
+# Ensures AVDs match the device definitions in devices.lock
+android_sync_avds() {
+  echo ""
+  echo "Syncing AVDs with device definitions..."
+
+  # Check if devices.lock exists
+  if [ ! -f "$lock_file_path" ]; then
+    echo "ERROR: devices.lock not found at $lock_file_path" >&2
+    return 1
+  fi
+
+  # Validate lock file format
+  if ! jq -e '.devices' "$lock_file_path" >/dev/null 2>&1; then
+    echo "ERROR: Invalid devices.lock format" >&2
+    return 1
+  fi
+
+  # Get device count
+  local device_count
+  device_count="$(jq '.devices | length' "$lock_file_path")"
+  if [ "$device_count" -eq 0 ]; then
+    echo "No devices defined in lock file"
+    return 0
+  fi
+
+  # Parse ANDROID_DEVICES filter (comma-separated list)
+  local selected_devices=()
+  if [ -n "${ANDROID_DEVICES:-}" ]; then
+    IFS=',' read -ra selected_devices <<< "${ANDROID_DEVICES}"
+  fi
+
+  echo "================================================"
+
+  # Show available devices for filtering transparency
+  if [ "${#selected_devices[@]}" -gt 0 ]; then
+    echo "Filter: ANDROID_DEVICES=${ANDROID_DEVICES}"
+    echo ""
+    echo "Available devices in lock file:"
+    local idx=0
+    local missing_filename=false
+    while [ "$idx" -lt "$device_count" ]; do
+      local temp_json="$(jq -c ".devices[$idx]" "$lock_file_path")"
+      local d_filename="$(echo "$temp_json" | jq -r '.filename // empty')"
+      local d_name="$(echo "$temp_json" | jq -r '.name // empty')"
+      local d_api="$(echo "$temp_json" | jq -r '.api // empty')"
+      if [ -n "$d_filename" ]; then
+        echo "  - $d_filename (name: $d_name, API $d_api)"
+      else
+        echo "  - [MISSING FILENAME] (name: $d_name, API $d_api)"
+        missing_filename=true
+      fi
+      idx=$((idx + 1))
+    done
+    echo ""
+
+    if [ "$missing_filename" = true ]; then
+      echo "ERROR: Lock file missing filename metadata (old format)" >&2
+      echo "       Regenerate with: devbox run android.sh devices eval" >&2
+      return 1
+    fi
+  fi
+
+  # Counters for summary
+  local matched=0
+  local recreated=0
+  local created=0
+  local skipped=0
+  local filtered=0
+
+  # Create temp files for each device definition
+  local temp_dir
+  temp_dir="$(mktemp -d)"
+
+  # Extract each device from lock file and sync
+  local device_index=0
+  while [ "$device_index" -lt "$device_count" ]; do
+    local device_json="$temp_dir/device_${device_index}.json"
+    jq -c ".devices[$device_index]" "$lock_file_path" > "$device_json"
+
+    # Get device identifier for filtering (filename only)
+    local device_filename
+    device_filename="$(jq -r '.filename // empty' "$device_json")"
+
+    # Filter devices based on ANDROID_DEVICES if set
+    if [ "${#selected_devices[@]}" -gt 0 ]; then
+      local should_sync=false
+      for selected in "${selected_devices[@]}"; do
+        # Match against filename only (e.g., "min", "max")
+        if [ "$device_filename" = "$selected" ]; then
+          should_sync=true
+          break
+        fi
+      done
+
+      if [ "$should_sync" = false ]; then
+        filtered=$((filtered + 1))
+        device_index=$((device_index + 1))
+        continue
+      fi
+    fi
+
+    # Call ensure function and track result (use || true to prevent early exit)
+    local result=0
+    android_ensure_avd_from_definition "$device_json" || result=$?
+    case $result in
+      0) matched=$((matched + 1)) ;;
+      1) recreated=$((recreated + 1)) ;;
+      2) created=$((created + 1)) ;;
+      3) skipped=$((skipped + 1)) ;;
+      *) skipped=$((skipped + 1)) ;;
+    esac
+
+    device_index=$((device_index + 1))
+  done
+
+  echo "================================================"
+
+  # Check if filtering resulted in zero devices being processed
+  local total_processed=$((matched + recreated + created + skipped))
+  if [ "${#selected_devices[@]}" -gt 0 ] && [ "$total_processed" -eq 0 ]; then
+    echo ""
+    echo "ERROR: No devices match ANDROID_DEVICES filter: ${ANDROID_DEVICES}" >&2
+    echo "       All $filtered device(s) were filtered out" >&2
+    echo ""
+    echo "HINT: Filter matches device filename (e.g., min, max)" >&2
+    echo "      Check available devices listed above" >&2
+    rm -rf "$temp_dir"
+    return 1
+  fi
+
+  echo "Sync complete:"
+  echo "  ✓ Matched:   $matched"
+  if [ "$recreated" -gt 0 ]; then
+    echo "  🔄 Recreated: $recreated"
+  fi
+  if [ "$created" -gt 0 ]; then
+    echo "  ➕ Created:   $created"
+  fi
+  if [ "$skipped" -gt 0 ]; then
+    echo "  ⚠ Skipped:   $skipped (missing system images)"
+  fi
+  if [ "$filtered" -gt 0 ]; then
+    echo "  ⊗ Filtered:  $filtered (ANDROID_DEVICES=${ANDROID_DEVICES})"
+  fi
+
+  # In strict mode (pure shell / CI), fail if any devices were skipped
+  if [ "$skipped" -gt 0 ]; then
+    if [ "${DEVBOX_PURE_SHELL:-}" = "1" ] || [ "${ANDROID_STRICT_SYNC:-}" = "1" ]; then
+      echo ""
+      echo "ERROR: $skipped device(s) skipped due to missing system images (strict mode)" >&2
+      echo "       This is different from filtering - system images need to be downloaded" >&2
+      echo "       Re-enter devbox shell to download system images or update device definitions" >&2
+      rm -rf "$temp_dir"
+      return 1
+    fi
+  fi
+
+  rm -rf "$temp_dir"
+  return 0
+}
 
 # ============================================================================
 # Command Handlers
@@ -453,11 +670,12 @@ case "$command_name" in
       exit 1
     fi
 
-    # Build JSON array of device information (include all fields + file path)
+    # Build JSON array of device information (include all fields + file metadata)
     devices_json="$(
       for device_file in $device_files; do
-        jq -c --arg path "$device_file" \
-          '. + {file: $path}' \
+        device_basename="$(basename "$device_file" .json)"
+        jq -c --arg path "$device_file" --arg filename "$device_basename" \
+          '. + {file: $path, filename: $filename}' \
           "$device_file"
       done | jq -s '.'
     )"
@@ -485,7 +703,7 @@ case "$command_name" in
       checksum_changed=true
     fi
 
-    # Generate lock file with full device configs (strip the .file field we added)
+    # Generate lock file with full device configs (strip .file path, keep .filename for filtering)
     temp_lock_file="${lock_file_path}.tmp"
     printf '%s\n' "$devices_json" | jq \
       --arg cs "$checksum" \
@@ -494,16 +712,6 @@ case "$command_name" in
 
     mv "$temp_lock_file" "$lock_file_path"
 
-    # Update Android flake lock automatically if devices changed
-    if [ "$checksum_changed" = true ]; then
-      flake_dir="${config_dir}"
-      if [ -f "${flake_dir}/flake.nix" ] && [ -f "${flake_dir}/flake.lock" ]; then
-        if command -v nix >/dev/null 2>&1; then
-          (cd "${flake_dir}" && nix flake update 2>&1 | grep -v "^warning:" || true) >/dev/null
-        fi
-      fi
-    fi
-
     # Print summary
     device_count="$(jq '.devices | length' "$lock_file_path")"
     api_list="$(jq -r '.devices | map(.api) | join(",")' "$lock_file_path")"
@@ -511,86 +719,20 @@ case "$command_name" in
     ;;
 
   # --------------------------------------------------------------------------
-  # Sync: Ensure AVDs match device definitions
+  # Sync: Generate android.lock and devices.lock, ensure AVDs match
   # --------------------------------------------------------------------------
   sync)
-    # AVD management functions are already loaded from avd_manager.sh at the top of this script
-
-    # Check if devices.lock exists
-    if [ ! -f "$lock_file_path" ]; then
-      echo "ERROR: devices.lock not found at $lock_file_path" >&2
-      echo "       Run 'devices.sh eval' first or ensure ANDROID_DEVICES is set" >&2
-      exit 1
-    fi
-
-    # Validate lock file format
-    if ! jq -e '.devices' "$lock_file_path" >/dev/null 2>&1; then
-      echo "ERROR: Invalid devices.lock format" >&2
-      exit 1
-    fi
-
-    # Get device count
-    device_count="$(jq '.devices | length' "$lock_file_path")"
-    if [ "$device_count" -eq 0 ]; then
-      echo "No devices defined in lock file"
-      exit 0
-    fi
-
-    echo "Syncing AVDs with device definitions..."
+    echo "Syncing Android configuration..."
     echo "================================================"
 
-    # Counters for summary
-    matched=0
-    recreated=0
-    created=0
-    skipped=0
+    # Step 1: Generate android.lock from env vars
+    android_generate_android_lock
 
-    # Create temp files for each device definition
-    temp_dir="$(mktemp -d)"
-    trap 'rm -rf "$temp_dir"' EXIT
+    # Step 2: Regenerate devices.lock
+    android_regenerate_devices_lock || exit 1
 
-    # Extract each device from lock file and sync
-    device_index=0
-    while [ "$device_index" -lt "$device_count" ]; do
-      device_json="$temp_dir/device_${device_index}.json"
-      jq -c ".devices[$device_index]" "$lock_file_path" > "$device_json"
-
-      # Call ensure function and track result (use || true to prevent early exit)
-      android_ensure_avd_from_definition "$device_json" || result=$?
-      result=${result:-0}
-      case $result in
-        0) matched=$((matched + 1)) ;;
-        1) recreated=$((recreated + 1)) ;;
-        2) created=$((created + 1)) ;;
-        3) skipped=$((skipped + 1)) ;;
-        *) skipped=$((skipped + 1)) ;;
-      esac
-
-      device_index=$((device_index + 1))
-    done
-
-    echo "================================================"
-    echo "Sync complete:"
-    echo "  ✓ Matched:   $matched"
-    if [ "$recreated" -gt 0 ]; then
-      echo "  🔄 Recreated: $recreated"
-    fi
-    if [ "$created" -gt 0 ]; then
-      echo "  ➕ Created:   $created"
-    fi
-    if [ "$skipped" -gt 0 ]; then
-      echo "  ⚠ Skipped:   $skipped"
-    fi
-
-    # In strict mode (pure shell / CI), fail if any devices were skipped
-    if [ "$skipped" -gt 0 ]; then
-      if [ "${DEVBOX_PURE_SHELL:-}" = "1" ] || [ "${ANDROID_STRICT_SYNC:-}" = "1" ]; then
-        echo ""
-        echo "ERROR: $skipped device(s) skipped due to missing system images (strict mode)" >&2
-        echo "       Re-enter devbox shell to download system images or update device definitions" >&2
-        exit 1
-      fi
-    fi
+    # Step 3: Sync AVDs with device definitions
+    android_sync_avds || exit 1
     ;;
 
   # --------------------------------------------------------------------------
