@@ -103,14 +103,21 @@
 
           # Apply hash overrides to nixpkgs if any are specified
           # Android packages use SHA1 hashes, not SHA256
+          # We need to re-import nixpkgs with overlays when overrides are present
           pkgsWithOverrides = if (builtins.length (builtins.attrNames hashOverrides)) > 0
-            then pkgs.appendOverlays [(final: prev: {
-              fetchurl = args: prev.fetchurl (args // (
-                if builtins.hasAttr (args.url or "") hashOverrides
-                then { sha1 = hashOverrides.${args.url}; }
-                else {}
-              ));
-            })]
+            then import nixpkgs {
+              inherit system;
+              config = {
+                allowUnfree = true;
+                android_sdk.accept_license = true;
+              };
+              overlays = [(final: prev: {
+                fetchurl = args:
+                  if builtins.isAttrs args && builtins.hasAttr "url" args && builtins.hasAttr args.url hashOverrides
+                  then prev.fetchurl (args // { sha1 = hashOverrides.${args.url}; })
+                  else prev.fetchurl args;
+              })];
+            }
             else pkgs;
 
           androidPkgs =
