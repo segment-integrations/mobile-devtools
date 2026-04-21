@@ -123,7 +123,6 @@ resolve_flake_sdk_root() {
       echo "⚠️  Android SDK hash mismatch detected" >&2
       echo "" >&2
       echo "Google updated files on their servers without changing version numbers." >&2
-      echo "Fixing automatically..." >&2
       echo "" >&2
 
       # Suggest manual hash override

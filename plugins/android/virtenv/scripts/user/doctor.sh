@@ -102,3 +102,25 @@ else
   echo "  ⚠ Cannot check drift (drift detection not available)"
 fi
 echo ''
+
+# Check 6: Hash overrides
+echo 'Hash Overrides:'
+if [ -f "$android_lock" ] && command -v jq >/dev/null 2>&1; then
+  if jq -e '.hash_overrides' "$android_lock" >/dev/null 2>&1; then
+    override_count=$(jq '.hash_overrides | length' "$android_lock")
+    if [ "$override_count" -gt 0 ]; then
+      echo "  ⚠ $override_count hash override(s) active"
+      jq -r '.hash_overrides | to_entries[] | "    - \(.key | split("/") | last)"' "$android_lock"
+      echo "  Purpose: Temporary fix for Google SDK file updates"
+      echo "  View: android.sh hash show"
+      echo "  Clear: android.sh hash clear (when nixpkgs is updated)"
+    else
+      echo "  ✓ No hash overrides (using upstream hashes)"
+    fi
+  else
+    echo "  ✓ No hash overrides (using upstream hashes)"
+  fi
+else
+  echo "  ⚠ Cannot check (android.lock not found or jq unavailable)"
+fi
+echo ''
