@@ -95,7 +95,7 @@ fi
 # Test 4: Device list shows fixtures
 echo "Test: Device list validation..."
 device_list=$(sh "$ANDROID_SCRIPTS_DIR/user/devices.sh" list 2>/dev/null || echo "")
-if echo "$device_list" | grep -q "pixel_api21"; then
+if echo "$device_list" | grep -q "pixel_api24"; then
   test_passed=$((test_passed + 1))
   echo "✓ Device list shows test devices"
 else
