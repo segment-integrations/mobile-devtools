@@ -122,7 +122,7 @@
               includeNDK = config.includeNDK;
               ndkVersions = if config.includeNDK && config.ndkVersion != "" then [ config.ndkVersion ] else [ ];
               includeCmake = config.includeCMake;
-              cmakeVersions = if config.includeCmake && config.cmakeVersion != "" then [ config.cmakeVersion ] else [ ];
+              cmakeVersions = if config.includeCMake && config.cmakeVersion != "" then [ config.cmakeVersion ] else [ ];
               abiVersions = abiVersions;
               systemImageTypes = config.systemImageTypes;
             };
