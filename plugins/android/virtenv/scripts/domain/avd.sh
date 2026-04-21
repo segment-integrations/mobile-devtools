@@ -391,7 +391,8 @@ android_setup_avds() {
       fi
     done
 
-    devices_json="$filtered_json"
+    # Strip trailing newline to prevent empty iterations
+    devices_json="${filtered_json%$'\n'}"
 
     if [ -z "$devices_json" ]; then
       echo "ERROR: No devices match ANDROID_DEVICES filter: ${ANDROID_DEVICES}" >&2
@@ -422,9 +423,32 @@ android_setup_avds() {
   # Get default system image tag
   default_image_tag="${ANDROID_SYSTEM_IMAGE_TAG:-google_apis}"
 
+  # Count devices to process
+  device_count=$(echo "$devices_json" | grep -c '{' || echo "0")
+  echo "Processing $device_count device(s) from lock file"
+
+  # Debug: show devices_json content
+  if android_debug_enabled; then
+    echo "DEBUG: devices_json content:" >&2
+    echo "$devices_json" | cat -A >&2
+  fi
+
   echo "$devices_json" | while IFS= read -r device_json; do
+    # Skip empty lines (defensive guard)
+    if [ -z "$device_json" ]; then
+      if android_debug_enabled; then
+        echo "DEBUG: Skipping empty device line" >&2
+      fi
+      continue
+    fi
+
     echo ""
     echo "Processing device from lock file..."
+
+    # Debug: show raw JSON being parsed
+    if android_debug_enabled; then
+      echo "DEBUG: Raw device JSON: $device_json" >&2
+    fi
 
     # Parse device definition from lock file
     device_name="$(echo "$device_json" | jq -r '.name // empty')"
