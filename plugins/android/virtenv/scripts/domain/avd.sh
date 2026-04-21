@@ -344,6 +344,36 @@ android_setup_avds() {
     exit 1
   fi
 
+  # Filter devices based on ANDROID_DEVICES if set
+  if [ -n "${ANDROID_DEVICES:-}" ]; then
+    IFS=',' read -ra selected_devices <<< "${ANDROID_DEVICES}"
+    filtered_json=""
+
+    for device_json in $devices_json; do
+      device_name="$(echo "$device_json" | jq -r '.name // empty')"
+
+      # Check if device is in selected list
+      should_include=false
+      for selected in "${selected_devices[@]}"; do
+        if [ "$device_name" = "$selected" ]; then
+          should_include=true
+          break
+        fi
+      done
+
+      if [ "$should_include" = true ]; then
+        filtered_json="${filtered_json}${device_json}"$'\n'
+      fi
+    done
+
+    devices_json="$filtered_json"
+
+    if [ -z "$devices_json" ]; then
+      echo "ERROR: No devices match ANDROID_DEVICES filter: ${ANDROID_DEVICES}" >&2
+      exit 1
+    fi
+  fi
+
   # Get lock file checksum for AVD validation
   lock_checksum="$(jq -r '.checksum // ""' "$lock_file" 2>/dev/null || echo "")"
 

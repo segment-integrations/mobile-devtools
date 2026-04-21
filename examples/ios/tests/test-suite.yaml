@@ -176,7 +176,7 @@ processes:
       if ! ios.sh app status; then
         echo "FAIL: App is not running"
         if [ -n "$UDID" ]; then
-          xcrun simctl spawn "$UDID" log show --predicate 'eventMessage contains "crash" OR eventMessage contains "fatal" OR eventMessage contains "terminate"' --last 5m --style compact > "$_logs_dir/simulator-crash.log" 2>&1 || true
+          xcrun simctl spawn "$UDID" log show --predicate 'process == "ios" AND (eventMessage contains "crash" OR eventMessage contains "fatal" OR eventMessage contains "terminate")' --last 5m --style compact > "$_logs_dir/simulator-crash.log" 2>&1 || true
           echo "Simulator crash logs: $_logs_dir/simulator-crash.log"
         fi
         printf 'fail\nApp not found in running processes\n' > "$_step_dir/$_step.status"
@@ -190,7 +190,7 @@ processes:
       if ! ios.sh app status; then
         echo "FAIL: App crashed during soak period"
         if [ -n "$UDID" ]; then
-          xcrun simctl spawn "$UDID" log show --predicate 'eventMessage contains "crash" OR eventMessage contains "fatal" OR eventMessage contains "terminate"' --last 5m --style compact > "$_logs_dir/simulator-crash.log" 2>&1 || true
+          xcrun simctl spawn "$UDID" log show --predicate 'process == "ios" AND (eventMessage contains "crash" OR eventMessage contains "fatal" OR eventMessage contains "terminate")' --last 5m --style compact > "$_logs_dir/simulator-crash.log" 2>&1 || true
           echo "Simulator crash logs: $_logs_dir/simulator-crash.log"
         fi
         printf 'fail\nApp crashed during soak period\n' > "$_step_dir/$_step.status"
@@ -199,9 +199,10 @@ processes:
 
       # Capture simulator logs for analysis
       if [ -n "$UDID" ]; then
-        xcrun simctl spawn "$UDID" log show --last 2m --style compact > "$_logs_dir/simulator-app.log" 2>&1 || true
+        # Filter logs to only our test app process to avoid false positives from system services
+        xcrun simctl spawn "$UDID" log show --last 2m --predicate 'process == "ios"' --style compact > "$_logs_dir/simulator-app.log" 2>&1 || true
 
-        # Scan for native crash patterns
+        # Scan for native crash patterns (only in our app's logs)
         error_patterns="Terminating app|SIGABRT|EXC_BAD_ACCESS|EXC_CRASH|Assertion failure"
         if grep -qiE "$error_patterns" "$_logs_dir/simulator-app.log" 2>/dev/null; then
           echo ""
@@ -233,7 +234,7 @@ processes:
       # Capture final simulator logs before teardown
       UDID=$(cat "${IOS_RUNTIME_DIR:-/tmp}/ios-e2e/simulator-udid.txt" 2>/dev/null || cat "${IOS_RUNTIME_DIR:-/tmp}/${SUITE_NAME:-ios-e2e}/simulator-udid.txt" 2>/dev/null || true)
       if [ -n "$UDID" ]; then
-        xcrun simctl spawn "$UDID" log show --last 5m --style compact > "$_logs_dir/simulator-final.log" 2>&1 || true
+        xcrun simctl spawn "$UDID" log show --last 5m --predicate 'process == "ios"' --style compact > "$_logs_dir/simulator-final.log" 2>&1 || true
         echo "Final simulator logs: $_logs_dir/simulator-final.log"
       fi
 
