@@ -43,7 +43,7 @@ Commands:
 
 Hash Subcommands:
   hash show                Show current hash overrides in android.lock
-  hash update <url> <hash> Add/update a hash override for a Google server file
+  hash update <url> <hash> Add/update a hash override (SHA1 hex, 40 chars)
   hash clear               Remove all hash overrides from android.lock
 
 Device Creation Options:
@@ -64,13 +64,15 @@ Hash Overrides:
   you may see hash mismatch errors. Use 'hash update' to add an override.
   By default, hash overrides are not set - only use as a temporary fix.
 
+  Hash format: SHA1 hex string (40 characters), e.g., 8c4c926d0ca192376b2a04b0318484724319e67c
+
 Examples:
   devices.sh list
   devices.sh create pixel_api28 --api 28 --device pixel --tag google_apis
   devices.sh eval
   devices.sh sync
   devices.sh hash show
-  devices.sh hash update https://dl.google.com/android/repository/file.zip sha256-abc123...
+  devices.sh hash update https://dl.google.com/android/repository/platform-tools_r37.0.0-darwin.zip 8c4c926d0ca192376b2a04b0318484724319e67c
   devices.sh hash clear
 USAGE
   exit 1

@@ -42,7 +42,7 @@ Example:
   "ANDROID_INCLUDE_CMAKE": false,
   "ANDROID_CMAKE_VERSION": "3.22.1",
   "hash_overrides": {
-    "https://dl.google.com/android/repository/file.zip": "sha256-abc123..."
+    "https://dl.google.com/android/repository/platform-tools_r37.0.0-darwin.zip": "8c4c926d0ca192376b2a04b0318484724319e67c"
   }
 }
 ```
@@ -50,6 +50,7 @@ Example:
 **Hash overrides field (optional):**
 - By default, this field is **not present** - uses upstream hashes from nixpkgs
 - Only set via `android.sh hash update` when Google updates files without version changes
+- Uses **SHA1 hex format** (40 characters) matching nixpkgs Android repo.json
 - Temporary workaround until nixpkgs catches up
 - Safe to remove once nixpkgs is updated
 
@@ -66,20 +67,28 @@ This is a **recurring problem** with Android SDK where Google updates files at s
 **Symptoms:**
 ```
 error: hash mismatch in fixed-output derivation
-         specified: sha256-XXXXXXX
-            got:    sha256-YYYYYYY
+         specified: sha1-XXXXXXX
+            got:    sha1-YYYYYYY
 ```
 
 **Manual fix:**
 When `devbox shell` fails with a hash mismatch:
-1. Extract the URL and new hash from the error message
-2. Add the override: `android.sh hash update <url> <sha256-hash>`
-3. Commit the fix: `git add devbox.d/*/android.lock && git commit -m "fix(android): add hash override"`
-4. Retry: `devbox shell`
+1. Extract the URL from the error message
+2. Download the file and compute its SHA1 hash
+3. Add the override: `android.sh hash update <url> <sha1-hex>`
+4. Commit the fix: `git add devbox.d/*/android.lock && git commit -m "fix(android): add hash override"`
+5. Retry: `devbox shell`
 
 **Example:**
 ```bash
-android.sh hash update https://dl.google.com/android/repository/platform-tools_r37.0.0-darwin.zip sha256-abc123...
+# Download file and compute SHA1 hash
+curl -O https://dl.google.com/android/repository/platform-tools_r37.0.0-darwin.zip
+shasum platform-tools_r37.0.0-darwin.zip  # or sha1sum on Linux
+
+# Add override with SHA1 hex (40 characters)
+android.sh hash update https://dl.google.com/android/repository/platform-tools_r37.0.0-darwin.zip 8c4c926d0ca192376b2a04b0318484724319e67c
+
+# Commit and retry
 git add devbox.d/*/android.lock
 git commit -m "fix(android): add hash override for platform-tools"
 devbox shell

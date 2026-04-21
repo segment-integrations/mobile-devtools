@@ -31,7 +31,7 @@ Usage: android.sh <command> [args]
 Commands:
   deploy [apk_path]                Install and launch app on running emulator
   devices <command> [args]         Manage device definitions
-  hash <subcommand> [args]         Manage Nix hash overrides
+  hash <subcommand> [args]         Manage Nix hash overrides (SHA1)
   info                             Display resolved SDK information
   doctor                           Diagnose environment and check for SDK version mismatches
   config <command>                 Manage configuration
@@ -50,7 +50,7 @@ Examples:
   android.sh devices create pixel_api28 --api 28 --device pixel
   android.sh devices sync
   android.sh hash show
-  android.sh hash update https://dl.google.com/android/repository/file.zip sha256-abc...
+  android.sh hash update https://dl.google.com/android/repository/platform-tools_r37.0.0-darwin.zip 8c4c926d0ca192376b2a04b0318484724319e67c
   android.sh hash clear
   android.sh info
   android.sh doctor

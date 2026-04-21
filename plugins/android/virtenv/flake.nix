@@ -102,11 +102,12 @@
           abiVersions = if builtins.match "aarch64-.*" system != null then [ "arm64-v8a" ] else [ "x86_64" ];
 
           # Apply hash overrides to nixpkgs if any are specified
+          # Android packages use SHA1 hashes, not SHA256
           pkgsWithOverrides = if (builtins.length (builtins.attrNames hashOverrides)) > 0
             then pkgs.appendOverlays [(final: prev: {
               fetchurl = args: prev.fetchurl (args // (
                 if builtins.hasAttr (args.url or "") hashOverrides
-                then { sha256 = hashOverrides.${args.url}; }
+                then { sha1 = hashOverrides.${args.url}; }
                 else {}
               ));
             })]

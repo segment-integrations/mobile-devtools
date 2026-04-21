@@ -128,15 +128,18 @@ resolve_flake_sdk_root() {
       # Suggest manual hash override
       echo "💡 To fix this hash mismatch:" >&2
       echo "" >&2
-      echo "1. Extract URL and new hash from the error above" >&2
-      echo "2. Run: android.sh hash update <url> <sha256-hash>" >&2
-      echo "3. Commit android.lock:" >&2
+      echo "1. Extract URL from the error above" >&2
+      echo "2. Download file and compute SHA1: shasum <file> or sha1sum <file>" >&2
+      echo "3. Run: android.sh hash update <url> <sha1-hex>" >&2
+      echo "4. Commit android.lock:" >&2
       echo "   git add devbox.d/*/android.lock" >&2
       echo "   git commit -m 'fix(android): add hash override'" >&2
-      echo "4. Re-run: devbox shell" >&2
+      echo "5. Re-run: devbox shell" >&2
       echo "" >&2
       echo "Example:" >&2
-      echo "  android.sh hash update https://dl.google.com/android/repository/file.zip sha256-abc123..." >&2
+      echo "  curl -O https://dl.google.com/android/repository/platform-tools_r37.0.0-darwin.zip" >&2
+      echo "  shasum platform-tools_r37.0.0-darwin.zip  # Get SHA1 hash" >&2
+      echo "  android.sh hash update https://dl.google.com/android/repository/platform-tools_r37.0.0-darwin.zip 8c4c926d0ca192376b2a04b0318484724319e67c" >&2
       echo "" >&2
       # Cleanup
       rm -f "$_nix_stderr_file" 2>/dev/null || true
