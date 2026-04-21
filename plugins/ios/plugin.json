@@ -1,6 +1,6 @@
 {
   "name": "ios",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Configures iOS tooling inside Devbox and ensures Xcode toolchain usage.",
   "env": {
     "IOS_CONFIG_DIR": "{{ .DevboxDir }}",

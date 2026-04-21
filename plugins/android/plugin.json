@@ -1,6 +1,6 @@
 {
   "name": "android",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "description": "Sets Android home/AVD paths inside the Devbox virtenv for reproducible, project-local Android tooling.",
   "env": {
     "ANDROID_USER_HOME": "{{ .Virtenv }}/android",
