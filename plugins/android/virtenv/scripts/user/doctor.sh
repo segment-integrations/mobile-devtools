@@ -103,7 +103,7 @@ else
 fi
 echo ''
 
-# Check 6: Hash overrides
+# Check 6: Hash overrides validation
 echo 'Hash Overrides:'
 if [ -f "$android_lock" ] && command -v jq >/dev/null 2>&1; then
   if jq -e '.hash_overrides' "$android_lock" >/dev/null 2>&1; then
@@ -111,9 +111,48 @@ if [ -f "$android_lock" ] && command -v jq >/dev/null 2>&1; then
     if [ "$override_count" -gt 0 ]; then
       echo "  ⚠ $override_count hash override(s) active"
       jq -r '.hash_overrides | to_entries[] | "    - \(.key | split("/") | last)"' "$android_lock"
-      echo "  Purpose: Temporary fix for Google SDK file updates"
+
+      # Test if overrides are still needed
+      echo "  Testing override validity..."
+
+      # Create temporary android.lock without overrides
+      temp_lock=$(mktemp)
+      jq 'del(.hash_overrides)' "$android_lock" > "$temp_lock"
+
+      # Try building SDK without overrides (quick check, no full build)
+      if [ -n "${ANDROID_SCRIPTS_DIR:-}" ] && [ -f "${ANDROID_SCRIPTS_DIR}/platform/core.sh" ]; then
+        # Source core to get SDK resolution function
+        . "${ANDROID_SCRIPTS_DIR}/platform/core.sh" 2>/dev/null || true
+
+        # Temporarily swap lock file
+        mv "$android_lock" "${android_lock}.backup"
+        mv "$temp_lock" "$android_lock"
+
+        # Try resolving SDK (this will fail fast if hash mismatch)
+        test_output=$(android_resolve_sdk_root 2>&1 || true)
+
+        # Restore original lock file
+        mv "$android_lock" "$temp_lock"
+        mv "${android_lock}.backup" "$android_lock"
+
+        # Check result
+        if echo "$test_output" | grep -q "hash mismatch"; then
+          echo "  ✓ Overrides are still needed (upstream not fixed)"
+        elif echo "$test_output" | grep -qE "^/nix/store/"; then
+          echo "  ⚠ Overrides may no longer be needed!"
+          echo "    Test: android.sh hash clear && devbox shell"
+          echo "    If successful, commit the fix"
+        else
+          echo "  ? Cannot validate overrides (SDK resolution failed for other reasons)"
+        fi
+
+        rm -f "$temp_lock"
+      else
+        echo "  ? Cannot validate (core.sh not available)"
+      fi
+
       echo "  View: android.sh hash show"
-      echo "  Clear: android.sh hash clear (when nixpkgs is updated)"
+      echo "  Clear: android.sh hash clear"
     else
       echo "  ✓ No hash overrides (using upstream hashes)"
     fi
