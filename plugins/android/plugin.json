@@ -44,18 +44,22 @@
     "{{ .Virtenv }}/scripts/lib/lib.sh": "virtenv/scripts/lib/lib.sh",
     "{{ .Virtenv }}/scripts/platform/core.sh": "virtenv/scripts/platform/core.sh",
     "{{ .Virtenv }}/scripts/platform/device_config.sh": "virtenv/scripts/platform/device_config.sh",
+    "{{ .Virtenv }}/scripts/platform/drift.sh": "virtenv/scripts/platform/drift.sh",
     "{{ .Virtenv }}/scripts/domain/avd.sh": "virtenv/scripts/domain/avd.sh",
     "{{ .Virtenv }}/scripts/domain/avd-reset.sh": "virtenv/scripts/domain/avd-reset.sh",
     "{{ .Virtenv }}/scripts/domain/emulator.sh": "virtenv/scripts/domain/emulator.sh",
     "{{ .Virtenv }}/scripts/domain/deploy.sh": "virtenv/scripts/domain/deploy.sh",
     "{{ .Virtenv }}/scripts/domain/validate.sh": "virtenv/scripts/domain/validate.sh",
+    "{{ .Virtenv }}/scripts/domain/hash-fix.sh": "virtenv/scripts/domain/hash-fix.sh",
     "{{ .Virtenv }}/scripts/user/android.sh": "virtenv/scripts/user/android.sh",
     "{{ .Virtenv }}/scripts/user/config.sh": "virtenv/scripts/user/config.sh",
     "{{ .Virtenv }}/scripts/user/devices.sh": "virtenv/scripts/user/devices.sh",
     "{{ .Virtenv }}/scripts/user/setup.sh": "virtenv/scripts/user/setup.sh",
+    "{{ .Virtenv }}/scripts/user/doctor.sh": "virtenv/scripts/user/doctor.sh",
     "{{ .Virtenv }}/scripts/init/init-hook.sh": "virtenv/scripts/init/init-hook.sh",
     "{{ .Virtenv }}/scripts/init/setup.sh": "virtenv/scripts/init/setup.sh",
-    "{{ .Virtenv }}/flake.nix": "virtenv/flake.nix",
+    "{{ .Virtenv }}/scripts/init/doctor.sh": "virtenv/scripts/init/doctor.sh",
+    "{{ .DevboxDir }}/flake.nix": "virtenv/flake.nix",
     "{{ .DevboxDir }}/devices/min.json": "config/devices/min.json",
     "{{ .DevboxDir }}/devices/max.json": "config/devices/max.json"
   },
@@ -68,8 +72,14 @@
       "setup": [
         "bash {{ .Virtenv }}/scripts/user/setup.sh"
       ],
+      "android:sync": [
+        "android.sh devices sync"
+      ],
       "android:devices:eval": [
         "ANDROID_SDK_REQUIRED=0 android.sh devices eval"
+      ],
+      "android:hash-fix": [
+        "ANDROID_HASH_FIX_VERBOSE=1 bash {{ .Virtenv }}/scripts/domain/hash-fix.sh auto"
       ],
       "start:emu": [
         "android.sh emulator start \"${1:-}\""
@@ -81,26 +91,7 @@
         "android.sh emulator reset"
       ],
       "doctor": [
-        "echo 'Android Environment Check'",
-        "echo '========================='",
-        "echo ''",
-        "echo 'ANDROID_SDK_ROOT:' ${ANDROID_SDK_ROOT:-'NOT SET'}",
-        "test -n \"${ANDROID_SDK_ROOT}\" && echo '✓ ANDROID_SDK_ROOT is set' || echo '✗ ANDROID_SDK_ROOT is not set'",
-        "test -d \"${ANDROID_SDK_ROOT}\" && echo '✓ ANDROID_SDK_ROOT directory exists' || echo '✗ ANDROID_SDK_ROOT directory does not exist'",
-        "echo ''",
-        "echo 'ANDROID_AVD_HOME:' ${ANDROID_AVD_HOME:-'NOT SET'}",
-        "test -w \"${ANDROID_AVD_HOME}\" && echo '✓ ANDROID_AVD_HOME is writable' || echo '✗ ANDROID_AVD_HOME is not writable'",
-        "echo ''",
-        "command -v adb >/dev/null 2>&1 && echo '✓ adb is in PATH' || echo '✗ adb is not in PATH'",
-        "command -v emulator >/dev/null 2>&1 && echo '✓ emulator is in PATH' || echo '✗ emulator is not in PATH'",
-        "command -v avdmanager >/dev/null 2>&1 && echo '✓ avdmanager is in PATH' || echo '✗ avdmanager is not in PATH'",
-        "echo ''",
-        "echo 'Device Definitions:'",
-        "ls -1 ${ANDROID_DEVICES_DIR}/*.json 2>/dev/null | wc -l | xargs echo '  Count:'",
-        "echo '  ANDROID_DEVICES:' ${ANDROID_DEVICES:-'(all devices)'}",
-        "echo ''",
-        "test -f ${ANDROID_DEVICES_DIR}/devices.lock && echo '✓ Lock file exists' || echo '⚠ Lock file not generated yet (run devbox shell)'",
-        "echo ''"
+        "bash {{ .Virtenv }}/scripts/user/doctor.sh"
       ],
       "verify:setup": [
         "test -n \"${ANDROID_SDK_ROOT}\" && test -d \"${ANDROID_SDK_ROOT}\" && command -v adb >/dev/null 2>&1 && echo '✓ Android environment OK' || (echo '✗ Android environment check failed. Run: devbox run doctor' && exit 1)"

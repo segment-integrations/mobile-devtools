@@ -96,13 +96,9 @@ if [ -n "${ANDROID_RUNTIME_DIR:-}" ]; then
   echo "${ANDROID_SDK_ROOT}" > "${ANDROID_RUNTIME_DIR}/.state/sdk_root"
 fi
 
-# Verify essential tools are in PATH
-if ! command -v adb >/dev/null 2>&1; then
-  echo "⚠️  [WARN] adb not in PATH" >&2
-fi
-
-if ! command -v emulator >/dev/null 2>&1; then
-  echo "⚠️  [WARN] emulator not in PATH" >&2
-fi
-
 echo "✅ [OK] Android setup complete"
+
+# Run lightweight doctor check
+if [ -n "${ANDROID_SCRIPTS_DIR:-}" ] && [ -f "${ANDROID_SCRIPTS_DIR}/init/doctor.sh" ]; then
+  bash "${ANDROID_SCRIPTS_DIR}/init/doctor.sh" 2>&1
+fi
