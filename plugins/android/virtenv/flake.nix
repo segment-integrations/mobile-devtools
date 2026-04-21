@@ -71,6 +71,12 @@
         cmakeVersion = getVar "ANDROID_CMAKE_VERSION";
       };
 
+      # Hash overrides for when Google updates files on their servers
+      # These can be set in android.json to work around nixpkgs hash mismatches
+      hashOverrides = if builtins.hasAttr "hash_overrides" versionData
+        then versionData.hash_overrides
+        else {};
+
       forAllSystems =
         f:
         builtins.listToAttrs (
@@ -94,9 +100,20 @@
 
           abiVersions = if builtins.match "aarch64-.*" system != null then [ "arm64-v8a" ] else [ "x86_64" ];
 
+          # Apply hash overrides to nixpkgs if any are specified
+          pkgsWithOverrides = if (builtins.length (builtins.attrNames hashOverrides)) > 0
+            then pkgs.appendOverlays [(final: prev: {
+              fetchurl = args: prev.fetchurl (args // (
+                if builtins.hasAttr (args.url or "") hashOverrides
+                then { sha256 = hashOverrides.${args.url}; }
+                else {}
+              ));
+            })]
+            else pkgs;
+
           androidPkgs =
             config:
-            pkgs.androidenv.composeAndroidPackages {
+            pkgsWithOverrides.androidenv.composeAndroidPackages {
               platformVersions = config.platformVersions;
               buildToolsVersions = [ config.buildToolsVersion ];
               cmdLineToolsVersion = config.cmdLineToolsVersion;

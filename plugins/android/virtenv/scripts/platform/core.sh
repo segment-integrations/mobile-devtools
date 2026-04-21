@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # Android Plugin - Core SDK and Environment Setup
 # Extracted from env.sh to eliminate circular dependencies
 
@@ -69,19 +69,13 @@ resolve_flake_sdk_root() {
 
   root="${ANDROID_SDK_FLAKE_PATH:-}"
   if [ -z "$root" ]; then
-    if [ -n "${ANDROID_RUNTIME_DIR:-}" ] && [ -d "${ANDROID_RUNTIME_DIR}" ]; then
-      root="${ANDROID_RUNTIME_DIR}"
-    elif [ -n "${ANDROID_SCRIPTS_DIR:-}" ] && [ -d "${ANDROID_SCRIPTS_DIR}" ]; then
-      # Flake is in same directory as scripts (virtenv)
-      root="$(dirname "${ANDROID_SCRIPTS_DIR}")"
-    elif [ -n "${DEVBOX_PROJECT_ROOT:-}" ] && [ -d "${DEVBOX_PROJECT_ROOT}/.devbox/virtenv/android" ]; then
-      root="${DEVBOX_PROJECT_ROOT}/.devbox/virtenv/android"
-    elif [ -n "${DEVBOX_PROJECT_DIR:-}" ] && [ -d "${DEVBOX_PROJECT_DIR}/.devbox/virtenv/android" ]; then
-      root="${DEVBOX_PROJECT_DIR}/.devbox/virtenv/android"
-    elif [ -n "${DEVBOX_WD:-}" ] && [ -d "${DEVBOX_WD}/.devbox/virtenv/android" ]; then
-      root="${DEVBOX_WD}/.devbox/virtenv/android"
+    # Flake is in the config directory (devbox.d/) where device configs live
+    if [ -n "${ANDROID_CONFIG_DIR:-}" ] && [ -d "${ANDROID_CONFIG_DIR}" ]; then
+      root="${ANDROID_CONFIG_DIR}"
     else
-      root="./.devbox/virtenv/android"
+      echo "[ERROR] Failed to resolve flake SDK root directory" >&2
+      echo "        ANDROID_CONFIG_DIR not set or directory does not exist" >&2
+      return 1
     fi
     ANDROID_SDK_FLAKE_PATH="$root"
     export ANDROID_SDK_FLAKE_PATH
@@ -104,31 +98,80 @@ resolve_flake_sdk_root() {
   # Capture stderr so failures are visible instead of silently swallowed
   [ -n "${ANDROID_DEBUG_SETUP:-}" ] && echo "[CORE-$$] Building SDK: path:${root}#${output}" >&2
   _nix_stderr=""
-  _nix_stderr_file="$(mktemp "${TMPDIR:-/tmp}/android-nix-build-XXXXXX.stderr")"
+  _nix_stderr_file=$(mktemp "${TMPDIR:-/tmp}/android-nix-build-XXXXXX.stderr")
   sdk_out=$(
     nix --extra-experimental-features 'nix-command flakes' \
-      build "path:${root}#${output}" --no-link --print-out-paths 2>"$_nix_stderr_file"
+      build "path:${root}#${output}" --no-link --print-out-paths --show-trace 2>"$_nix_stderr_file"
   ) || true
   _nix_stderr=""
   if [ -f "$_nix_stderr_file" ]; then
     _nix_stderr=$(cat "$_nix_stderr_file" 2>/dev/null || true)
-    rm -f "$_nix_stderr_file" 2>/dev/null || true
   fi
   [ -n "${ANDROID_DEBUG_SETUP:-}" ] && echo "[CORE-$$] nix build returned: ${sdk_out:-(empty)}" >&2
 
   if [ -n "${sdk_out:-}" ] && [ -d "$sdk_out/libexec/android-sdk" ]; then
+    rm -f "$_nix_stderr_file"
     printf '%s\n' "$sdk_out/libexec/android-sdk"
     return 0
   fi
 
   # Nix build failed - show the error so it's not a silent failure
   if [ -n "$_nix_stderr" ]; then
+    # Check for hash mismatch or dependency failures (often caused by hash mismatches)
+    if echo "$_nix_stderr" | grep -qE "(hash mismatch in fixed-output derivation|Cannot build.*android-sdk.*Reason: 1 dependency failed)"; then
+      echo "" >&2
+      echo "⚠️  Android SDK hash mismatch detected" >&2
+      echo "" >&2
+      echo "Google updated files on their servers without changing version numbers." >&2
+      echo "Fixing automatically..." >&2
+      echo "" >&2
+
+      # Try to automatically fix the hash mismatch
+      if [ -n "${ANDROID_SCRIPTS_DIR:-}" ] && [ -f "${ANDROID_SCRIPTS_DIR}/domain/hash-fix.sh" ]; then
+        if bash "${ANDROID_SCRIPTS_DIR}/domain/hash-fix.sh" auto "$_nix_stderr_file" 2>&1; then
+          echo "" >&2
+          echo "✅ Hash mismatch fixed!" >&2
+          echo "" >&2
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
+          echo "1. Run 'devbox shell' again to rebuild with the fix" >&2
+          echo "2. Commit hash-overrides.json to preserve reproducibility:" >&2
+          echo "   git add devbox.d/*/hash-overrides.json" >&2
+          echo "   git commit -m \"fix(android): add SDK hash override\"" >&2
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
+          echo "" >&2
+        else
+          echo "" >&2
+          echo "⚠️  Automatic fix failed. Manual workarounds:" >&2
+          echo "" >&2
+          echo "1. Use Android Studio SDK:" >&2
+          echo "   Add to devbox.json:" >&2
+          echo '     "env": {' >&2
+          echo '       "ANDROID_LOCAL_SDK": "1",' >&2
+          echo '       "ANDROID_SDK_ROOT": "/Users/YOU/Library/Android/sdk"' >&2
+          echo '     }' >&2
+          echo "" >&2
+          echo "2. Update nixpkgs: cd devbox.d/*/android/ && nix flake update" >&2
+          echo "" >&2
+          echo "3. Run on Linux x86_64 where SDK builds more reliably" >&2
+          echo "" >&2
+          echo "See: https://github.com/NixOS/nixpkgs/issues?q=android+hash+mismatch" >&2
+          echo "" >&2
+        fi
+      else
+        echo "⚠️  Hash fix script not found. Manual fix:" >&2
+        echo "   devbox run android:hash-fix" >&2
+        echo "" >&2
+      fi
+      # Manual cleanup after hash-fix
+      rm -f "$_nix_stderr_file" 2>/dev/null || true
+    fi
     echo "WARNING: Android SDK Nix flake evaluation failed:" >&2
     # Show last 15 lines of stderr (skip noisy download progress)
     printf '%s\n' "$_nix_stderr" | tail -15 >&2
   elif [ -z "${sdk_out:-}" ]; then
     echo "WARNING: Android SDK Nix flake evaluation returned empty output" >&2
   fi
+  rm -f "$_nix_stderr_file"
   return 1
 }
 
