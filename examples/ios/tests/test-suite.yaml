@@ -228,23 +228,35 @@ processes:
   # Cleanup - capture final logs, then stop everything in pure mode
   cleanup:
     command: |
+      _step_dir="reports/steps"
       _logs_dir="reports/logs"
       mkdir -p "$_logs_dir"
 
-      # Capture final simulator logs before teardown
-      UDID=$(cat "${IOS_RUNTIME_DIR:-/tmp}/ios-e2e/simulator-udid.txt" 2>/dev/null || cat "${IOS_RUNTIME_DIR:-/tmp}/${SUITE_NAME:-ios-e2e}/simulator-udid.txt" 2>/dev/null || true)
-      if [ -n "$UDID" ]; then
-        xcrun simctl spawn "$UDID" log show --last 5m --predicate 'process == "ios"' --style compact > "$_logs_dir/simulator-final.log" 2>&1 || true
-        echo "Final simulator logs: $_logs_dir/simulator-final.log"
+      # Check if app verification succeeded
+      app_verify_failed=false
+      if [ -f "$_step_dir/verify-app.status" ]; then
+        verify_status=$(head -n1 "$_step_dir/verify-app.status")
+        if [ "$verify_status" = "fail" ]; then
+          app_verify_failed=true
+          echo "App verification failed, skipping log capture"
+        fi
       fi
 
+      # Only capture logs if verification succeeded
+      if [ "$app_verify_failed" = false ]; then
+        UDID=$(cat "${IOS_RUNTIME_DIR:-/tmp}/ios-e2e/simulator-udid.txt" 2>/dev/null || cat "${IOS_RUNTIME_DIR:-/tmp}/${SUITE_NAME:-ios-e2e}/simulator-udid.txt" 2>/dev/null || true)
+        if [ -n "$UDID" ]; then
+          timeout 10s xcrun simctl spawn "$UDID" log show --last 5m --predicate 'process == "ios"' --style compact > "$_logs_dir/simulator-final.log" 2>&1 || true
+          echo "Final simulator logs: $_logs_dir/simulator-final.log"
+        fi
+      fi
+
+      # Stop services (only in pure mode)
       if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
         echo "Cleaning up (pure mode)..."
         ios.sh app stop || true
         ios.sh simulator stop
-        echo "App stopped, test simulator deleted"
-      else
-        echo "Test complete - app and simulator still running"
+        echo "Cleanup complete"
       fi
     depends_on:
       verify-app-running:

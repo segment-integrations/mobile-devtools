@@ -469,29 +469,42 @@ processes:
   # Cleanup - capture final logs, then stop everything in pure mode
   cleanup:
     command: |
+      _step_dir="reports/steps"
       _logs_dir="reports/logs"
       mkdir -p "$_logs_dir"
 
-      # Capture final logcat before teardown
-      state_dir="${ANDROID_RUNTIME_DIR:-.devbox/virtenv}/${SUITE_NAME:-default}"
-      serial=""
-      if [ -f "$state_dir/emulator-serial.txt" ]; then
-        serial="$(cat "$state_dir/emulator-serial.txt")"
+      # Check if app verification succeeded
+      app_verify_failed=false
+      if [ -f "$_step_dir/verify-app.status" ]; then
+        verify_status=$(head -n1 "$_step_dir/verify-app.status")
+        if [ "$verify_status" = "fail" ]; then
+          app_verify_failed=true
+          echo "App verification failed, skipping adb operations"
+        fi
       fi
-      if [ -z "$serial" ]; then
-        serial="emulator-${EMU_PORT:-5554}"
-      fi
-      adb -s "$serial" logcat -d > "$_logs_dir/logcat-cleanup.txt" 2>&1 || true
-      echo "Final logcat: $_logs_dir/logcat-cleanup.txt"
 
+      # Only capture logs if app verification succeeded
+      if [ "$app_verify_failed" = false ]; then
+        state_dir="${ANDROID_RUNTIME_DIR:-.devbox/virtenv}/${SUITE_NAME:-default}"
+        serial=""
+        if [ -f "$state_dir/emulator-serial.txt" ]; then
+          serial="$(cat "$state_dir/emulator-serial.txt")"
+        fi
+        if [ -z "$serial" ]; then
+          serial="emulator-${EMU_PORT:-5554}"
+        fi
+        # Use timeout to prevent hanging
+        timeout 10s adb -s "$serial" logcat -d > "$_logs_dir/logcat-cleanup.txt" 2>&1 || true
+        echo "Final logcat: $_logs_dir/logcat-cleanup.txt"
+      fi
+
+      # Stop services (only in pure mode)
       if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
         echo "Cleaning up (pure mode)..."
         metro.sh stop android || true
         android.sh app stop || true
         android.sh emulator stop || true
-        echo "Metro, app, and emulator stopped"
-      else
-        echo "Test complete - Metro, app, and emulator still running for iteration"
+        echo "Cleanup complete"
       fi
     depends_on:
       verify-app-running:

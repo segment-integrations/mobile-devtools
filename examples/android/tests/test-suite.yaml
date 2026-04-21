@@ -374,21 +374,34 @@ processes:
   # Cleanup - capture final logs, then stop everything in pure mode
   cleanup-app:
     command: |
+      _step_dir="reports/steps"
       _logs_dir="reports/logs"
       mkdir -p "$_logs_dir"
 
-      # Capture final logcat before teardown
-      serial="${ANDROID_EMULATOR_SERIAL:-emulator-${EMU_PORT:-5554}}"
-      adb -s "$serial" logcat -d > "$_logs_dir/logcat-cleanup.txt" 2>&1 || true
-      echo "Final logcat: $_logs_dir/logcat-cleanup.txt"
+      # Check if deployment succeeded
+      deploy_failed=false
+      if [ -f "$_step_dir/deploy-app.status" ]; then
+        deploy_status=$(head -n1 "$_step_dir/deploy-app.status")
+        if [ "$deploy_status" = "fail" ]; then
+          deploy_failed=true
+          echo "Deploy failed, skipping adb operations"
+        fi
+      fi
 
+      # Only capture logs if deployment succeeded
+      if [ "$deploy_failed" = false ]; then
+        serial="${ANDROID_EMULATOR_SERIAL:-emulator-${EMU_PORT:-5554}}"
+        # Use timeout to prevent hanging
+        timeout 10s adb -s "$serial" logcat -d > "$_logs_dir/logcat-cleanup.txt" 2>&1 || true
+        echo "Final logcat: $_logs_dir/logcat-cleanup.txt"
+      fi
+
+      # Stop emulator (only in pure mode)
       if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
         echo "Cleaning up (pure mode)..."
         android.sh app stop || true
         android.sh emulator stop || true
-        echo "App stopped, emulator stopped"
-      else
-        echo "Test complete - app and emulator still running"
+        echo "Cleanup complete"
       fi
     depends_on:
       deploy-app:
