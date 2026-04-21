@@ -126,43 +126,20 @@ resolve_flake_sdk_root() {
       echo "Fixing automatically..." >&2
       echo "" >&2
 
-      # Try to automatically fix the hash mismatch
-      if [ -n "${ANDROID_SCRIPTS_DIR:-}" ] && [ -f "${ANDROID_SCRIPTS_DIR}/domain/hash-fix.sh" ]; then
-        if bash "${ANDROID_SCRIPTS_DIR}/domain/hash-fix.sh" auto "$_nix_stderr_file" 2>&1; then
-          echo "" >&2
-          echo "✅ Hash mismatch fixed!" >&2
-          echo "" >&2
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
-          echo "1. Run 'devbox shell' again to rebuild with the fix" >&2
-          echo "2. Commit hash-overrides.json to preserve reproducibility:" >&2
-          echo "   git add devbox.d/*/hash-overrides.json" >&2
-          echo "   git commit -m \"fix(android): add SDK hash override\"" >&2
-          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" >&2
-          echo "" >&2
-        else
-          echo "" >&2
-          echo "⚠️  Automatic fix failed. Manual workarounds:" >&2
-          echo "" >&2
-          echo "1. Use Android Studio SDK:" >&2
-          echo "   Add to devbox.json:" >&2
-          echo '     "env": {' >&2
-          echo '       "ANDROID_LOCAL_SDK": "1",' >&2
-          echo '       "ANDROID_SDK_ROOT": "/Users/YOU/Library/Android/sdk"' >&2
-          echo '     }' >&2
-          echo "" >&2
-          echo "2. Update nixpkgs: cd devbox.d/*/android/ && nix flake update" >&2
-          echo "" >&2
-          echo "3. Run on Linux x86_64 where SDK builds more reliably" >&2
-          echo "" >&2
-          echo "See: https://github.com/NixOS/nixpkgs/issues?q=android+hash+mismatch" >&2
-          echo "" >&2
-        fi
-      else
-        echo "⚠️  Hash fix script not found. Manual fix:" >&2
-        echo "   devbox run android:hash-fix" >&2
-        echo "" >&2
-      fi
-      # Manual cleanup after hash-fix
+      # Suggest manual hash override
+      echo "💡 To fix this hash mismatch:" >&2
+      echo "" >&2
+      echo "1. Extract URL and new hash from the error above" >&2
+      echo "2. Run: android.sh hash update <url> <sha256-hash>" >&2
+      echo "3. Commit android.lock:" >&2
+      echo "   git add devbox.d/*/android.lock" >&2
+      echo "   git commit -m 'fix(android): add hash override'" >&2
+      echo "4. Re-run: devbox shell" >&2
+      echo "" >&2
+      echo "Example:" >&2
+      echo "  android.sh hash update https://dl.google.com/android/repository/file.zip sha256-abc123..." >&2
+      echo "" >&2
+      # Cleanup
       rm -f "$_nix_stderr_file" 2>/dev/null || true
     fi
     echo "WARNING: Android SDK Nix flake evaluation failed:" >&2
