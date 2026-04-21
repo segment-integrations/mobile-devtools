@@ -90,6 +90,21 @@ else
   echo "✅ [OK] Android SDK: ${ANDROID_SDK_ROOT}"
 fi
 
+# Set ANDROID_NDK_ROOT if NDK is included
+if [ "${ANDROID_INCLUDE_NDK:-false}" = "true" ] || [ "${ANDROID_INCLUDE_NDK:-0}" = "1" ]; then
+  if [ -n "${ANDROID_NDK_VERSION:-}" ]; then
+    ndk_path="${ANDROID_SDK_ROOT}/ndk/${ANDROID_NDK_VERSION}"
+    if [ -d "$ndk_path" ]; then
+      export ANDROID_NDK_ROOT="$ndk_path"
+    else
+      # Fallback: check for ndk-bundle (older SDK layout)
+      if [ -d "${ANDROID_SDK_ROOT}/ndk-bundle" ]; then
+        export ANDROID_NDK_ROOT="${ANDROID_SDK_ROOT}/ndk-bundle"
+      fi
+    fi
+  fi
+fi
+
 # Write SDK root to shared state file (for process-compose sibling processes)
 if [ -n "${ANDROID_RUNTIME_DIR:-}" ]; then
   mkdir -p "${ANDROID_RUNTIME_DIR}/.state"
