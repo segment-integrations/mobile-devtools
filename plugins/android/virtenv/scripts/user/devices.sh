@@ -305,6 +305,12 @@ android_sync_avds() {
     return 0
   fi
 
+  # Parse ANDROID_DEVICES filter (comma-separated list)
+  local selected_devices=()
+  if [ -n "${ANDROID_DEVICES:-}" ]; then
+    IFS=',' read -ra selected_devices <<< "${ANDROID_DEVICES}"
+  fi
+
   echo "================================================"
 
   # Counters for summary
@@ -312,6 +318,7 @@ android_sync_avds() {
   local recreated=0
   local created=0
   local skipped=0
+  local filtered=0
 
   # Create temp files for each device definition
   local temp_dir
@@ -323,6 +330,27 @@ android_sync_avds() {
   while [ "$device_index" -lt "$device_count" ]; do
     local device_json="$temp_dir/device_${device_index}.json"
     jq -c ".devices[$device_index]" "$lock_file_path" > "$device_json"
+
+    # Get device name for filtering
+    local device_name
+    device_name="$(jq -r '.name // empty' "$device_json")"
+
+    # Filter devices based on ANDROID_DEVICES if set
+    if [ "${#selected_devices[@]}" -gt 0 ]; then
+      local should_sync=false
+      for selected in "${selected_devices[@]}"; do
+        if [ "$device_name" = "$selected" ]; then
+          should_sync=true
+          break
+        fi
+      done
+
+      if [ "$should_sync" = false ]; then
+        filtered=$((filtered + 1))
+        device_index=$((device_index + 1))
+        continue
+      fi
+    fi
 
     # Call ensure function and track result (use || true to prevent early exit)
     local result=0
@@ -349,6 +377,9 @@ android_sync_avds() {
   fi
   if [ "$skipped" -gt 0 ]; then
     echo "  ⚠ Skipped:   $skipped"
+  fi
+  if [ "$filtered" -gt 0 ]; then
+    echo "  ⊗ Filtered:  $filtered (ANDROID_DEVICES=${ANDROID_DEVICES})"
   fi
 
   # In strict mode (pure shell / CI), fail if any devices were skipped
