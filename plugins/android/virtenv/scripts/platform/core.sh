@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # Android Plugin - Core SDK and Environment Setup
 # Extracted from env.sh to eliminate circular dependencies
 

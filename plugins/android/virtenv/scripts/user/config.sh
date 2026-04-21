@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # Android Plugin - Configuration Management
 # See REFERENCE.md for detailed documentation
 

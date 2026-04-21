@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # iOS Plugin - Configuration Management
 # See REFERENCE.md for detailed documentation
 

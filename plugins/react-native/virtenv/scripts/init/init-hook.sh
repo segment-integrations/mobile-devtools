@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # React Native Plugin - Initialization Hook
 # Adds React Native scripts to PATH
 # NOTE: This file is sourced (not executed) by devbox init_hook,

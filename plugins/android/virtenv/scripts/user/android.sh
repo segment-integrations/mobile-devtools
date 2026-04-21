@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # Android Plugin - Main CLI Entry Point
 #
 # This is the primary command-line interface for Android plugin operations.

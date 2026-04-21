@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # Android Plugin - AVD Manager Operations
 # Extracted from avd.sh to eliminate circular dependencies
 

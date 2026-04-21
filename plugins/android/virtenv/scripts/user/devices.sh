@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # Android Plugin - Device Management CLI
 #
 # This script manages Android device definitions stored in devbox.d/android/devices/

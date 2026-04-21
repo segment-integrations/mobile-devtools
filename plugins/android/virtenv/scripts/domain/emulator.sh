@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # Android Plugin - Emulator Lifecycle Management
 # See SCRIPTS.md for detailed documentation
 

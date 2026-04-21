@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # iOS Plugin - Shell Initialization
 # Sets up environment when user runs 'devbox shell'
 # NOTE: This file is sourced (not executed) by devbox init_hook,
