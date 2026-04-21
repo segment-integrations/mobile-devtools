@@ -209,6 +209,21 @@ processes:
       _logs_dir="reports/logs"
       mkdir -p "$_step_dir" "$_logs_dir"
 
+      # Check if emulator boot succeeded
+      if [ -f "$_step_dir/emulator-boot.status" ]; then
+        boot_status=$(head -n1 "$_step_dir/emulator-boot.status")
+        if [ "$boot_status" = "fail" ]; then
+          echo "ERROR: Emulator boot failed, cannot deploy" >&2
+          cat "$_step_dir/emulator-boot.status"
+          printf 'fail\nEmulator boot failed - skipping deploy\n' > "$_step_dir/$_step.status"
+          exit 1
+        fi
+      else
+        echo "ERROR: Emulator boot status not found" >&2
+        printf 'fail\nEmulator boot status missing\n' > "$_step_dir/$_step.status"
+        exit 1
+      fi
+
       serial="${ANDROID_EMULATOR_SERIAL:-emulator-${EMU_PORT:-5554}}"
 
       # Capture emulator state before deploy
@@ -352,7 +367,7 @@ processes:
       build-app:
         condition: process_completed_successfully
       verify-emulator-ready:
-        condition: process_completed_successfully
+        condition: process_completed
     availability:
       restart: "no"
 
