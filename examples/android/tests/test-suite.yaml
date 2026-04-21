@@ -138,26 +138,25 @@ processes:
 
       echo "Verifying emulator is ready..."
 
-      # Early failure detection: Check if emulator is ready via adb
-      echo "Checking if emulator started (via adb)..."
+      # Early failure detection: Check if emulator appears in adb devices
+      echo "Checking if emulator is visible to adb..."
       initial_wait=30
       elapsed=0
-      emulator_ready=false
+      emulator_detected=false
 
       while [ $elapsed -lt $initial_wait ]; do
-        if android.sh emulator ready >/dev/null 2>&1; then
-          emulator_ready=true
-          echo "✓ Emulator detected via adb"
+        if adb devices 2>/dev/null | grep -q "emulator-"; then
+          emulator_detected=true
+          echo "✓ Emulator detected by adb"
           break
         fi
         sleep 2
         elapsed=$((elapsed + 2))
-        echo "  Waiting for emulator... ${elapsed}s/${initial_wait}s"
       done
 
-      if [ "$emulator_ready" = false ]; then
+      if [ "$emulator_detected" = false ]; then
         echo ""
-        echo "ERROR: Emulator not detected via adb after ${initial_wait}s" >&2
+        echo "ERROR: Emulator not visible to adb after ${initial_wait}s" >&2
         echo ""
         echo "This usually means:" >&2
         echo "  1. Device filtering removed all devices (check sync-avds logs)" >&2
@@ -185,9 +184,8 @@ processes:
 
         sleep 3
         elapsed=$((elapsed + 3))
-        echo "  Waiting for emulator... ${elapsed}s/${max_wait}s"
         if [ $elapsed -ge $max_wait ]; then
-          printf 'fail\nTimed out after %ds waiting for emulator to boot\n' "$max_wait" > "$_step_dir/$_step.status"
+          printf 'fail\nTimed out after 300s waiting for emulator to boot\n' > "$_step_dir/$_step.status"
           exit 1
         fi
       done
