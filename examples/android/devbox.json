@@ -1,5 +1,5 @@
 {
-  "include": ["path:../../plugins/android/plugin.json"],
+  "include": ["github:segment-integrations/mobile-devtools?dir=plugins/android&ref=main"],
   "packages": {
     "jdk17": "latest",
     "gradle": "latest"

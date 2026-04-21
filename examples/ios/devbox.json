@@ -1,5 +1,5 @@
 {
-  "include": ["path:../../plugins/ios/plugin.json"],
+  "include": ["github:segment-integrations/mobile-devtools?dir=plugins/ios&ref=main"],
   "packages": {
     "process-compose": "latest"
   },
