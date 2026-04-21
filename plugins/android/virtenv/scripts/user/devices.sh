@@ -38,7 +38,13 @@ Commands:
   update <name> [options]                           Update existing device
   delete <name>                                     Remove device definition
   eval                                              Generate devices.lock from ANDROID_DEVICES
-  sync                                              Ensure AVDs match device definitions
+  sync                                              Generate locks and sync AVDs
+  hash <subcommand> [args]                          Manage Nix hash overrides
+
+Hash Subcommands:
+  hash show                Show current hash overrides in android.lock
+  hash update <url> <hash> Add/update a hash override (SHA1 hex, 40 chars)
+  hash clear               Remove all hash overrides from android.lock
 
 Device Creation Options:
   --api <n>         Android API level (required, e.g., 28, 34)
@@ -53,11 +59,21 @@ Device Selection:
   Set ANDROID_DEVICES env var in devbox.json (comma-separated, empty = all):
     {"ANDROID_DEVICES": "min,max"}
 
+Hash Overrides:
+  When Google updates files on their servers but nixpkgs hasn't caught up,
+  you may see hash mismatch errors. Use 'hash update' to add an override.
+  By default, hash overrides are not set - only use as a temporary fix.
+
+  Hash format: SHA1 hex string (40 characters), e.g., 8c4c926d0ca192376b2a04b0318484724319e67c
+
 Examples:
   devices.sh list
   devices.sh create pixel_api28 --api 28 --device pixel --tag google_apis
   devices.sh eval
   devices.sh sync
+  devices.sh hash show
+  devices.sh hash update https://dl.google.com/android/repository/platform-tools_r37.0.0-darwin.zip 8c4c926d0ca192376b2a04b0318484724319e67c
+  devices.sh hash clear
 USAGE
   exit 1
 }
@@ -230,33 +246,69 @@ fi
 
 # Generate android.lock from environment variables
 # Creates/updates android.lock with current Android SDK configuration from env vars
+# Preserves hash_overrides field if it exists
 android_generate_android_lock() {
   local android_lock_file="${config_dir}/android.lock"
   local android_lock_tmp="${android_lock_file}.tmp"
 
+  # Preserve existing hash_overrides if present
+  local hash_overrides_json="{}"
+  if [ -f "$android_lock_file" ]; then
+    hash_overrides_json="$(jq -c '.hash_overrides // {}' "$android_lock_file")"
+  fi
+
   # Extract relevant Android env vars and create lock file
   # Convert boolean env vars (accepts: true/1/yes/on, case-insensitive)
-  jq -n \
-    --arg build_tools "${ANDROID_BUILD_TOOLS_VERSION:-36.1.0}" \
-    --arg cmdline_tools "${ANDROID_CMDLINE_TOOLS_VERSION:-19.0}" \
-    --arg compile_sdk "${ANDROID_COMPILE_SDK:-36}" \
-    --arg target_sdk "${ANDROID_TARGET_SDK:-36}" \
-    --arg system_image_tag "${ANDROID_SYSTEM_IMAGE_TAG:-google_apis}" \
-    --arg include_ndk "${ANDROID_INCLUDE_NDK:-false}" \
-    --arg ndk_version "${ANDROID_NDK_VERSION:-27.0.12077973}" \
-    --arg include_cmake "${ANDROID_INCLUDE_CMAKE:-false}" \
-    --arg cmake_version "${ANDROID_CMAKE_VERSION:-3.22.1}" \
-    '{
-      ANDROID_BUILD_TOOLS_VERSION: $build_tools,
-      ANDROID_CMDLINE_TOOLS_VERSION: $cmdline_tools,
-      ANDROID_COMPILE_SDK: ($compile_sdk | tonumber),
-      ANDROID_TARGET_SDK: ($target_sdk | tonumber),
-      ANDROID_SYSTEM_IMAGE_TAG: $system_image_tag,
-      ANDROID_INCLUDE_NDK: ($include_ndk | test("true|1|yes|on"; "i")),
-      ANDROID_NDK_VERSION: $ndk_version,
-      ANDROID_INCLUDE_CMAKE: ($include_cmake | test("true|1|yes|on"; "i")),
-      ANDROID_CMAKE_VERSION: $cmake_version
-    }' > "$android_lock_tmp"
+  # Only include hash_overrides field if it has content
+  if [ "$hash_overrides_json" = "{}" ]; then
+    # No hash overrides - standard lock file
+    jq -n \
+      --arg build_tools "${ANDROID_BUILD_TOOLS_VERSION:-36.1.0}" \
+      --arg cmdline_tools "${ANDROID_CMDLINE_TOOLS_VERSION:-19.0}" \
+      --arg compile_sdk "${ANDROID_COMPILE_SDK:-36}" \
+      --arg target_sdk "${ANDROID_TARGET_SDK:-36}" \
+      --arg system_image_tag "${ANDROID_SYSTEM_IMAGE_TAG:-google_apis}" \
+      --arg include_ndk "${ANDROID_INCLUDE_NDK:-false}" \
+      --arg ndk_version "${ANDROID_NDK_VERSION:-27.0.12077973}" \
+      --arg include_cmake "${ANDROID_INCLUDE_CMAKE:-false}" \
+      --arg cmake_version "${ANDROID_CMAKE_VERSION:-3.22.1}" \
+      '{
+        ANDROID_BUILD_TOOLS_VERSION: $build_tools,
+        ANDROID_CMDLINE_TOOLS_VERSION: $cmdline_tools,
+        ANDROID_COMPILE_SDK: ($compile_sdk | tonumber),
+        ANDROID_TARGET_SDK: ($target_sdk | tonumber),
+        ANDROID_SYSTEM_IMAGE_TAG: $system_image_tag,
+        ANDROID_INCLUDE_NDK: ($include_ndk | test("true|1|yes|on"; "i")),
+        ANDROID_NDK_VERSION: $ndk_version,
+        ANDROID_INCLUDE_CMAKE: ($include_cmake | test("true|1|yes|on"; "i")),
+        ANDROID_CMAKE_VERSION: $cmake_version
+      }' > "$android_lock_tmp"
+  else
+    # Has hash overrides - include them
+    jq -n \
+      --arg build_tools "${ANDROID_BUILD_TOOLS_VERSION:-36.1.0}" \
+      --arg cmdline_tools "${ANDROID_CMDLINE_TOOLS_VERSION:-19.0}" \
+      --arg compile_sdk "${ANDROID_COMPILE_SDK:-36}" \
+      --arg target_sdk "${ANDROID_TARGET_SDK:-36}" \
+      --arg system_image_tag "${ANDROID_SYSTEM_IMAGE_TAG:-google_apis}" \
+      --arg include_ndk "${ANDROID_INCLUDE_NDK:-false}" \
+      --arg ndk_version "${ANDROID_NDK_VERSION:-27.0.12077973}" \
+      --arg include_cmake "${ANDROID_INCLUDE_CMAKE:-false}" \
+      --arg cmake_version "${ANDROID_CMAKE_VERSION:-3.22.1}" \
+      --argjson hash_overrides "$hash_overrides_json" \
+      '{
+        ANDROID_BUILD_TOOLS_VERSION: $build_tools,
+        ANDROID_CMDLINE_TOOLS_VERSION: $cmdline_tools,
+        ANDROID_COMPILE_SDK: ($compile_sdk | tonumber),
+        ANDROID_TARGET_SDK: ($target_sdk | tonumber),
+        ANDROID_SYSTEM_IMAGE_TAG: $system_image_tag,
+        ANDROID_INCLUDE_NDK: ($include_ndk | test("true|1|yes|on"; "i")),
+        ANDROID_NDK_VERSION: $ndk_version,
+        ANDROID_INCLUDE_CMAKE: ($include_cmake | test("true|1|yes|on"; "i")),
+        ANDROID_CMAKE_VERSION: $cmake_version,
+        hash_overrides: $hash_overrides
+      }' > "$android_lock_tmp"
+  fi
 
   mv "$android_lock_tmp" "$android_lock_file"
   echo "✓ Generated android.lock"
@@ -733,6 +785,104 @@ case "$command_name" in
 
     # Step 3: Sync AVDs with device definitions
     android_sync_avds || exit 1
+    ;;
+
+  # --------------------------------------------------------------------------
+  # hash - Manage Nix hash overrides in android.lock
+  # --------------------------------------------------------------------------
+  hash)
+    subcommand="${1-}"
+    [ -n "$subcommand" ] || usage
+    shift || true
+
+    android_lock_file="${config_dir}/android.lock"
+
+    case "$subcommand" in
+      show)
+        # Display current hash overrides
+        if [ ! -f "$android_lock_file" ]; then
+          echo "No android.lock file found"
+          exit 0
+        fi
+
+        if ! jq -e '.hash_overrides' "$android_lock_file" >/dev/null 2>&1; then
+          echo "No hash overrides set"
+          exit 0
+        fi
+
+        override_count=$(jq '.hash_overrides | length' "$android_lock_file")
+        if [ "$override_count" -eq 0 ]; then
+          echo "No hash overrides set"
+          exit 0
+        fi
+
+        echo "Hash overrides in android.lock:"
+        jq -r '.hash_overrides | to_entries[] | "  \(.key): \(.value)"' "$android_lock_file"
+        ;;
+
+      update)
+        # Add or update a hash override
+        url="${1-}"
+        new_hash="${2-}"
+
+        if [ -z "$url" ] || [ -z "$new_hash" ]; then
+          echo "ERROR: Both URL and hash are required" >&2
+          echo "Usage: devices.sh hash update <url> <hash>" >&2
+          exit 1
+        fi
+
+        # Ensure android.lock exists
+        if [ ! -f "$android_lock_file" ]; then
+          echo "ERROR: android.lock not found. Run 'devices.sh sync' first." >&2
+          exit 1
+        fi
+
+        # Update hash override
+        temp_lock="${android_lock_file}.tmp"
+        jq --arg url "$url" --arg hash "$new_hash" \
+          '.hash_overrides = (.hash_overrides // {}) | .hash_overrides[$url] = $hash' \
+          "$android_lock_file" > "$temp_lock"
+
+        mv "$temp_lock" "$android_lock_file"
+        echo "✓ Added hash override for: $url"
+        echo "  Hash: $new_hash"
+        echo ""
+        echo "IMPORTANT: Commit android.lock to preserve this fix:"
+        echo "  git add devbox.d/*/android.lock"
+        echo "  git commit -m 'fix(android): add hash override for $(basename "$url")'"
+        ;;
+
+      clear)
+        # Remove all hash overrides
+        if [ ! -f "$android_lock_file" ]; then
+          echo "No android.lock file found"
+          exit 0
+        fi
+
+        if ! jq -e '.hash_overrides' "$android_lock_file" >/dev/null 2>&1; then
+          echo "No hash overrides to clear"
+          exit 0
+        fi
+
+        override_count=$(jq '.hash_overrides | length' "$android_lock_file")
+        if [ "$override_count" -eq 0 ]; then
+          echo "No hash overrides to clear"
+          exit 0
+        fi
+
+        # Remove hash_overrides field
+        temp_lock="${android_lock_file}.tmp"
+        jq 'del(.hash_overrides)' "$android_lock_file" > "$temp_lock"
+        mv "$temp_lock" "$android_lock_file"
+
+        echo "✓ Cleared $override_count hash override(s) from android.lock"
+        ;;
+
+      *)
+        echo "ERROR: Unknown hash subcommand: $subcommand" >&2
+        usage
+        ;;
+    esac
     ;;
 
   # --------------------------------------------------------------------------
