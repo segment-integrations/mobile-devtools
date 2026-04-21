@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # React Native Plugin - Main CLI
 
 set -eu

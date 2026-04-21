@@ -624,28 +624,55 @@ processes:
   # Cleanup - capture final logs, then stop everything in pure mode
   cleanup:
     command: |
+      _step_dir="reports/steps"
       _logs_dir="reports/logs"
       mkdir -p "$_logs_dir"
 
-      # Capture final Android logcat before teardown
-      serial=""
-      state_dir="${ANDROID_RUNTIME_DIR:-.devbox/virtenv}/${SUITE_NAME:-default}"
-      if [ -f "$state_dir/emulator-serial.txt" ]; then
-        serial="$(cat "$state_dir/emulator-serial.txt")"
-      fi
-      if [ -z "$serial" ]; then
-        serial="emulator-${EMU_PORT:-5554}"
-      fi
-      adb -s "$serial" logcat -d > "$_logs_dir/logcat-android-cleanup.txt" 2>&1 || true
-      echo "Final Android logcat: $_logs_dir/logcat-android-cleanup.txt"
-
-      # Capture final iOS simulator logs before teardown
-      UDID=$(cat "${IOS_RUNTIME_DIR:-/tmp}/rn-all-e2e/simulator-udid.txt" 2>/dev/null || cat "${IOS_RUNTIME_DIR:-/tmp}/${SUITE_NAME:-rn-all-e2e}/simulator-udid.txt" 2>/dev/null || true)
-      if [ -n "$UDID" ]; then
-        xcrun simctl spawn "$UDID" log show --last 5m --style compact > "$_logs_dir/simulator-final.log" 2>&1 || true
-        echo "Final iOS simulator logs: $_logs_dir/simulator-final.log"
+      # Check if Android verification succeeded
+      android_verify_failed=false
+      if [ -f "$_step_dir/verify-android.status" ]; then
+        verify_status=$(head -n1 "$_step_dir/verify-android.status")
+        if [ "$verify_status" = "fail" ]; then
+          android_verify_failed=true
+          echo "Android verification failed, skipping Android adb operations"
+        fi
       fi
 
+      # Check if iOS verification succeeded
+      ios_verify_failed=false
+      if [ -f "$_step_dir/verify-ios.status" ]; then
+        verify_status=$(head -n1 "$_step_dir/verify-ios.status")
+        if [ "$verify_status" = "fail" ]; then
+          ios_verify_failed=true
+          echo "iOS verification failed, skipping iOS log capture"
+        fi
+      fi
+
+      # Only capture Android logs if verification succeeded
+      if [ "$android_verify_failed" = false ]; then
+        serial=""
+        state_dir="${ANDROID_RUNTIME_DIR:-.devbox/virtenv}/${SUITE_NAME:-default}"
+        if [ -f "$state_dir/emulator-serial.txt" ]; then
+          serial="$(cat "$state_dir/emulator-serial.txt")"
+        fi
+        if [ -z "$serial" ]; then
+          serial="emulator-${EMU_PORT:-5554}"
+        fi
+        # Use timeout to prevent hanging
+        timeout 10s adb -s "$serial" logcat -d > "$_logs_dir/logcat-android-cleanup.txt" 2>&1 || true
+        echo "Final Android logcat: $_logs_dir/logcat-android-cleanup.txt"
+      fi
+
+      # Only capture iOS logs if verification succeeded
+      if [ "$ios_verify_failed" = false ]; then
+        UDID=$(cat "${IOS_RUNTIME_DIR:-/tmp}/rn-all-e2e/simulator-udid.txt" 2>/dev/null || cat "${IOS_RUNTIME_DIR:-/tmp}/${SUITE_NAME:-rn-all-e2e}/simulator-udid.txt" 2>/dev/null || true)
+        if [ -n "$UDID" ]; then
+          timeout 10s xcrun simctl spawn "$UDID" log show --last 5m --style compact > "$_logs_dir/simulator-final.log" 2>&1 || true
+          echo "Final iOS simulator logs: $_logs_dir/simulator-final.log"
+        fi
+      fi
+
+      # Stop services (only in pure mode)
       if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
         echo "Cleaning up (pure mode)..."
         metro.sh stop all || true
@@ -658,9 +685,7 @@ processes:
         ios.sh app stop || true
         ios.sh simulator stop || true
 
-        echo "Metro, apps, and emulator/simulator stopped"
-      else
-        echo "Test complete - Metro, apps, and emulator/simulator still running for iteration"
+        echo "Cleanup complete"
       fi
     depends_on:
       verify-android-running:

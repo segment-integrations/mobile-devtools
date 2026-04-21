@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # iOS Plugin - Device Configuration Management
 # Extracted from device.sh to eliminate circular dependencies
 

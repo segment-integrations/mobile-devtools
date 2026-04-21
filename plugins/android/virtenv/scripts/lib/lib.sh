@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # Android Plugin - Core Utilities
 # See SCRIPTS.md for detailed documentation
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # iOS Plugin - App Building and Deployment
 # See REFERENCE.md for detailed documentation
 
