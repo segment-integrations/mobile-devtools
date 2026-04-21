@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # Android Plugin - AVD Manager Operations
 # Extracted from avd.sh to eliminate circular dependencies
 
@@ -342,6 +342,68 @@ android_setup_avds() {
     echo "ERROR: No devices found in ${lock_file}" >&2
     echo "       Run 'devbox run android.sh devices eval' to regenerate" >&2
     exit 1
+  fi
+
+  # Filter devices based on ANDROID_DEVICES if set
+  if [ -n "${ANDROID_DEVICES:-}" ]; then
+    IFS=',' read -ra selected_devices <<< "${ANDROID_DEVICES}"
+
+    # Show filtering context for transparency
+    echo ""
+    echo "Filtering devices: ANDROID_DEVICES=${ANDROID_DEVICES}"
+    echo ""
+    echo "Available devices in lock file:"
+    missing_filename=false
+    for device_json in $devices_json; do
+      d_filename="$(echo "$device_json" | jq -r '.filename // empty')"
+      d_name="$(echo "$device_json" | jq -r '.name // empty')"
+      d_api="$(echo "$device_json" | jq -r '.api // empty')"
+      if [ -n "$d_filename" ]; then
+        echo "  - $d_filename (name: $d_name, API $d_api)"
+      else
+        echo "  - [MISSING FILENAME] (name: $d_name, API $d_api)"
+        missing_filename=true
+      fi
+    done
+    echo ""
+
+    if [ "$missing_filename" = true ]; then
+      echo "ERROR: Lock file missing filename metadata (old format)" >&2
+      echo "       Regenerate with: devbox run android.sh devices eval" >&2
+      exit 1
+    fi
+
+    filtered_json=""
+    for device_json in $devices_json; do
+      device_filename="$(echo "$device_json" | jq -r '.filename // empty')"
+
+      # Check if device matches filter (filename only)
+      should_include=false
+      for selected in "${selected_devices[@]}"; do
+        if [ "$device_filename" = "$selected" ]; then
+          should_include=true
+          break
+        fi
+      done
+
+      if [ "$should_include" = true ]; then
+        filtered_json="${filtered_json}${device_json}"$'\n'
+      fi
+    done
+
+    devices_json="$filtered_json"
+
+    if [ -z "$devices_json" ]; then
+      echo "ERROR: No devices match ANDROID_DEVICES filter: ${ANDROID_DEVICES}" >&2
+      echo "       All devices were filtered out" >&2
+      echo ""
+      echo "HINT: Filter matches device filename (e.g., min, max)" >&2
+      echo "      Check available devices listed above" >&2
+      exit 1
+    fi
+
+    echo "Proceeding with filtered device list"
+    echo ""
   fi
 
   # Get lock file checksum for AVD validation
