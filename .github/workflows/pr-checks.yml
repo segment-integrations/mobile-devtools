@@ -11,11 +11,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Fast test suite (lint + unit + integration)
-  fast-tests:
-    name: Fast Tests (Lint + Unit + Integration)
+  # Linting and formatting checks
+  lint:
+    name: Lint
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
 
@@ -24,24 +24,106 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Run fast test suite
-        run: devbox run test:fast
+      - name: Run linting
+        run: devbox run lint
 
-      - name: Upload reports and logs
+  # Shell script unit tests (no SDK required)
+  test-shell-scripts:
+    name: Shell Script Tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Devbox
+        uses: jetify-com/devbox-install-action@v0.15.0
+        with:
+          enable-cache: true
+
+      - name: Run Android lib.sh tests
+        run: devbox run bash plugins/tests/android/test-lib.sh
+
+      - name: Run Android apk-resolution tests
+        run: devbox run bash plugins/tests/android/test-apk-resolution.sh
+
+      - name: Run iOS lib.sh tests
+        run: devbox run bash plugins/tests/ios/test-lib.sh
+
+      - name: Run iOS app-resolution tests
+        run: devbox run bash plugins/tests/ios/test-app-resolution.sh
+
+      - name: Run React Native lib.sh tests
+        run: devbox run bash plugins/tests/react-native/test-lib.sh
+
+      - name: Upload logs
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: fast-test-reports
-          path: |
-            reports/
+          name: shell-script-test-logs
+          path: reports/logs/
+          retention-days: 7
+
+  # Device config tests (no SDK build, just config validation)
+  test-device-config:
+    name: Device Config Tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Devbox
+        uses: jetify-com/devbox-install-action@v0.15.0
+        with:
+          enable-cache: true
+
+      - name: Run Android device config tests
+        env:
+          ANDROID_SDK_REQUIRED: "0"
+        run: devbox run bash plugins/tests/android/test-devices.sh
+
+      - name: Run iOS device config tests
+        env:
+          IOS_SDK_REQUIRED: "0"
+        run: devbox run bash plugins/tests/ios/test-devices.sh
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: device-config-test-logs
+          path: reports/logs/
+          retention-days: 7
+
+  # devbox-mcp plugin tests
+  test-devbox-mcp:
+    name: Devbox MCP Plugin Tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Devbox
+        uses: jetify-com/devbox-install-action@v0.15.0
+        with:
+          enable-cache: true
+
+      - name: Run devbox-mcp tests
+        run: devbox run process-compose -f plugins/devbox-mcp/tests/test-suite.yaml --no-server --tui=false
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: devbox-mcp-test-logs
+          path: reports/logs/
           retention-days: 7
 
   # Android example E2E test (max device only on PRs)
+  # Runs in parallel with fast checks for better CI throughput
   android-e2e:
     name: Android E2E - max
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    needs: fast-tests
     steps:
       - uses: actions/checkout@v6
 
@@ -77,6 +159,10 @@ jobs:
       - name: Rewrite plugin URLs to local
         run: bash scripts/dev/rewrite-plugin-urls.sh --to-local examples/
 
+      - name: Run Android apk-detection tests
+        working-directory: examples/android
+        run: devbox run bash ../../plugins/tests/android/test-apk-detection.sh
+
       - name: Run Android E2E test
         working-directory: examples/android
         env:
@@ -98,11 +184,11 @@ jobs:
           retention-days: 7
 
   # iOS example E2E test (max device only on PRs)
+  # Runs in parallel with fast checks for better CI throughput
   ios-e2e:
     name: iOS E2E - max
     runs-on: macos-26
     timeout-minutes: 25
-    needs: fast-tests
     steps:
       - uses: actions/checkout@v6
 
@@ -165,11 +251,11 @@ jobs:
           retention-days: 7
 
   # React Native E2E tests (max device only on PRs, plus web)
+  # Runs in parallel with fast checks for better CI throughput
   react-native-e2e:
     name: React Native E2E - ${{ matrix.platform }}-${{ matrix.device }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
-    needs: fast-tests
     strategy:
       fail-fast: false
       matrix:
@@ -289,19 +375,25 @@ jobs:
   status-check:
     name: All PR Checks Passed
     runs-on: ubuntu-latest
-    needs: [fast-tests, android-e2e, ios-e2e, react-native-e2e]
+    needs: [lint, test-shell-scripts, test-device-config, test-devbox-mcp, android-e2e, ios-e2e, react-native-e2e]
     if: always()
     steps:
       - name: Check job results
         run: |
           echo "PR Check Results:"
-          echo "  Fast Tests: ${{ needs.fast-tests.result }}"
+          echo "  Lint: ${{ needs.lint.result }}"
+          echo "  Shell Script Tests: ${{ needs.test-shell-scripts.result }}"
+          echo "  Device Config Tests: ${{ needs.test-device-config.result }}"
+          echo "  Devbox MCP Tests: ${{ needs.test-devbox-mcp.result }}"
           echo "  Android E2E: ${{ needs.android-e2e.result }}"
           echo "  iOS E2E: ${{ needs.ios-e2e.result }}"
           echo "  React Native E2E: ${{ needs.react-native-e2e.result }}"
           echo ""
 
-          if [[ "${{ needs.fast-tests.result }}" != "success" ]] || \
+          if [[ "${{ needs.lint.result }}" != "success" ]] || \
+             [[ "${{ needs.test-shell-scripts.result }}" != "success" ]] || \
+             [[ "${{ needs.test-device-config.result }}" != "success" ]] || \
+             [[ "${{ needs.test-devbox-mcp.result }}" != "success" ]] || \
              [[ "${{ needs.android-e2e.result }}" != "success" ]] || \
              [[ "${{ needs.ios-e2e.result }}" != "success" ]] || \
              [[ "${{ needs.react-native-e2e.result }}" != "success" ]]; then
