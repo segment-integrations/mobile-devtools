@@ -121,14 +121,63 @@ Each example includes package managers (SPM for Swift, Gradle for Android) that 
 
 ### 6. Share the Reproduction
 
-Commit your changes and share:
+Use the built-in share command to package your reproduction:
+```bash
+devbox run share
+```
+
+**What it does:**
+- ✅ Auto-commits your changes (no Git knowledge needed!)
+- ✅ Creates a zip file with everything needed to reproduce
+- ✅ Names file with commit hash + timestamp for easy identification
+- ✅ Excludes build artifacts (keeps file size small)
+- ✅ Includes setup instructions (REPRO-INFO.txt)
+- ✅ Shows you exactly where the file is saved
+- ✅ Copies path to clipboard (macOS)
+
+**Example output:**
+```
+✅ Archive created successfully!
+
+Archive Details:
+  Name:     swift-repro-a1b2c3d-20260422-143052.zip
+  Size:     2.3M
+  Location: ~/mobile-devtools/shared-repros/swift-repro-a1b2c3d-20260422-143052.zip
+  Commit:   a1b2c3d
+
+Next Steps:
+1️⃣  Upload to Jira: Drag and drop the zip onto the issue
+2️⃣  Or share via email: Attach the zip file
+3️⃣  Or post to Slack: Drag into your message
+```
+
+**Uploading to Jira:**
+1. Open the Jira issue
+2. Click **Attach** or drag the zip file onto the page
+3. Add a comment:
+   ```
+   Reproduction case attached (commit: a1b2c3d)
+   
+   Changes made:
+   - Modified identify call to match customer setup
+   - Using SDK version 1.6.2
+   
+   To run: Extract and run "devbox run --pure start:app"
+   ```
+
+**Sharing via Email/Slack:**
+Just attach or drag the zip file and mention the commit hash from the output.
+
+The recipient can extract the zip and immediately run `devbox run --pure start:app` - everything is included!
+
+**Manual sharing (if needed):**
+If the share command isn't available, you can still share manually:
 ```bash
 git add .
 git commit -m "Reproduce: customer issue description"
-git push origin reproduce-customer-issue
+git format-patch -1 HEAD --stdout > repro.patch
 ```
-
-Now the customer, support, and engineering all have the exact same reproduction environment.
+Then share the patch file.
 
 ## What Makes These Examples Special
 
@@ -144,6 +193,79 @@ Now the customer, support, and engineering all have the exact same reproduction 
 
 **Pure Mode:** The `--pure` flag ensures a clean environment with no inherited state from your system.
 
+**Easy Sharing:** Built-in `share` command packages reproductions for Jira, email, or Slack - no Git knowledge required.
+
+## Sharing Made Easy
+
+All reproduction examples include a `share` command that makes it trivial to package and share reproductions, even for non-technical team members.
+
+### How It Works
+
+```bash
+cd swift  # or any other example
+# Make your changes to reproduce the issue
+devbox run share
+```
+
+The share command automatically:
+1. **Commits changes** - No need to know Git commands
+2. **Creates archive** - Zip file with meaningful name (commit-hash-timestamp)
+3. **Excludes bloat** - No build artifacts, only source code
+4. **Adds instructions** - Includes REPRO-INFO.txt with setup steps
+5. **Shows location** - Tells you exactly where the file is
+6. **Copies path** - Clipboard integration on macOS
+
+### What's In The Archive
+
+Each shared reproduction package contains:
+- All source code showing the issue
+- Project configuration (devbox.json, Xcode project, etc.)
+- Device/simulator definitions
+- **REPRO-INFO.txt** - Instructions for running the reproduction
+- **changes.patch** - Git patch showing exactly what was modified
+
+The archive excludes:
+- Build artifacts (DerivedData, build/, etc.)
+- Git history (.git/)
+- Devbox cache (.devbox/)
+- Node modules, Pods, etc.
+
+This keeps files small (typically 2-5 MB) while including everything needed to run the reproduction.
+
+### Where To Share
+
+**Jira (Primary Method):**
+1. Drag the zip file onto the Jira issue
+2. Add a comment with the commit hash
+3. Describe what you changed
+
+**Email:**
+- Attach the zip file
+- Mention commit hash in email body
+- CC relevant team members
+
+**Slack:**
+- Drag zip into relevant channel
+- Include Jira issue link
+- Brief description of the issue
+
+### For Recipients
+
+Anyone receiving a shared reproduction can:
+```bash
+# Extract the zip file
+unzip swift-repro-a1b2c3d-20260422-143052.zip
+cd swift-repro-a1b2c3d-20260422-143052
+
+# Install devbox if needed
+curl -fsSL https://get.jetify.com/devbox | bash
+
+# Run the reproduction
+devbox run --pure start:app
+```
+
+Everything is included and ready to run. No setup needed.
+
 ## Adding New Examples
 
 When adding a new platform or SDK:
@@ -154,7 +276,9 @@ When adding a new platform or SDK:
 4. Include a custom logging plugin for debugging
 5. Use gitignored config files for API keys
 6. Configure project-local build output
-7. Document the quick start workflow
+7. Add `scripts/share.sh` for easy sharing
+8. Add `share` command to `devbox.json` scripts
+9. Document the quick start workflow
 
 Follow the pattern established by the Swift example.
 
