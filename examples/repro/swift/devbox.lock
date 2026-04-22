@@ -684,6 +684,102 @@
           "store_path": "/nix/store/c7fywarscr5c07bxgd6d5g0isn0ijysz-process-compose-1.90.0"
         }
       }
+    },
+    "rsync@latest": {
+      "last_modified": "2026-04-16T08:46:55Z",
+      "resolved": "github:NixOS/nixpkgs/b86751bc4085f48661017fa226dee99fab6c651b#rsync",
+      "source": "devbox-search",
+      "version": "3.4.1",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/q39r4xfp8vqnyn1pmdml038k60asxhyg-rsync-3.4.1",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/q39r4xfp8vqnyn1pmdml038k60asxhyg-rsync-3.4.1"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/4qi0siq0csw6kmss8vbsgc5bg2x2iv1k-rsync-3.4.1",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/4qi0siq0csw6kmss8vbsgc5bg2x2iv1k-rsync-3.4.1"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/2pmx9fn2wyrlqd5hwp9m751218i5s7my-rsync-3.4.1",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/2pmx9fn2wyrlqd5hwp9m751218i5s7my-rsync-3.4.1"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/rqxr17iaips1kfs65q2z6wczh2m4kwlm-rsync-3.4.1",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/rqxr17iaips1kfs65q2z6wczh2m4kwlm-rsync-3.4.1"
+        }
+      }
+    },
+    "zip@latest": {
+      "last_modified": "2026-04-16T08:46:55Z",
+      "resolved": "github:NixOS/nixpkgs/b86751bc4085f48661017fa226dee99fab6c651b#zip",
+      "source": "devbox-search",
+      "version": "3.0",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/cvymyyay5ik73gssz0s42qy6nx44mk6w-zip-3.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/cvymyyay5ik73gssz0s42qy6nx44mk6w-zip-3.0"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/ynz8cp00bh3cm4asvjn3yc0b0qafvi65-zip-3.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/ynz8cp00bh3cm4asvjn3yc0b0qafvi65-zip-3.0"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/3wx5g5jsnls3any0p0r19v5jhvdi3f1w-zip-3.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/3wx5g5jsnls3any0p0r19v5jhvdi3f1w-zip-3.0"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/chqyzmw0g42i2v9r4lf38azn73w8lhd0-zip-3.0",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/chqyzmw0g42i2v9r4lf38azn73w8lhd0-zip-3.0"
+        }
+      }
     }
   }
 }
