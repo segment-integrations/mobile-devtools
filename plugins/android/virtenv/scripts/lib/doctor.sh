@@ -318,12 +318,13 @@ doctor_check_disk_space() {
   local min_gb="${1:-5}"
   local check_name="Disk space (>= ${min_gb}GB free)"
 
-  local available_kb
   if command -v df >/dev/null 2>&1; then
-    available_kb=$(df -k . | tail -1 | awk '{print $4}')
-    local available_gb=$((available_kb / 1024 / 1024))
+    # Use awk for floating-point division to get accurate GB with one decimal place
+    local available_gb
+    available_gb=$(df -k . | tail -1 | awk '{printf "%.1f", $4/1024/1024}')
 
-    if [ "$available_gb" -ge "$min_gb" ]; then
+    # Use awk for floating-point comparison since bash only does integers
+    if awk -v avail="$available_gb" -v min="$min_gb" 'BEGIN {exit !(avail >= min)}'; then
       doctor_check_pass "$check_name"
       return 0
     else
