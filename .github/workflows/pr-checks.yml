@@ -112,7 +112,7 @@ jobs:
           enable-cache: true
 
       - name: Run devbox-mcp tests
-        run: process-compose -f plugins/devbox-mcp/tests/test-suite.yaml --no-server --tui=false
+        run: devbox run process-compose -f plugins/devbox-mcp/tests/test-suite.yaml --no-server --tui=false
 
       - name: Upload logs
         if: always()
