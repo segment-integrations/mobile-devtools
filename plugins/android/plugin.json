@@ -41,6 +41,7 @@
   "create_files": {
     "{{ .Virtenv }}/android": "",
     "{{ .Virtenv }}/android/avd": "",
+    "{{ .Virtenv }}/flake.nix": "virtenv/flake.nix",
     "{{ .Virtenv }}/scripts/lib/lib.sh": "virtenv/scripts/lib/lib.sh",
     "{{ .Virtenv }}/scripts/platform/core.sh": "virtenv/scripts/platform/core.sh",
     "{{ .Virtenv }}/scripts/platform/device_config.sh": "virtenv/scripts/platform/device_config.sh",
@@ -58,7 +59,6 @@
     "{{ .Virtenv }}/scripts/init/init-hook.sh": "virtenv/scripts/init/init-hook.sh",
     "{{ .Virtenv }}/scripts/init/setup.sh": "virtenv/scripts/init/setup.sh",
     "{{ .Virtenv }}/scripts/init/doctor.sh": "virtenv/scripts/init/doctor.sh",
-    "{{ .DevboxDir }}/flake.nix": "virtenv/flake.nix",
     "{{ .DevboxDir }}/devices/min.json": "config/devices/min.json",
     "{{ .DevboxDir }}/devices/max.json": "config/devices/max.json"
   },

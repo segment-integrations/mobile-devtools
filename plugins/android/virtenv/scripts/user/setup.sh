@@ -37,7 +37,7 @@ else
 
     sdk_out=$(
       nix --extra-experimental-features 'nix-command flakes' \
-        build "path:${flake_root}#${flake_output}" --no-link --print-out-paths 2>&1
+        build "path:${flake_root}#${flake_output}" --no-link --print-out-paths --impure 2>&1
     ) || true
 
     # Check if we got a valid store path
