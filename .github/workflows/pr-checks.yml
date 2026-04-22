@@ -51,7 +51,7 @@ jobs:
         run: bash plugins/tests/android/test-apk-resolution.sh
 
       - name: Run iOS lib.sh tests
-        run: sh plugins/tests/ios/test-lib.sh
+        run: bash plugins/tests/ios/test-lib.sh
 
       - name: Run iOS app-resolution tests
         run: bash plugins/tests/ios/test-app-resolution.sh
@@ -88,7 +88,7 @@ jobs:
       - name: Run iOS device config tests
         env:
           IOS_SDK_REQUIRED: "0"
-        run: sh plugins/tests/ios/test-devices.sh
+        run: bash plugins/tests/ios/test-devices.sh
 
       - name: Upload logs
         if: always()
