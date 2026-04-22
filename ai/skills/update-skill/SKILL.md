@@ -1,18 +1,117 @@
 ---
 name: update-skill
-description: Verify and update skill command syntax against current tool versions via --help flags and documentation. Ensures skills stay accurate and consistent with latest CLI changes.
-argument-hint: [skill-name or empty for all skills]
+description: Update skills based on user requests or verify CLI syntax against current tool versions. Handles content modifications, new features, corrections, and automated CLI verification.
+argument-hint: [skill-name] [modification-description or empty for CLI verification]
 disable-model-invocation: false
 allowed-tools: Read Bash(*) Grep Edit Write
 ---
 
-# Skill Update and Verification
+# Skill Update and Modification
 
 ## Overview
 
-Verifies skill documentation accuracy by checking command syntax against current tool versions. Updates skills with correct flags, arguments, and behavior.
+Updates skills in two modes:
 
-## Workflow
+1. **Modification Mode**: Apply user-requested changes to skill content, structure, or behavior
+2. **Verification Mode**: Automatically verify CLI command syntax against current tool versions
+
+Choose mode based on user request or default to CLI verification when no specific changes requested.
+
+## Mode Selection
+
+Determine mode from user request:
+
+**Modification Mode** - User specifies changes:
+```
+/update-skill cleanup add detection for X files
+/update-skill pr change description format to Y
+/update-skill devbox-android update device selection behavior
+/update-skill rebase add conflict resolution examples
+```
+
+**Verification Mode** - No specific changes mentioned:
+```
+/update-skill devbox          # Verify devbox CLI syntax
+/update-skill                 # Verify all skills with CLI commands
+```
+
+## Modification Mode Workflow
+
+When user requests specific changes to a skill:
+
+### 1. Understand the Request
+
+Parse user intent:
+- What skill to modify
+- What aspect to change (content, examples, structure, behavior)
+- What the desired outcome is
+
+Examples:
+- "add X feature" → Add new section or examples
+- "change Y to Z" → Replace or update existing content
+- "improve documentation for X" → Enhance clarity or completeness
+- "remove outdated X" → Delete deprecated information
+- "reorganize sections" → Restructure content
+
+### 2. Read Current Skill
+
+```bash
+cat ai/skills/<skill-name>/SKILL.md
+```
+
+Understand:
+- Current structure and organization
+- Existing content and examples
+- Writing style and format
+- Where changes should be integrated
+
+### 3. Apply Requested Changes
+
+Make modifications following create-skill guidelines:
+
+**Content changes:**
+- Add new sections with clear headings
+- Update examples with current syntax
+- Improve clarity of explanations
+- Remove outdated information
+- Fix inaccuracies
+
+**Structure changes:**
+- Reorganize sections logically
+- Split large sections if needed
+- Add subsections for clarity
+- Improve information hierarchy
+
+**Format requirements:**
+- Agent-readable structure
+- No emojis or decorative symbols
+- Direct, concise statements
+- Inline code examples
+- Clear section boundaries
+
+### 4. Verify Changes
+
+After editing:
+- Re-read modified sections
+- Check examples are correct and runnable
+- Ensure changes integrate smoothly
+- Verify formatting follows create-skill guidelines
+- Test any command examples if possible
+
+### 5. Report Changes
+
+Summarize what was modified:
+```markdown
+Updated <skill-name>:
+- Added: X feature documentation
+- Changed: Y section to Z format
+- Removed: Outdated A information
+- Improved: Clarity of B examples
+```
+
+## Verification Mode Workflow
+
+When automatically verifying CLI command syntax:
 
 ### 1. Identify Skills to Update
 
@@ -256,12 +355,61 @@ FLAGS:
 
 ## Integration Workflow
 
-When invoked with argument:
+### Modification Mode Examples
 
-**Update specific skill:**
+**Add new feature:**
+```
+/update-skill cleanup add detection for AI-generated files
+
+Process:
+1. Read ai/skills/cleanup/SKILL.md
+2. Find appropriate section (detection categories)
+3. Add new detection pattern and examples
+4. Update summary and checklist
+5. Report changes
+```
+
+**Change behavior:**
+```
+/update-skill pr change to create PRs as ready instead of draft
+
+Process:
+1. Read ai/skills/pr/SKILL.md
+2. Find PR creation workflow
+3. Update gh pr create examples (remove --draft)
+4. Update description text
+5. Report changes
+```
+
+**Improve documentation:**
+```
+/update-skill devbox improve error handling documentation
+
+Process:
+1. Read ai/skills/devbox/SKILL.md
+2. Find error handling sections
+3. Add examples of common errors
+4. Document recovery steps
+5. Report changes
+```
+
+**Remove outdated content:**
+```
+/update-skill git-town remove deprecated commands
+
+Process:
+1. Read ai/skills/git-town/SKILL.md
+2. Identify deprecated commands (check via --help)
+3. Remove or mark as deprecated
+4. Update examples to use current commands
+5. Report changes
+```
+
+### Verification Mode Examples
+
+**Verify specific skill:**
 ```
 /update-skill devbox
-```
 
 Process:
 1. Read ai/skills/devbox/SKILL.md
@@ -270,16 +418,29 @@ Process:
 4. Compare documented vs actual syntax
 5. Update SKILL.md with corrections
 6. Report changes made
+```
 
-**Update all skills:**
+**Verify all skills:**
 ```
 /update-skill
-```
 
 Process:
 1. List all skills in ai/skills/
-2. For each skill, perform specific update workflow
+2. For each skill, perform verification workflow
 3. Report changes per skill
+```
+
+### Mixed Requests
+
+User may combine modification with verification:
+```
+/update-skill gh update to latest CLI version and add examples for new flags
+
+Process:
+1. Run verification mode (check gh --help)
+2. Apply modification mode (add new flag examples)
+3. Report both types of changes
+```
 
 ## Output Format
 
@@ -338,14 +499,139 @@ Recommended verification frequency:
 - On-demand: After known tool updates
 - On-error: When user reports incorrect syntax
 
+## Argument Parsing
+
+Parse user request to determine mode and action:
+
+**Skill name only** → Verification mode:
+```
+/update-skill devbox
+/update-skill gh
+```
+
+**Skill name + modification keywords** → Modification mode:
+```
+/update-skill cleanup add X
+/update-skill pr change Y to Z
+/update-skill devbox update documentation
+/update-skill rebase improve examples
+```
+
+**No arguments** → Verification mode (all skills):
+```
+/update-skill
+```
+
+**Keywords indicating modification:**
+- add, include, insert
+- change, modify, update, revise
+- remove, delete, drop
+- improve, enhance, clarify
+- fix, correct
+- reorganize, restructure
+
+**Keywords indicating verification:**
+- verify, check, validate
+- sync, update (without specifics)
+- No keywords (default to verification)
+
+## Common Modification Patterns
+
+### Adding Content
+
+**New detection category:**
+```
+Add section for X file types
+Add examples for Y scenario
+Add workflow for Z use case
+```
+
+Implementation:
+1. Find appropriate section
+2. Insert new subsection
+3. Add examples and commands
+4. Update any reference lists
+
+**New examples:**
+```
+Add example of handling X error
+Add workflow example for Y
+Add command example showing Z flag
+```
+
+Implementation:
+1. Find examples section
+2. Add new example with explanation
+3. Ensure formatting matches existing
+
+### Changing Content
+
+**Update behavior:**
+```
+Change default from X to Y
+Update workflow to use Z approach
+Modify examples to show new pattern
+```
+
+Implementation:
+1. Find relevant sections
+2. Update descriptions and examples
+3. Check for consistency across skill
+
+**Improve clarity:**
+```
+Clarify section about X
+Simplify explanation of Y
+Make Z more explicit
+```
+
+Implementation:
+1. Read section carefully
+2. Rewrite for clarity
+3. Add examples if helpful
+4. Remove ambiguity
+
+### Removing Content
+
+**Remove outdated:**
+```
+Remove deprecated command X
+Delete outdated section Y
+Drop old workflow Z
+```
+
+Implementation:
+1. Locate content
+2. Verify it's outdated (check --help or docs)
+3. Remove completely or mark deprecated
+4. Update related sections
+
+### Restructuring
+
+**Reorganize:**
+```
+Reorganize sections for better flow
+Split section X into subsections
+Merge related sections Y and Z
+```
+
+Implementation:
+1. Plan new structure
+2. Move content systematically
+3. Update cross-references
+4. Verify logical flow
+
 ## Quick Reference
 
 | Task | Command |
 |------|---------|
-| Update specific skill | `/update-skill <skill-name>` |
-| Update all skills | `/update-skill` |
+| Add feature to skill | `/update-skill <name> add <feature>` |
+| Change skill behavior | `/update-skill <name> change <aspect>` |
+| Improve documentation | `/update-skill <name> improve <section>` |
+| Remove outdated content | `/update-skill <name> remove <content>` |
+| Verify CLI syntax | `/update-skill <name>` |
+| Verify all skills | `/update-skill` |
 | List skills | `ls ai/skills/*/SKILL.md` |
-| Verify command | `<command> --help` |
-| Check man page | `man <command>` |
+| Check command syntax | `<command> --help` |
 | Read skill | `Read ai/skills/<name>/SKILL.md` |
 | Update skill | `Edit ai/skills/<name>/SKILL.md` |
