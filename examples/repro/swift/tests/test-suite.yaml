@@ -1,0 +1,284 @@
+version: "0.5"
+
+environment:
+  - "IOS_DEVICE=${IOS_DEFAULT_DEVICE:-max}"
+  - "SUITE_NAME=ios-e2e"
+
+log_location: "reports/ios-e2e-logs"
+log_level: info
+is_strict: true
+
+processes:
+  # Phase 0: Setup - ensure iOS environment is ready
+  setup-sdk:
+    command: |
+      set -e
+      _step="setup-sdk"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+
+      if [ -n "${IOS_SCRIPTS_DIR:-}" ] && [ -f "${IOS_SCRIPTS_DIR}/user/setup.sh" ]; then
+        bash "${IOS_SCRIPTS_DIR}/user/setup.sh"
+      elif [ -n "${IOS_SCRIPTS_DIR:-}" ] && [ -f "${IOS_SCRIPTS_DIR}/init/setup.sh" ]; then
+        if ! . "${IOS_SCRIPTS_DIR}/init/setup.sh"; then
+          echo "❌ [ERROR] iOS setup failed" >&2
+          printf 'fail\niOS init/setup.sh failed\n' > "$_step_dir/$_step.status"
+          exit 1
+        fi
+      fi
+      echo "pass" > "$_step_dir/$_step.status"
+    availability:
+      restart: "no"
+
+  # Phase 1: Build app (depends on simulator so runtime is installed)
+  build-app:
+    depends_on:
+      verify-simulator-ready:
+        condition: process_completed_successfully
+    command: |
+      set -e
+      _step="build-app"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
+      # Source iOS setup (process-compose processes have isolated environments)
+      if [ -n "${IOS_SCRIPTS_DIR:-}" ] && [ -f "${IOS_SCRIPTS_DIR}/init/setup.sh" ]; then
+        . "${IOS_SCRIPTS_DIR}/init/setup.sh"
+      fi
+
+      DERIVED_DATA="${DEVBOX_PROJECT_ROOT:-.}/.devbox/virtenv/ios/DerivedData"
+      mkdir -p "$DERIVED_DATA"
+      xcodebuild -project ios.xcodeproj -scheme ios \
+        -configuration Debug \
+        -destination "generic/platform=iOS Simulator" \
+        -derivedDataPath "$DERIVED_DATA" \
+        build
+
+      echo "pass" > "$_step_dir/$_step.status"
+    availability:
+      restart: "no"
+
+  # Phase 2: Sync simulators - ensure all simulators match device definitions
+  sync-simulators:
+    depends_on:
+      setup-sdk:
+        condition: process_completed_successfully
+    command: "ios.sh devices sync"
+    availability:
+      restart: "no"
+
+  # Phase 3: Start simulator (runs concurrently with build)
+  ios-simulator:
+    command: |
+      set -e
+      if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
+        ios.sh simulator start --pure ${IOS_DEVICE}
+      else
+        ios.sh simulator start ${IOS_DEVICE}
+      fi
+      # Keep process alive for readiness probe (process-compose services pattern)
+      tail -f /dev/null
+    depends_on:
+      sync-simulators:
+        condition: process_completed_successfully
+    availability:
+      restart: "no"
+    readiness_probe:
+      exec:
+        command: "ios.sh simulator ready"
+      initial_delay_seconds: 5
+      period_seconds: 5
+      timeout_seconds: 10
+      success_threshold: 1
+      failure_threshold: 36
+
+  # Phase 3b: Verify simulator ready (timeout safety net)
+  verify-simulator-ready:
+    command: |
+      set -e
+      _step="simulator-boot"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+
+      # Wait a moment for launch to start
+      sleep 3
+
+      echo "Verifying simulator is ready..."
+      max_wait=180
+      elapsed=0
+      while ! ios.sh simulator ready 2>/dev/null; do
+        sleep 2
+        elapsed=$((elapsed + 2))
+        echo "  Waiting for simulator... ${elapsed}s/${max_wait}s"
+        if [ $elapsed -ge $max_wait ]; then
+          printf 'fail\nTimed out after %ds waiting for simulator to boot\n' "$max_wait" > "$_step_dir/$_step.status"
+          exit 1
+        fi
+      done
+      echo "Simulator ready"
+
+      echo "pass" > "$_step_dir/$_step.status"
+    depends_on:
+      sync-simulators:
+        condition: process_completed_successfully
+    availability:
+      restart: "no"
+
+  # Phase 4: Deploy app - depends on both build and simulator
+  deploy-app:
+    command: |
+      set -e
+      _step="deploy-app"
+      _step_dir="reports/steps"
+      mkdir -p "$_step_dir"
+      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
+      ios.sh deploy
+
+      echo ""
+      echo "Waiting for app to start..."
+      max_attempts=10
+      attempt=0
+      while [ $attempt -lt $max_attempts ]; do
+        if ios.sh app status; then
+          echo "App is running"
+          echo "pass" > "$_step_dir/$_step.status"
+          exit 0
+        fi
+        attempt=$((attempt + 1))
+        echo "  Attempt $attempt/$max_attempts..."
+        sleep 2
+      done
+
+      printf 'fail\nApp did not start within timeout\n' > "$_step_dir/$_step.status"
+      exit 1
+    depends_on:
+      build-app:
+        condition: process_completed_successfully
+      verify-simulator-ready:
+        condition: process_completed_successfully
+    availability:
+      restart: "no"
+
+  # Phase 5: Verify app is running, healthy, and survives soak period
+  verify-app-running:
+    command: |
+      set -e
+      _step="verify-app"
+      _step_dir="reports/steps"
+      _logs_dir="reports/logs"
+      mkdir -p "$_step_dir" "$_logs_dir"
+
+      UDID=$(cat "${IOS_RUNTIME_DIR:-/tmp}/ios-e2e/simulator-udid.txt" 2>/dev/null || cat "${IOS_RUNTIME_DIR:-/tmp}/${SUITE_NAME:-ios-e2e}/simulator-udid.txt" 2>/dev/null || true)
+
+      # Initial liveness check
+      if ! ios.sh app status; then
+        echo "FAIL: App is not running"
+        if [ -n "$UDID" ]; then
+          xcrun simctl spawn "$UDID" log show --predicate 'process == "ios" AND (eventMessage contains "crash" OR eventMessage contains "fatal" OR eventMessage contains "terminate")' --last 5m --style compact > "$_logs_dir/simulator-crash.log" 2>&1 || true
+          echo "Simulator crash logs: $_logs_dir/simulator-crash.log"
+        fi
+        printf 'fail\nApp not found in running processes\n' > "$_step_dir/$_step.status"
+        exit 1
+      fi
+
+      # Soak period — verify app survives for 10 seconds
+      echo "App process is running, starting soak period (10s)..."
+      sleep 10
+
+      if ! ios.sh app status; then
+        echo "FAIL: App crashed during soak period"
+        if [ -n "$UDID" ]; then
+          xcrun simctl spawn "$UDID" log show --predicate 'process == "ios" AND (eventMessage contains "crash" OR eventMessage contains "fatal" OR eventMessage contains "terminate")' --last 5m --style compact > "$_logs_dir/simulator-crash.log" 2>&1 || true
+          echo "Simulator crash logs: $_logs_dir/simulator-crash.log"
+        fi
+        printf 'fail\nApp crashed during soak period\n' > "$_step_dir/$_step.status"
+        exit 1
+      fi
+
+      # Capture simulator logs for analysis
+      if [ -n "$UDID" ]; then
+        # Filter logs to only our test app process to avoid false positives from system services
+        xcrun simctl spawn "$UDID" log show --last 2m --predicate 'process == "ios"' --style compact > "$_logs_dir/simulator-app.log" 2>&1 || true
+
+        # Scan for native crash patterns (only in our app's logs)
+        error_patterns="Terminating app|SIGABRT|EXC_BAD_ACCESS|EXC_CRASH|Assertion failure"
+        if grep -qiE "$error_patterns" "$_logs_dir/simulator-app.log" 2>/dev/null; then
+          echo ""
+          echo "FAIL: Crash/error patterns detected in simulator logs"
+          echo "--- Error lines ---"
+          grep -iE "$error_patterns" "$_logs_dir/simulator-app.log" | head -20
+          echo "---"
+          echo "Full logs: $_logs_dir/simulator-app.log"
+          printf 'fail\nCrash patterns detected in simulator logs\n' > "$_step_dir/$_step.status"
+          exit 1
+        fi
+      fi
+
+      echo "pass" > "$_step_dir/$_step.status"
+      echo "App verified healthy (process alive, no crashes detected)"
+      [ -f "$_logs_dir/simulator-app.log" ] && echo "App logs: $_logs_dir/simulator-app.log"
+    depends_on:
+      deploy-app:
+        condition: process_completed_successfully
+    availability:
+      restart: "no"
+
+  # Cleanup - capture final logs, then stop everything in pure mode
+  cleanup:
+    command: |
+      _step_dir="reports/steps"
+      _logs_dir="reports/logs"
+      mkdir -p "$_logs_dir"
+
+      # Check if app verification succeeded
+      app_verify_failed=false
+      if [ -f "$_step_dir/verify-app.status" ]; then
+        verify_status=$(head -n1 "$_step_dir/verify-app.status")
+        if [ "$verify_status" = "fail" ]; then
+          app_verify_failed=true
+          echo "App verification failed, skipping log capture"
+        fi
+      fi
+
+      # Only capture logs if verification succeeded
+      if [ "$app_verify_failed" = false ]; then
+        UDID=$(cat "${IOS_RUNTIME_DIR:-/tmp}/ios-e2e/simulator-udid.txt" 2>/dev/null || cat "${IOS_RUNTIME_DIR:-/tmp}/${SUITE_NAME:-ios-e2e}/simulator-udid.txt" 2>/dev/null || true)
+        if [ -n "$UDID" ]; then
+          timeout 10s xcrun simctl spawn "$UDID" log show --last 5m --predicate 'process == "ios"' --style compact > "$_logs_dir/simulator-final.log" 2>&1 || true
+          echo "Final simulator logs: $_logs_dir/simulator-final.log"
+        fi
+      fi
+
+      # Stop services (only in pure mode)
+      if [ "${DEVBOX_PURE_SHELL:-}" = "1" ]; then
+        echo "Cleaning up (pure mode)..."
+        ios.sh app stop || true
+        ios.sh simulator stop
+        echo "Cleanup complete"
+      fi
+    depends_on:
+      verify-app-running:
+        condition: process_completed
+    availability:
+      restart: "no"
+
+  # Summary - reports per-step pass/fail
+  summary:
+    command: |
+      set -e
+      export REPO_ROOT="$(cd ../.. && pwd)"
+      . "$REPO_ROOT/plugins/tests/test-framework.sh"
+      log_test "iOS E2E Test Suite"
+      e2e_report_steps setup-sdk simulator-boot build-app deploy-app verify-app || true
+      test_summary "ios-e2e"
+    depends_on:
+      cleanup:
+        condition: process_completed
+    availability:
+      restart: "no"
+      exit_on_end: true
+    shutdown:
+      signal: 15
+      timeout_seconds: 1
