@@ -33,3 +33,16 @@ examples/*/test-results/
 plugins/*/tests/reports/
 plugins/*/tests/test-results/
 notes/
+
+# AI-generated artifacts (don't commit these)
+*DIAGNOSIS*.md
+*ANALYSIS*.md
+*SUMMARY*.md
+*DEBUG*.md
+*REPORT*.md
+claude_conversation_*
+chatgpt_export_*
+conversation_*.md
+transcript_*
+scratch_*
+draft_*
