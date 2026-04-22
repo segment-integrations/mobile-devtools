@@ -137,11 +137,12 @@ echo -e "${BLUE}Compressing...${NC}"
 cd "$TEMP_DIR"
 zip -r "$ARCHIVE_PATH" "$ARCHIVE_NAME" > /dev/null
 
-# Clean up
-rm -rf "$TEMP_DIR"
-
-# Get file size
+# Get file size before cleanup
 FILE_SIZE=$(du -h "$ARCHIVE_PATH" | cut -f1)
+
+# Clean up and return to original directory
+rm -rf "$TEMP_DIR"
+cd "$REPRO_DIR"
 
 echo ""
 echo -e "${GREEN}✅ Archive created successfully!${NC}"
