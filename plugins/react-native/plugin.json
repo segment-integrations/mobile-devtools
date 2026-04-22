@@ -37,7 +37,9 @@
     "{{ .Virtenv }}/scripts/lib/lib.sh": "virtenv/scripts/lib/lib.sh",
     "{{ .Virtenv }}/scripts/user/rn.sh": "virtenv/scripts/user/rn.sh",
     "{{ .Virtenv }}/scripts/user/metro.sh": "virtenv/scripts/user/metro.sh",
-    "{{ .Virtenv }}/scripts/user/setup.sh": "virtenv/scripts/user/setup.sh"
+    "{{ .Virtenv }}/scripts/user/setup.sh": "virtenv/scripts/user/setup.sh",
+    "{{ .Virtenv }}/scripts/lib/doctor.sh": "virtenv/scripts/lib/doctor.sh",
+    "{{ .Virtenv }}/scripts/user/doctor.sh": "virtenv/scripts/user/doctor.sh"
   },
   "shell": {
     "init_hook": [
@@ -55,25 +57,7 @@
         "rn.sh metro clean ${1:-default}"
       ],
       "doctor": [
-        "echo 'React Native Environment Check'",
-        "echo '=============================='",
-        "echo ''",
-        "command -v node >/dev/null 2>&1 && echo '✓ Node.js is available' || echo '✗ Node.js not found'",
-        "command -v npm >/dev/null 2>&1 && echo '✓ npm is available' || echo '✗ npm not found'",
-        "command -v watchman >/dev/null 2>&1 && echo '✓ Watchman is available' || echo '⚠ Watchman not found (recommended for React Native)'",
-        "echo ''",
-        "echo '--- Android ---'",
-        "test -n \"${ANDROID_SDK_ROOT}\" && echo '✓ ANDROID_SDK_ROOT is set' || echo '✗ ANDROID_SDK_ROOT is not set'",
-        "test -d \"${ANDROID_SDK_ROOT}\" && echo '✓ ANDROID_SDK_ROOT directory exists' || echo '✗ ANDROID_SDK_ROOT directory does not exist'",
-        "command -v adb >/dev/null 2>&1 && echo '✓ adb is in PATH' || echo '✗ adb is not in PATH'",
-        "command -v emulator >/dev/null 2>&1 && echo '✓ emulator is in PATH' || echo '✗ emulator is not in PATH'",
-        "ls -1 ${ANDROID_DEVICES_DIR}/*.json 2>/dev/null | wc -l | xargs echo '  Device count:'",
-        "echo ''",
-        "echo '--- iOS ---'",
-        "xcrun --show-sdk-path >/dev/null 2>&1 && echo '✓ Xcode command line tools available' || echo '✗ Xcode command line tools not found'",
-        "command -v xcrun >/dev/null 2>&1 && echo '✓ xcrun is in PATH' || echo '✗ xcrun is not in PATH'",
-        "xcrun simctl list devices >/dev/null 2>&1 && echo '✓ xcrun simctl working' || echo '✗ xcrun simctl not working'",
-        "ls -1 ${IOS_DEVICES_DIR}/*.json 2>/dev/null | wc -l | xargs echo '  Device count:'"
+        "bash {{ .Virtenv }}/scripts/user/doctor.sh"
       ],
       "verify:setup": [
         "echo 'Verifying React Native setup...'",
