@@ -13,129 +13,214 @@ This is a ready-to-use iOS app for reproducing and debugging issues with the Seg
 
 ## Prerequisites and Installation
 
-This section will walk you through installing everything you need, even if you've never used the terminal before.
+**You need TWO things installed before you can run this example:**
 
-### Step 1: Make Sure You Have macOS
+1. ✅ **Xcode** - Apple's development tools (**NOT included with Devbox - you must install separately**)
+2. ✅ **Devbox** - Environment manager that handles everything else
+
+Follow these steps in order. Each step has inline instructions you can follow right now.
+
+---
+
+## Step 1: Make Sure You Have macOS
 
 iOS development requires macOS. If you're on Windows or Linux, you'll need access to a Mac (physical or virtual).
 
-### Step 2: Install Xcode
+---
 
-Xcode is Apple's development environment for building iOS apps.
+## Step 2: Install Xcode
 
-**Option A: Install from App Store (Recommended for most users)**
-1. Open the **App Store** app on your Mac
-2. Search for **"Xcode"**
-3. Click **Get** or **Install** (it's free, but the download is large - about 15GB)
-4. Wait for installation to complete (this can take 30-60 minutes depending on your internet speed)
-5. Open Xcode once installed and accept the license agreement
-6. Wait for Xcode to install additional components
+**⚠️ IMPORTANT: Xcode is NOT included with Devbox. You must install it separately from the Mac App Store.**
 
-**Option B: Install via Command Line (Advanced users)**
-1. Open **Terminal** (you can find it in Applications → Utilities → Terminal)
-2. Type this command and press Enter:
-   ```bash
-   xcode-select --install
-   ```
-3. Follow the prompts to install Command Line Tools
-4. For the full Xcode app, still use the App Store method above
+Xcode is Apple's development environment. It's about 15 GB and takes 30-60 minutes to download and install.
 
-**Verify Xcode is installed:**
-Open Terminal and type:
+### Install Xcode Now:
+
+**1. Open the App Store**
+   - Look for the **App Store** icon in your dock (blue icon with a white "A")
+   - Or click the Apple menu (top-left) → **App Store**
+
+**2. Search and Install**
+   - In the App Store, search for **"Xcode"**
+   - Click **Get** or **Install** (it's free)
+   - Enter your Apple ID password if prompted
+   - Wait for it to download and install (30-60 minutes depending on internet speed)
+
+**3. Open Xcode Once**
+   - After installation, open Xcode from your Applications folder
+   - Click **Agree** when you see the license agreement
+   - Wait for additional components to install (a few minutes)
+   - You can close Xcode after this
+
+### Verify Xcode Installation:
+
+**Open Terminal:**
+- Press `Command (⌘) + Space` 
+- Type "Terminal" and press Enter
+- A window with black text will open
+
+**Check if Xcode is installed:**
+
+Copy this command, paste it into Terminal, and press Enter:
 ```bash
 xcodebuild -version
 ```
 
-You should see output like:
+**✅ Success looks like:**
 ```
 Xcode 16.2
 Build version 16B5109o
 ```
 
-If you see an error, Xcode isn't installed correctly.
+**❌ If you see an error:**
+- Make sure Xcode finished installing completely
+- Open Xcode once to accept the license
+- Run this command to set it up:
+  ```bash
+  sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+  ```
+- Enter your Mac password when prompted
 
-### Step 3: Install Devbox
+---
 
-Devbox creates isolated development environments so everyone gets the exact same tools and versions.
+## Step 3: Install Devbox
 
-**Installation steps:**
-1. Open Terminal (Applications → Utilities → Terminal)
-2. Copy and paste this command, then press Enter:
-   ```bash
-   curl -fsSL https://get.jetify.com/devbox | bash
-   ```
-3. Wait for the installation to complete (this takes 1-2 minutes)
-4. Close and reopen your Terminal window (important!)
-5. Verify installation by typing:
-   ```bash
-   devbox version
-   ```
-   
-You should see a version number like `0.15.0` or similar.
+Devbox manages iOS simulators and build tools, but **it requires Xcode to be installed first** (from Step 2).
 
-**If you see "command not found":**
-- Make sure you closed and reopened Terminal after installation
-- Try opening a brand new Terminal window
-- Check that the installer completed without errors
+### Install Devbox Now:
 
-**What is Devbox?**
-Devbox is a tool that ensures everyone uses the same development environment. Think of it as a recipe that sets up all the tools you need automatically, in an isolated way that won't mess with other projects on your computer.
+**1. Terminal Should Already Be Open** (from verifying Xcode above)
+   - If not: Press `Command (⌘) + Space`, type "Terminal", press Enter
 
-### Step 4: Clone or Download This Repository
+**2. Run the Installation Command**
 
-If you haven't already, you need to get the mobile-devtools code on your computer.
-
-**Option A: Clone with Git (if you have Git installed)**
+Copy this entire line, paste it into Terminal, and press Enter:
 ```bash
-git clone https://github.com/segment-integrations/mobile-devtools.git
-cd mobile-devtools/examples/repro/swift
+curl -fsSL https://get.jetify.com/devbox | bash
 ```
 
-**Option B: Download as ZIP**
-1. Go to https://github.com/segment-integrations/mobile-devtools
-2. Click the green **Code** button
-3. Click **Download ZIP**
-4. Unzip the file
-5. Open Terminal and navigate to the folder:
-   ```bash
-   cd ~/Downloads/mobile-devtools-main/examples/repro/swift
-   ```
-   (Adjust the path if you saved it somewhere else)
+You'll see text scrolling as it installs. Takes about 1-2 minutes.
 
-**Verify you're in the right directory:**
-Type this in Terminal:
+**3. Close and Reopen Terminal (CRITICAL!)**
+   - Click **Terminal** menu → **Quit Terminal**
+   - Press `Command (⌘) + Space`, type "Terminal", press Enter again
+   - This step is required for Devbox to work!
+
+### Verify Devbox Installation:
+
+In the new Terminal window, type this and press Enter:
+```bash
+devbox version
+```
+
+**✅ Success looks like:**
+```
+0.15.0
+```
+
+**❌ If you see "command not found":**
+- Did you close and reopen Terminal? (Most common issue!)
+- Quit Terminal completely (Command + Q) and open a fresh window
+- If still broken, re-run the curl command from step 2 above
+
+---
+
+## Step 4: Download the Code
+
+### Download Now:
+
+**1. Download the Repository**
+   - Go to: https://github.com/segment-integrations/mobile-devtools
+   - Click the green **Code** button
+   - Click **Download ZIP**
+   - Wait for download to complete (file will be in your Downloads folder)
+
+**2. Unzip the File**
+   - Go to your Downloads folder
+   - Double-click `mobile-devtools-main.zip`
+   - You'll see a new folder: `mobile-devtools-main`
+
+**3. Navigate to the Swift Example in Terminal**
+
+Copy and paste this into Terminal and press Enter:
+```bash
+cd ~/Downloads/mobile-devtools-main/examples/repro/swift
+```
+
+**If you saved it somewhere else:** Replace `~/Downloads` with the actual folder location.
+
+### Verify You're in the Right Place:
+
+Type this and press Enter:
 ```bash
 ls
 ```
 
-You should see files like `README.md`, `devbox.json`, and an `ios` folder.
-
-## Quick Start - Running the App
-
-Now that everything is installed, let's run the example app. This will automatically set up the environment, build the app, boot a simulator, and launch it.
-
-**Step 1: Open Terminal and navigate to the Swift example directory**
-```bash
-cd path/to/mobile-devtools/examples/repro/swift
+**✅ You should see:**
+```
+Config.example.swift
+README.md
+devbox.json
+ios/
+ios.xcodeproj/
+scripts/
+tests/
 ```
 
-Replace `path/to/mobile-devtools` with the actual location where you downloaded or cloned the repository.
+If you see these files, you're ready to run the app! ✅
 
-**Step 2: Run the app**
-Type this command and press Enter:
+---
+
+## Quick Start - Run the App
+
+You're now in the Swift example directory with Xcode and Devbox installed. Let's run it!
+
+### Run the App Now:
+
+Copy this command and paste it into Terminal, then press Enter:
 ```bash
 devbox run --pure start:app
 ```
 
-**What happens when you run this command:**
-1. Devbox creates an isolated environment with all necessary tools
-2. It builds the iOS app from source code
-3. It starts an iOS simulator (a virtual iPhone on your Mac)
-4. It installs and launches the app on that simulator
+### What Happens Next:
 
-**How long does this take?**
-- First time: 5-10 minutes (it downloads and sets up everything)
-- After that: 1-2 minutes (much faster!)
+**First time (slow - 5-10 minutes):**
+- Devbox sets up the environment
+- Downloads iOS simulators
+- Builds the app
+- Launches iPhone simulator
+- Installs and opens the app
+
+**After first time (fast - 1-2 minutes):**
+- Just builds and launches
+
+**You'll see:**
+- Lots of text scrolling in Terminal (that's normal!)
+- An iPhone simulator window will open
+- The app will launch with buttons you can tap
+
+### When the App Launches:
+
+You'll see an iPhone screen with:
+- **Track Event** button - Tap to send an event
+- **Identify User** button - Tap to identify a user
+- **Track Screen** button - Tap to track a screen view
+- **Amplitude Toggle** - Switch to enable Amplitude destination
+
+**Watch Terminal for Event Logs:**
+When you tap buttons, Terminal will show:
+```
+📊 Track Event: Button Pressed
+   Properties: {"button": "Track Event", "count": 1}
+```
+
+**Congratulations!** 🎉 You're now running the Swift repro example!
+
+---
+
+## What Does `--pure` Mean?
+
+The `--pure` flag tells Devbox to use a completely isolated environment with no interference from other tools on your Mac. This ensures everyone sees the same behavior.
 
 **What you should see:**
 - Terminal will show build progress messages
