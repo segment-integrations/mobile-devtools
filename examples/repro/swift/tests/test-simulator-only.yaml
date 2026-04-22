@@ -1,0 +1,76 @@
+version: "0.5"
+
+log_location: "reports/simulator-test-logs"
+log_level: info
+
+processes:
+  ios-simulator:
+    command: |
+      set -e
+      echo "[SIMULATOR-ONLY] Starting simulator..."
+
+      # Ensure reports/logs directory exists
+      mkdir -p reports/logs
+
+      device="${IOS_DEFAULT_DEVICE:-max}"
+
+      # Start simulator in pure mode (capture output to extract UDID)
+      output=$(ios.sh simulator start --pure "$device" 2>&1)
+      echo "$output"
+
+      # Extract UDID from output line like: "Test simulator ready: iPhone 17 (iOS 26.2) Test (UDID)"
+      sim_udid=$(echo "$output" | grep -oE '[0-9A-F]{8}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{4}-[0-9A-F]{12}' | tail -1)
+
+      if [ -z "$sim_udid" ]; then
+        echo "ERROR: No simulator UDID found in output"
+        exit 1
+      fi
+
+      echo "Simulator started: $sim_udid"
+      echo "$sim_udid" > reports/logs/ios-sim-udid.txt
+
+      # Wait for simulator to be ready
+      echo "Waiting for simulator to boot..."
+      xcrun simctl bootstatus "$sim_udid" -b || true
+
+      echo "✓ Simulator is ready"
+    availability:
+      restart: "no"
+    readiness_probe:
+      exec:
+        command: |
+          udid=$(cat reports/logs/ios-sim-udid.txt 2>/dev/null || echo "")
+          if [ -z "$udid" ]; then
+            exit 1
+          fi
+          # Check if simulator is booted
+          state=$(xcrun simctl list devices -j | jq -r --arg udid "$udid" '.devices[]?[]? | select(.udid == $udid) | .state' | head -n1)
+          [ "$state" = "Booted" ]
+      initial_delay_seconds: 5
+      period_seconds: 5
+      timeout_seconds: 10
+      success_threshold: 1
+      failure_threshold: 24
+
+  cleanup:
+    depends_on:
+      ios-simulator:
+        condition: process_completed
+    command: |
+      echo "[CLEANUP] Cleaning up test simulator..."
+
+      # Get simulator UDID
+      sim_udid=$(cat reports/logs/ios-sim-udid.txt 2>/dev/null || echo "")
+
+      if [ -n "$sim_udid" ]; then
+        echo "Stopping simulator: $sim_udid"
+        xcrun simctl shutdown "$sim_udid" >/dev/null 2>&1 || true
+
+        echo "Deleting simulator: $sim_udid"
+        xcrun simctl delete "$sim_udid" >/dev/null 2>&1 || true
+
+        rm -f reports/logs/ios-sim-udid.txt
+        echo "✓ Cleanup complete"
+      else
+        echo "No simulator to clean up"
+      fi

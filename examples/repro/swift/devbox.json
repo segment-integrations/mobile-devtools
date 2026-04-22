@@ -1,0 +1,31 @@
+{
+  "include": ["path:../../../plugins/ios/plugin.json"],
+  "packages": {
+    "process-compose": "latest"
+  },
+  "env": {
+    "IOS_APP_ARTIFACT": "DerivedData/Build/Products/Debug-iphonesimulator/ios.app"
+  },
+  "shell": {
+    "scripts": {
+      "build": [
+        "ios.sh xcodebuild -project ios.xcodeproj -scheme ios -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData build"
+      ],
+      "build:release": [
+        "ios.sh xcodebuild -project ios.xcodeproj -scheme ios -configuration Release -derivedDataPath DerivedData build"
+      ],
+      "build:clean": [
+        "rm -rf DerivedData"
+      ],
+      "start:app": [
+        "ios.sh run ${1:-}"
+      ],
+      "test": [
+        "ios.sh xcodebuild -project ios.xcodeproj -scheme ios -destination 'platform=iOS Simulator,name=iPhone 17' test"
+      ],
+      "test:e2e": [
+        "process-compose -f tests/test-suite.yaml --no-server --tui=${TEST_TUI:-false}"
+      ]
+    }
+  }
+}
