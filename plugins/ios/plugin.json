@@ -56,7 +56,8 @@
     "{{ .Virtenv }}/scripts/init/setup.sh": "virtenv/scripts/init/setup.sh",
     "{{ .Virtenv }}/scripts/init/doctor.sh": "virtenv/scripts/init/doctor.sh",
     "{{ .DevboxDir }}/devices/min.json": "config/devices/min.json",
-    "{{ .DevboxDir }}/devices/max.json": "config/devices/max.json"
+    "{{ .DevboxDir }}/devices/max.json": "config/devices/max.json",
+    "{{ .Virtenv }}/scripts/lib/doctor.sh": "virtenv/scripts/lib/doctor.sh"
   },
   "shell": {
     "init_hook": [
