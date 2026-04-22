@@ -99,12 +99,11 @@ Archive Details:
   Name:     swift-repro-a1b2c3d-20260422-143052.zip
   Size:     2.3M
   Location: ~/mobile-devtools/shared-repros/swift-repro-a1b2c3d-20260422-143052.zip
-  Commit:   a1b2c3d
 
 Next Steps:
-1️⃣  Upload to Jira: Drag and drop the zip onto the issue
+1️⃣  Upload to Jira: Attach the zip file to the issue
 2️⃣  Or share via email: Attach the zip file
-3️⃣  Or post to Slack: Drag into your message
+3️⃣  Or post to Slack: Upload the file to your message
 ```
 
 ### What's In The Archive
@@ -127,11 +126,9 @@ Files are typically 2-5 MB - small enough to attach anywhere.
 
 **Jira (Recommended):**
 1. Open the Jira issue
-2. Drag the zip file onto the issue page
-3. Add a comment:
+2. Attach the zip file to the issue
+3. Add a comment describing what you changed:
    ```
-   Reproduction attached (commit: a1b2c3d)
-   
    Changes: Modified identify call to match customer setup
    SDK version: 1.6.2
    
@@ -140,13 +137,11 @@ Files are typically 2-5 MB - small enough to attach anywhere.
 
 **Email:**
 - Attach the zip file
-- Include the commit hash in your message
 - Describe what you changed
 
 **Slack:**
-- Drag the zip into the relevant channel
-- Include Jira issue link
-- Brief description of the issue
+- Upload the zip file to the relevant channel
+- Include Jira issue link if applicable
 
 ### For Recipients
 
