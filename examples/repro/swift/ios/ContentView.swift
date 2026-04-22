@@ -19,8 +19,17 @@ struct ContentView: View {
 
     init() {
         // Initialize Segment Analytics
-        let configuration = Configuration(writeKey: Config.segmentWriteKey)
-            .flushInterval(10)
+        var configuration = Configuration(writeKey: Config.segmentWriteKey)
+
+        // Disable flushing when using demo key to avoid errors
+        if Config.isUsingDemoKey {
+            configuration = configuration
+                .flushAt(1000)           // Only flush after 1000 events (effectively disabled)
+                .flushInterval(0)        // Disable time-based flushing
+        } else {
+            configuration = configuration
+                .flushInterval(10)       // Normal flush interval
+        }
 
         self.analytics = Analytics(configuration: configuration)
 
@@ -32,6 +41,7 @@ struct ContentView: View {
 
         print("🚀 Segment Analytics initialized")
         print("   Write Key: \(Config.segmentWriteKey)")
+        print("   Mode: \(Config.isUsingDemoKey ? "Demo (events queued locally)" : "Live (sending to Segment)")")
         print("   Plugins: ConsoleLogger, IDFA, Amplitude (toggleable)")
     }
 

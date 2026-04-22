@@ -9,6 +9,3 @@ DerivedData/
 *.moved-aside
 *.xccheckout
 *.xcscmblueprint
-
-# Segment configuration (contains write keys)
-ios/Config.swift
