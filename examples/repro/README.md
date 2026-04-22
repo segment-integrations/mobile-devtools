@@ -1,6 +1,6 @@
 # Bug Reproduction Examples
 
-This directory contains pre-configured, minimal apps for reproducing Segment SDK issues. These examples are designed for customer support, CSMs, and developers who need to quickly reproduce and diagnose bugs.
+Pre-configured, minimal apps for reproducing Segment SDK issues. These examples help customer support, CSMs, and engineers quickly reproduce and diagnose bugs in a consistent environment.
 
 ## Available Examples
 
@@ -8,148 +8,124 @@ This directory contains pre-configured, minimal apps for reproducing Segment SDK
 
 Fully-configured iOS app for reproducing Segment Analytics Swift SDK issues.
 
-**What's included:**
-- Segment Analytics Swift SDK (v1.6.2+)
-- Amplitude destination plugin (v1.2.0+)
-- ConsoleLogger custom plugin for debugging
-- Interactive UI with track, identify, and screen buttons
-- Gitignored config file for API keys
-- Project-local build isolation
+**Includes:** Amplitude destination, ConsoleLogger, interactive UI
 
-**Quick start:**
-```bash
-cd swift
-devbox run --pure start:app
-```
+**Quick links:**
+- [Prerequisites & Installation](./swift/README.md#prerequisites-and-installation) - Installing Xcode and Devbox
+- [Quick Start](./swift/README.md#quick-start---run-the-app) - Running the app
+- [Creating Bug Reproductions](./swift/README.md#how-to-create-bug-reproductions) - Workflow for reproducing issues
+- [Full Documentation](./swift/README.md) - Complete guide
 
 ## Purpose
 
-These examples serve multiple audiences:
-
 ### For Customer Support and CSMs
 
-When a customer reports a bug, you can:
-1. Modify the example to match the customer's use case
-2. Run `devbox run --pure start:app` to reproduce the issue
-3. Share the reproduction with engineering
-4. Test fixes across different SDK versions
+When a customer reports a bug:
+1. Use an example that matches their SDK (Swift, Android, React Native)
+2. Modify the code to replicate their exact use case
+3. Run the reproduction to confirm the issue
+4. Share the packaged reproduction with engineering (one command!)
+5. Test fixes across different SDK versions
 
-No Xcode configuration needed. No manual simulator setup. Just run the command.
+No need to set up development environments from scratch - everything is pre-configured.
 
 ### For Customers
 
-Customers can use these as templates when reporting issues:
+Use these examples as templates when reporting issues:
 1. Clone this repository
-2. Modify the example to demonstrate their bug
-3. Share the modified code with support
-4. Everyone sees the same behavior (reproducible environment)
+2. Modify the example to demonstrate the bug
+3. Share it with support
+4. Everyone sees identical behavior (reproducible environment)
+
+This eliminates "works on my machine" problems.
 
 ### For Engineering
 
-Use these examples to:
 - Validate bug reports with exact reproduction steps
 - Test fixes across different SDK versions
 - Create regression tests
-- Verify behavior across iOS/Android platforms
+- Verify behavior is consistent across platforms
 
 ## Why Devbox?
 
-**Reproducibility:** Everyone runs the exact same toolchain (Xcode, SDKs, simulators). No "works on my machine" problems.
+**Reproducibility:** Everyone runs the exact same toolchain. No "works on my machine" problems.
 
-**Isolation:** Each example has its own build directory and configuration. No global state pollution.
+**Isolation:** Each example has its own build directory and configuration. Multiple reproductions can coexist without conflicts.
 
-**Speed:** CSMs and support engineers can reproduce issues in seconds, without manual Xcode installation or simulator setup.
+**Speed:** Run reproductions in minutes without manual environment setup.
 
 **Consistency:** CI, developers, and support all use identical environments.
 
-**Simplicity:** One command (`devbox run --pure start:app`) builds and launches the app. No prerequisite knowledge required.
-
-## Prerequisites
-
-**You need TWO things installed:**
-
-1. **Xcode** (macOS only) - Required for iOS examples. **NOT included with Devbox - install separately from App Store.**
-2. **Devbox** - Handles SDKs, simulators, and other dependencies.
-
-### Install Xcode (for iOS examples)
-
-- Open the Mac App Store
-- Search for "Xcode" and install (free, ~15 GB, takes 30-60 min)
-- Open Xcode once to accept the license
-- Verify: `xcodebuild -version`
-
-### Install Devbox
-
-```bash
-# macOS/Linux
-curl -fsSL https://get.jetify.com/devbox | bash
-
-# IMPORTANT: Close and reopen Terminal after installation!
-
-# Verify installation
-devbox version
-```
-
-**Note:** Devbox handles simulators and build tools, but requires Xcode for iOS development.
+**Simplicity:** One command (`devbox run --pure start:app`) to build and launch.
 
 ## General Workflow
 
-### 1. Start with a Clean Example
+This is the conceptual workflow for using any reproduction example. See the specific example's README for detailed commands.
 
-```bash
-cd swift  # or another example
-devbox run --pure build:clean
-```
+### 1. Choose an Example
 
-### 2. Configure for the Customer
+Pick the example matching the customer's SDK:
+- `swift/` - iOS apps using Analytics Swift SDK
+- (Future: `android/`, `react-native/`, etc.)
 
-Update the config file with customer-specific details:
-```bash
-# Swift example
-cp Config.example.swift ios/Config.swift
-# Edit ios/Config.swift with customer's write key
-```
+### 2. Set Up Your Environment
+
+Each example's README has specific installation instructions. Generally you need:
+- Platform tools (Xcode for iOS, Android Studio for Android, etc.)
+- Devbox (handles SDKs, simulators, dependencies)
 
 ### 3. Modify the Code
 
 Update the example to match the customer's issue:
-- Change event names
-- Adjust properties
-- Add/remove plugins
 - Replicate their SDK configuration
+- Use their event names and properties
+- Add/remove plugins they're using
+- Match their SDK version
 
 ### 4. Reproduce the Issue
 
+Run the example and observe the behavior:
 ```bash
 devbox run --pure start:app
 ```
 
-Watch the console output for debugging information.
+Watch console output for debugging information. The examples include logging plugins that show exactly what's being sent to Segment.
 
 ### 5. Test Across SDK Versions
 
-Each example includes package managers (SPM for Swift, Gradle for Android) that let you test different SDK versions:
-- Update the version in the package configuration
-- Rebuild and retest
+Change the SDK version in the package configuration and rebuild:
 - Identify when the bug was introduced
+- Verify fixes work across versions
+- Test with customer's exact SDK version
 
 ### 6. Share the Reproduction
 
-Use the built-in share command to package your reproduction:
+Package everything for sharing using the built-in share command:
 ```bash
 devbox run share
 ```
 
-**What it does:**
-- ✅ Auto-commits your changes (no Git knowledge needed!)
-- ✅ Creates a zip file with everything needed to reproduce
-- ✅ Names file with commit hash + timestamp for easy identification
-- ✅ Excludes build artifacts (keeps file size small)
-- ✅ Includes setup instructions (REPRO-INFO.txt)
-- ✅ Shows you exactly where the file is saved
+This automatically:
+- ✅ Commits your changes (no Git knowledge needed)
+- ✅ Creates a zip archive with timestamp and commit hash
+- ✅ Excludes build artifacts (keeps file small)
+- ✅ Includes setup instructions
+- ✅ Shows where the file is saved
 - ✅ Copies path to clipboard (macOS)
 
-**Example output:**
+## Sharing Reproductions
+
+Every example includes a `share` command that packages reproductions for easy sharing via Jira, email, or Slack.
+
+### Quick Share
+
+```bash
+cd swift  # or another example
+# Make your changes to reproduce the issue
+devbox run share
+```
+
+**Output:**
 ```
 ✅ Archive created successfully!
 
@@ -165,156 +141,131 @@ Next Steps:
 3️⃣  Or post to Slack: Drag into your message
 ```
 
-**Uploading to Jira:**
+### What's In The Archive
+
+Each package contains:
+- All source code showing the issue
+- Project configuration (devbox.json, etc.)
+- Setup instructions (REPRO-INFO.txt)
+- Git patch showing your exact changes
+
+Excludes:
+- Build artifacts (DerivedData, build/, etc.)
+- Git history
+- Devbox cache
+- Dependencies (node_modules, Pods, etc.)
+
+Files are typically 2-5 MB - small enough to attach anywhere.
+
+### How to Share
+
+**Jira (Recommended):**
 1. Open the Jira issue
-2. Click **Attach** or drag the zip file onto the page
+2. Drag the zip file onto the issue page
 3. Add a comment:
    ```
-   Reproduction case attached (commit: a1b2c3d)
+   Reproduction attached (commit: a1b2c3d)
    
-   Changes made:
-   - Modified identify call to match customer setup
-   - Using SDK version 1.6.2
+   Changes: Modified identify call to match customer setup
+   SDK version: 1.6.2
    
    To run: Extract and run "devbox run --pure start:app"
    ```
 
-**Sharing via Email/Slack:**
-Just attach or drag the zip file and mention the commit hash from the output.
-
-The recipient can extract the zip and immediately run `devbox run --pure start:app` - everything is included!
-
-**Manual sharing (if needed):**
-If the share command isn't available, you can still share manually:
-```bash
-git add .
-git commit -m "Reproduce: customer issue description"
-git format-patch -1 HEAD --stdout > repro.patch
-```
-Then share the patch file.
-
-## What Makes These Examples Special
-
-**Minimal:** Only the essential code to demonstrate SDK functionality. No clutter, no distractions.
-
-**Interactive:** UI buttons to trigger SDK methods. Immediate feedback via console logging.
-
-**Secure:** API keys stored in gitignored config files. Safe to commit reproductions without exposing credentials.
-
-**Isolated:** Project-local build artifacts. Multiple reproductions can coexist without conflicts.
-
-**Debuggable:** Custom plugins log all SDK activity to the console. See exactly what's being sent to Segment.
-
-**Pure Mode:** The `--pure` flag ensures a clean environment with no inherited state from your system.
-
-**Easy Sharing:** Built-in `share` command packages reproductions for Jira, email, or Slack - no Git knowledge required.
-
-## Sharing Made Easy
-
-All reproduction examples include a `share` command that makes it trivial to package and share reproductions, even for non-technical team members.
-
-### How It Works
-
-```bash
-cd swift  # or any other example
-# Make your changes to reproduce the issue
-devbox run share
-```
-
-The share command automatically:
-1. **Commits changes** - No need to know Git commands
-2. **Creates archive** - Zip file with meaningful name (commit-hash-timestamp)
-3. **Excludes bloat** - No build artifacts, only source code
-4. **Adds instructions** - Includes REPRO-INFO.txt with setup steps
-5. **Shows location** - Tells you exactly where the file is
-6. **Copies path** - Clipboard integration on macOS
-
-### What's In The Archive
-
-Each shared reproduction package contains:
-- All source code showing the issue
-- Project configuration (devbox.json, Xcode project, etc.)
-- Device/simulator definitions
-- **REPRO-INFO.txt** - Instructions for running the reproduction
-- **changes.patch** - Git patch showing exactly what was modified
-
-The archive excludes:
-- Build artifacts (DerivedData, build/, etc.)
-- Git history (.git/)
-- Devbox cache (.devbox/)
-- Node modules, Pods, etc.
-
-This keeps files small (typically 2-5 MB) while including everything needed to run the reproduction.
-
-### Where To Share
-
-**Jira (Primary Method):**
-1. Drag the zip file onto the Jira issue
-2. Add a comment with the commit hash
-3. Describe what you changed
-
 **Email:**
 - Attach the zip file
-- Mention commit hash in email body
-- CC relevant team members
+- Include the commit hash in your message
+- Describe what you changed
 
 **Slack:**
-- Drag zip into relevant channel
+- Drag the zip into the relevant channel
 - Include Jira issue link
 - Brief description of the issue
 
 ### For Recipients
 
-Anyone receiving a shared reproduction can:
+Anyone receiving a reproduction can run it immediately:
+
 ```bash
-# Extract the zip file
+# Extract
 unzip swift-repro-a1b2c3d-20260422-143052.zip
 cd swift-repro-a1b2c3d-20260422-143052
 
-# Install devbox if needed
+# Install Devbox if needed (one-time)
 curl -fsSL https://get.jetify.com/devbox | bash
 
-# Run the reproduction
+# Run
 devbox run --pure start:app
 ```
 
-Everything is included and ready to run. No setup needed.
+Everything needed is included. No manual setup required.
+
+## What Makes These Examples Special
+
+**Minimal:** Only the essential code to demonstrate SDK functionality. No clutter.
+
+**Interactive:** UI buttons trigger SDK methods. Immediate visual feedback.
+
+**Secure:** API keys in gitignored files. Safe to commit reproductions without exposing credentials.
+
+**Isolated:** Project-local build artifacts. Multiple reproductions coexist without conflicts.
+
+**Debuggable:** Custom logging plugins show all SDK activity in the console.
+
+**Pure Environment:** The `--pure` flag ensures clean, isolated execution with no system interference.
+
+**One-Command Sharing:** Built-in `share` command packages reproductions - no Git knowledge required.
 
 ## Adding New Examples
 
 When adding a new platform or SDK:
 
-1. Create a new directory (e.g., `android/`, `react-native/`)
-2. Include the mobile-devtools plugin (`devbox.json`)
-3. Add interactive UI with basic SDK operations
-4. Include a custom logging plugin for debugging
+**Required Structure:**
+1. Create directory: `examples/repro/{platform}/`
+2. Include mobile-devtools plugin in `devbox.json`
+3. Add interactive UI with basic SDK operations (track, identify, screen, etc.)
+4. Include custom logging plugin for console debugging
 5. Use gitignored config files for API keys
 6. Configure project-local build output
-7. Add `scripts/share.sh` for easy sharing
-8. Add `share` command to `devbox.json` scripts
-9. Document the quick start workflow
+7. Add `scripts/share.sh` (copy from Swift example)
+8. Add `share` command to `devbox.json` scripts section
 
-Follow the pattern established by the Swift example.
+**Required Documentation:**
+- `README.md` with platform-specific setup instructions
+- Prerequisites (platform tools + Devbox)
+- Quick start guide
+- Troubleshooting section
 
-## Support and Issues
+**Follow the Swift example pattern** - it demonstrates the complete structure.
 
-**For these reproduction examples:**
-- Open an issue in this repository
-- Tag with `reproduction-examples`
+## Getting Started
+
+1. **Choose your example:** Go to the example directory for your SDK (e.g., `cd swift`)
+2. **Follow that README:** Each example has complete, platform-specific setup instructions
+3. **Run the app:** Usually just `devbox run --pure start:app`
+4. **Make changes:** Modify code to reproduce the customer issue
+5. **Share it:** Run `devbox run share` and upload to Jira
+
+Each example's README is self-contained with everything you need.
+
+## Support and Resources
+
+**For reproduction examples:**
+- Issues: [mobile-devtools issues](https://github.com/segment-integrations/mobile-devtools/issues)
+- Tag: `reproduction-examples`
 
 **For Segment SDK bugs:**
-- Use the reproductions from this directory
-- Open issues in the respective SDK repositories
-- Include a link to your reproduction branch
+- Create reproduction using these examples
+- Open issue in SDK repository
+- Attach reproduction zip file
 
-**For Devbox issues:**
-- Check the [Devbox documentation](https://www.jetify.com/devbox/docs/)
-- Open issues in the [Devbox repository](https://github.com/jetify-com/devbox)
+**For Devbox:**
+- [Devbox Documentation](https://www.jetify.com/devbox/docs/)
+- [Devbox Repository](https://github.com/jetify-com/devbox)
 
 ## Related Resources
 
 - [iOS Plugin Reference](../../plugins/ios/REFERENCE.md)
 - [Android Plugin Reference](../../plugins/android/REFERENCE.md)
 - [React Native Plugin Reference](../../plugins/react-native/REFERENCE.md)
-- [Devbox Documentation](https://www.jetify.com/devbox)
 - [Segment Analytics Swift SDK](https://github.com/segmentio/analytics-swift)
