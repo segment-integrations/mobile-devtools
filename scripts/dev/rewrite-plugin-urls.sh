@@ -30,20 +30,16 @@ case "$mode" in
           # Backup original
           cp "$file" "$file.bak"
 
-          # Rewrite URLs using sed (cross-platform)
-          if [[ "$OSTYPE" == "darwin"* ]]; then
-            sed -i '' \
-              -e 's|"github:segment-integrations/mobile-devtools?dir=plugins/android&ref=main"|"path:../../plugins/android/plugin.json"|g' \
-              -e 's|"github:segment-integrations/mobile-devtools?dir=plugins/ios&ref=main"|"path:../../plugins/ios/plugin.json"|g' \
-              -e 's|"github:segment-integrations/mobile-devtools?dir=plugins/react-native&ref=main"|"path:../../plugins/react-native/plugin.json"|g' \
-              "$file"
-          else
-            sed -i \
-              -e 's|"github:segment-integrations/mobile-devtools?dir=plugins/android&ref=main"|"path:../../plugins/android/plugin.json"|g' \
-              -e 's|"github:segment-integrations/mobile-devtools?dir=plugins/ios&ref=main"|"path:../../plugins/ios/plugin.json"|g' \
-              -e 's|"github:segment-integrations/mobile-devtools?dir=plugins/react-native&ref=main"|"path:../../plugins/react-native/plugin.json"|g' \
-              "$file"
-          fi
+          # Rewrite URLs using jq (cross-platform, JSON-safe)
+          jq '.include = (.include | map(
+            if . == "github:segment-integrations/mobile-devtools?dir=plugins/android&ref=main"
+            then "path:../../plugins/android/plugin.json"
+            elif . == "github:segment-integrations/mobile-devtools?dir=plugins/ios&ref=main"
+            then "path:../../plugins/ios/plugin.json"
+            elif . == "github:segment-integrations/mobile-devtools?dir=plugins/react-native&ref=main"
+            then "path:../../plugins/react-native/plugin.json"
+            else . end
+          ))' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
         fi
       done
     fi
@@ -58,17 +54,14 @@ case "$mode" in
         cp "plugins/react-native/plugin.json" "plugins/react-native/plugin.json.bak"
 
         # Rewrite URLs to relative paths from react-native plugin
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-          sed -i '' \
-            -e 's|"github:segment-integrations/mobile-devtools?dir=plugins/android&ref=main"|"path:../android/plugin.json"|g' \
-            -e 's|"github:segment-integrations/mobile-devtools?dir=plugins/ios&ref=main"|"path:../ios/plugin.json"|g' \
-            "plugins/react-native/plugin.json"
-        else
-          sed -i \
-            -e 's|"github:segment-integrations/mobile-devtools?dir=plugins/android&ref=main"|"path:../android/plugin.json"|g' \
-            -e 's|"github:segment-integrations/mobile-devtools?dir=plugins/ios&ref=main"|"path:../ios/plugin.json"|g' \
-            "plugins/react-native/plugin.json"
-        fi
+        jq '.include = (.include | map(
+          if . == "github:segment-integrations/mobile-devtools?dir=plugins/android&ref=main"
+          then "path:../android/plugin.json"
+          elif . == "github:segment-integrations/mobile-devtools?dir=plugins/ios&ref=main"
+          then "path:../ios/plugin.json"
+          else . end
+        ))' "plugins/react-native/plugin.json" > "plugins/react-native/plugin.json.tmp" \
+          && mv "plugins/react-native/plugin.json.tmp" "plugins/react-native/plugin.json"
       fi
     fi
 
@@ -88,20 +81,16 @@ case "$mode" in
         elif grep -q "path:.*plugins/.*/plugin.json" "$file"; then
           echo "    Rewriting: $file"
 
-          # Rewrite URLs using sed (cross-platform)
-          if [[ "$OSTYPE" == "darwin"* ]]; then
-            sed -i '' \
-              -e 's|"path:../../plugins/android/plugin.json"|"github:segment-integrations/mobile-devtools?dir=plugins/android\&ref=main"|g' \
-              -e 's|"path:../../plugins/ios/plugin.json"|"github:segment-integrations/mobile-devtools?dir=plugins/ios\&ref=main"|g' \
-              -e 's|"path:../../plugins/react-native/plugin.json"|"github:segment-integrations/mobile-devtools?dir=plugins/react-native\&ref=main"|g' \
-              "$file"
-          else
-            sed -i \
-              -e 's|"path:../../plugins/android/plugin.json"|"github:segment-integrations/mobile-devtools?dir=plugins/android\&ref=main"|g' \
-              -e 's|"path:../../plugins/ios/plugin.json"|"github:segment-integrations/mobile-devtools?dir=plugins/ios\&ref=main"|g' \
-              -e 's|"path:../../plugins/react-native/plugin.json"|"github:segment-integrations/mobile-devtools?dir=plugins/react-native\&ref=main"|g' \
-              "$file"
-          fi
+          # Rewrite URLs using jq (cross-platform, JSON-safe)
+          jq '.include = (.include | map(
+            if . == "path:../../plugins/android/plugin.json"
+            then "github:segment-integrations/mobile-devtools?dir=plugins/android&ref=main"
+            elif . == "path:../../plugins/ios/plugin.json"
+            then "github:segment-integrations/mobile-devtools?dir=plugins/ios&ref=main"
+            elif . == "path:../../plugins/react-native/plugin.json"
+            then "github:segment-integrations/mobile-devtools?dir=plugins/react-native&ref=main"
+            else . end
+          ))' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
         fi
       done
       # Clean up any remaining backups
@@ -118,17 +107,14 @@ case "$mode" in
       echo "    Rewriting: plugins/react-native/plugin.json"
 
       # Rewrite URLs back to GitHub format
-      if [[ "$OSTYPE" == "darwin"* ]]; then
-        sed -i '' \
-          -e 's|"path:../android/plugin.json"|"github:segment-integrations/mobile-devtools?dir=plugins/android\&ref=main"|g' \
-          -e 's|"path:../ios/plugin.json"|"github:segment-integrations/mobile-devtools?dir=plugins/ios\&ref=main"|g' \
-          "plugins/react-native/plugin.json"
-      else
-        sed -i \
-          -e 's|"path:../android/plugin.json"|"github:segment-integrations/mobile-devtools?dir=plugins/android\&ref=main"|g' \
-          -e 's|"path:../ios/plugin.json"|"github:segment-integrations/mobile-devtools?dir=plugins/ios\&ref=main"|g' \
-          "plugins/react-native/plugin.json"
-      fi
+      jq '.include = (.include | map(
+        if . == "path:../android/plugin.json"
+        then "github:segment-integrations/mobile-devtools?dir=plugins/android&ref=main"
+        elif . == "path:../ios/plugin.json"
+        then "github:segment-integrations/mobile-devtools?dir=plugins/ios&ref=main"
+        else . end
+      ))' "plugins/react-native/plugin.json" > "plugins/react-native/plugin.json.tmp" \
+        && mv "plugins/react-native/plugin.json.tmp" "plugins/react-native/plugin.json"
     fi
 
     echo "✓ Restored plugin URLs to GitHub format"
