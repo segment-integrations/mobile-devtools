@@ -8,8 +8,7 @@
 import Foundation
 
 enum Config {
-    /// Segment write key for demo tracking
-    /// Events from this example are tracked to help improve the mobile-devtools project
-    /// You can replace this with your own write key from https://app.segment.com
-    static let segmentWriteKey = "Ci34OUnJa5OwlryHkkWGk0pNQ07uijWW"
+    /// Your Segment write key from https://app.segment.com
+    /// Get your write key: Sources → Your iOS Source → Settings → API Keys
+    static let segmentWriteKey = "YOUR_WRITE_KEY_HERE"
 }
