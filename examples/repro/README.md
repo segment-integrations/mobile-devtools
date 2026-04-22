@@ -4,17 +4,7 @@ Pre-configured, minimal apps for reproducing Segment SDK issues. These examples 
 
 ## Available Examples
 
-### [Swift/iOS](./swift/)
-
-Fully-configured iOS app for reproducing Segment Analytics Swift SDK issues.
-
-**Includes:** Amplitude destination, ConsoleLogger, interactive UI
-
-**Quick links:**
-- [Prerequisites & Installation](./swift/README.md#prerequisites-and-installation) - Installing Xcode and Devbox
-- [Quick Start](./swift/README.md#quick-start---run-the-app) - Running the app
-- [Creating Bug Reproductions](./swift/README.md#how-to-create-bug-reproductions) - Workflow for reproducing issues
-- [Full Documentation](./swift/README.md) - Complete guide
+- [Swift/iOS](./swift/README.md) - Fully-configured iOS app for reproducing Segment Analytics Swift SDK issues
 
 ## Purpose
 
