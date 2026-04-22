@@ -27,9 +27,12 @@ struct ContentView: View {
         // Add ConsoleLogger plugin for debugging
         analytics.add(plugin: ConsoleLoggerPlugin())
 
+        // Add IDFA plugin to demonstrate simple enrichment
+        analytics.add(plugin: IDFAPlugin())
+
         print("🚀 Segment Analytics initialized")
         print("   Write Key: \(Config.segmentWriteKey)")
-        print("   Plugins: ConsoleLogger, Amplitude")
+        print("   Plugins: ConsoleLogger, IDFA, Amplitude (toggleable)")
     }
 
     var body: some View {
