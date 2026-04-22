@@ -43,10 +43,6 @@ jobs:
       - name: Run Android lib.sh tests
         run: devbox run bash plugins/tests/android/test-lib.sh
 
-      - name: Run Android apk-detection tests
-        working-directory: examples/android
-        run: devbox run bash ../../plugins/tests/android/test-apk-detection.sh
-
       - name: Run Android apk-resolution tests
         run: devbox run bash plugins/tests/android/test-apk-resolution.sh
 
@@ -123,11 +119,11 @@ jobs:
           retention-days: 7
 
   # Android example E2E test (max device only on PRs)
+  # Runs in parallel with fast checks for better CI throughput
   android-e2e:
     name: Android E2E - max
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    needs: [lint, test-shell-scripts, test-device-config, test-devbox-mcp]
     steps:
       - uses: actions/checkout@v6
 
@@ -163,6 +159,10 @@ jobs:
       - name: Rewrite plugin URLs to local
         run: bash scripts/dev/rewrite-plugin-urls.sh --to-local examples/
 
+      - name: Run Android apk-detection tests
+        working-directory: examples/android
+        run: devbox run bash ../../plugins/tests/android/test-apk-detection.sh
+
       - name: Run Android E2E test
         working-directory: examples/android
         env:
@@ -184,11 +184,11 @@ jobs:
           retention-days: 7
 
   # iOS example E2E test (max device only on PRs)
+  # Runs in parallel with fast checks for better CI throughput
   ios-e2e:
     name: iOS E2E - max
     runs-on: macos-26
     timeout-minutes: 25
-    needs: [lint, test-shell-scripts, test-device-config, test-devbox-mcp]
     steps:
       - uses: actions/checkout@v6
 
@@ -251,11 +251,11 @@ jobs:
           retention-days: 7
 
   # React Native E2E tests (max device only on PRs, plus web)
+  # Runs in parallel with fast checks for better CI throughput
   react-native-e2e:
     name: React Native E2E - ${{ matrix.platform }}-${{ matrix.device }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
-    needs: [lint, test-shell-scripts, test-device-config, test-devbox-mcp]
     strategy:
       fail-fast: false
       matrix:
