@@ -1,7 +1,9 @@
 {
   "include": ["path:../../../plugins/ios/plugin.json"],
   "packages": {
-    "process-compose": "latest"
+    "process-compose": "latest",
+    "zip": "latest",
+    "rsync": "latest"
   },
   "env": {
     "IOS_APP_ARTIFACT": "DerivedData/Build/Products/Debug-iphonesimulator/ios.app"
@@ -25,6 +27,9 @@
       ],
       "test:e2e": [
         "process-compose -f tests/test-suite.yaml --no-server --tui=${TEST_TUI:-false}"
+      ],
+      "share": [
+        "bash scripts/share.sh"
       ]
     }
   }
