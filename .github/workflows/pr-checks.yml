@@ -94,29 +94,6 @@ jobs:
           path: reports/logs/
           retention-days: 7
 
-  # devbox-mcp plugin tests
-  test-devbox-mcp:
-    name: Devbox MCP Plugin Tests
-    runs-on: ubuntu-24.04
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Install Devbox
-        uses: jetify-com/devbox-install-action@v0.15.0
-        with:
-          enable-cache: true
-
-      - name: Run devbox-mcp tests
-        run: devbox run process-compose -f plugins/devbox-mcp/tests/test-suite.yaml --no-server --tui=false
-
-      - name: Upload logs
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: devbox-mcp-test-logs
-          path: reports/logs/
-          retention-days: 7
 
   # Android example E2E test (max device only on PRs)
   # Runs in parallel with fast checks for better CI throughput
@@ -375,7 +352,7 @@ jobs:
   status-check:
     name: All PR Checks Passed
     runs-on: ubuntu-latest
-    needs: [lint, test-shell-scripts, test-device-config, test-devbox-mcp, android-e2e, ios-e2e, react-native-e2e]
+    needs: [lint, test-shell-scripts, test-device-config, android-e2e, ios-e2e, react-native-e2e]
     if: always()
     steps:
       - name: Check job results
@@ -384,7 +361,6 @@ jobs:
           echo "  Lint: ${{ needs.lint.result }}"
           echo "  Shell Script Tests: ${{ needs.test-shell-scripts.result }}"
           echo "  Device Config Tests: ${{ needs.test-device-config.result }}"
-          echo "  Devbox MCP Tests: ${{ needs.test-devbox-mcp.result }}"
           echo "  Android E2E: ${{ needs.android-e2e.result }}"
           echo "  iOS E2E: ${{ needs.ios-e2e.result }}"
           echo "  React Native E2E: ${{ needs.react-native-e2e.result }}"
@@ -393,7 +369,6 @@ jobs:
           if [[ "${{ needs.lint.result }}" != "success" ]] || \
              [[ "${{ needs.test-shell-scripts.result }}" != "success" ]] || \
              [[ "${{ needs.test-device-config.result }}" != "success" ]] || \
-             [[ "${{ needs.test-devbox-mcp.result }}" != "success" ]] || \
              [[ "${{ needs.android-e2e.result }}" != "success" ]] || \
              [[ "${{ needs.ios-e2e.result }}" != "success" ]] || \
              [[ "${{ needs.react-native-e2e.result }}" != "success" ]]; then

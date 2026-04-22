@@ -146,14 +146,6 @@
         "devbox run test:plugin:ios:devices",
         "devbox run test:plugin:ios:app-resolution"
       ],
-      "test:plugin:devbox-mcp": [
-        "echo 'Running devbox-mcp plugin tests...'",
-        "process-compose -f plugins/devbox-mcp/tests/test-suite.yaml --no-server --tui=${TEST_TUI:-false}"
-      ],
-      "test:plugin:devbox-mcp:watch": [
-        "echo 'Running devbox-mcp plugin tests (interactive mode)...'",
-        "TEST_TUI=true process-compose -f plugins/devbox-mcp/tests/test-suite.yaml"
-      ],
       "test:plugin:rn:lib": [
         "bash plugins/tests/react-native/test-lib.sh"
       ],
@@ -164,8 +156,7 @@
         "echo 'Running plugin unit tests...'",
         "devbox run test:plugin:android",
         "devbox run test:plugin:ios",
-        "devbox run test:plugin:rn",
-        "devbox run test:plugin:devbox-mcp"
+        "devbox run test:plugin:rn"
       ],
       "test:integration:android:device-mgmt": [
         "/bin/bash tests/integration/android/test-device-mgmt.sh"
