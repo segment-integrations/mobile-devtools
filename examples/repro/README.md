@@ -1,6 +1,6 @@
 # Bug Reproduction Examples
 
-Pre-configured, minimal apps for reproducing Segment SDK issues. These examples help customer support, CSMs, and engineers quickly reproduce and diagnose bugs in a consistent environment.
+Pre-configured, minimal apps for reproducing Segment SDK issues. These examples help you reproduce and diagnose bugs in a consistent, isolated environment.
 
 ## Available Examples
 
