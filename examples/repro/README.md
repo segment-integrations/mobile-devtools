@@ -66,17 +66,31 @@ Use these examples to:
 
 ## Prerequisites
 
-The only requirement is [Devbox](https://www.jetify.com/devbox/docs/installing_devbox/):
+**You need TWO things installed:**
+
+1. **Xcode** (macOS only) - Required for iOS examples. **NOT included with Devbox - install separately from App Store.**
+2. **Devbox** - Handles SDKs, simulators, and other dependencies.
+
+### Install Xcode (for iOS examples)
+
+- Open the Mac App Store
+- Search for "Xcode" and install (free, ~15 GB, takes 30-60 min)
+- Open Xcode once to accept the license
+- Verify: `xcodebuild -version`
+
+### Install Devbox
 
 ```bash
 # macOS/Linux
 curl -fsSL https://get.jetify.com/devbox | bash
 
+# IMPORTANT: Close and reopen Terminal after installation!
+
 # Verify installation
 devbox version
 ```
 
-Devbox handles all other dependencies (Xcode, SDKs, simulators, etc.).
+**Note:** Devbox handles simulators and build tools, but requires Xcode for iOS development.
 
 ## General Workflow
 
