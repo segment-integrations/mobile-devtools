@@ -18,11 +18,18 @@ struct ContentView: View {
     private let amplitudePlugin = AmplitudeSession()
 
     init() {
-        // Initialize Segment Analytics with demo configuration
-        // Events are queued locally but not sent (flushAt disabled)
-        let configuration = Configuration(writeKey: Config.segmentWriteKey)
-            .flushAt(1000)           // Only flush after 1000 events (effectively disabled)
-            .flushInterval(0)        // Disable time-based flushing
+        // Initialize Segment Analytics
+        var configuration = Configuration(writeKey: Config.segmentWriteKey)
+
+        // Disable flushing when using demo key to avoid errors
+        if Config.isUsingDemoKey {
+            configuration = configuration
+                .flushAt(1000)           // Only flush after 1000 events (effectively disabled)
+                .flushInterval(0)        // Disable time-based flushing
+        } else {
+            configuration = configuration
+                .flushInterval(10)       // Normal flush interval
+        }
 
         self.analytics = Analytics(configuration: configuration)
 
@@ -34,6 +41,7 @@ struct ContentView: View {
 
         print("🚀 Segment Analytics initialized")
         print("   Write Key: \(Config.segmentWriteKey)")
+        print("   Mode: \(Config.isUsingDemoKey ? "Demo (events queued locally)" : "Live (sending to Segment)")")
         print("   Plugins: ConsoleLogger, IDFA, Amplitude (toggleable)")
     }
 
