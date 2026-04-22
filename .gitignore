@@ -46,3 +46,6 @@ conversation_*.md
 transcript_*
 scratch_*
 draft_*
+
+# Shared reproduction archives
+shared-repros/

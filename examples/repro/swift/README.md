@@ -284,6 +284,12 @@ devbox run --pure start:app iphone15
 ```
 Launches the app on iPhone 15 instead of the default device.
 
+**Share your reproduction:**
+```bash
+devbox run share
+```
+Packages your reproduction into a zip file for sharing via Jira, email, or Slack. Automatically commits changes and creates a properly named archive.
+
 ## Understanding the Console Output
 
 When you run the app, the Terminal shows a lot of output. Here's what to look for:
@@ -368,19 +374,202 @@ To test if the bug exists in different versions of the SDK:
 5. Click the version number and select a different version to test
 6. Click **Done**, then rebuild: `devbox run --pure build`
 
-### Step 6: Document and Share
+### Step 6: Share Your Reproduction
 
-Once you've reproduced the bug:
+Once you've reproduced the bug, use the built-in share command to package everything for sharing:
+
 ```bash
-# Clean build files (saves space)
+devbox run share
+```
+
+This automatically commits your changes, creates a zip file, and tells you where to find it. See the **Sharing Reproductions** section below for complete details on uploading to Jira or sharing with the team.
+
+## Sharing Reproductions
+
+After you've reproduced a customer issue, you need to share it with the engineering team. The `share` command makes this easy, even if you're not familiar with Git.
+
+### Quick Share (Recommended)
+
+Just run this command:
+```bash
+devbox run share
+```
+
+**What it does:**
+1. ✅ Automatically commits any changes you made
+2. ✅ Creates a zip file with everything needed to reproduce the issue
+3. ✅ Names the file with a unique identifier (commit hash + timestamp)
+4. ✅ Excludes unnecessary files (build artifacts, etc.) to keep it small
+5. ✅ Shows you exactly where the zip file is located
+6. ✅ Copies the file path to your clipboard (on macOS)
+
+**What you'll see:**
+```
+📦 Swift Repro Share Tool
+
+Repository: /Users/you/mobile-devtools
+Repro directory: examples/repro/swift
+
+Found uncommitted changes:
+M  ios/ContentView.swift
+
+Committing changes...
+✓ Changes committed
+
+Creating archive...
+  Name: swift-repro-a1b2c3d-20260422-143052.zip
+
+✅ Archive created successfully!
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Archive Details:
+  Name:     swift-repro-a1b2c3d-20260422-143052.zip
+  Size:     2.3M
+  Location: /Users/you/mobile-devtools/shared-repros/swift-repro-a1b2c3d-20260422-143052.zip
+  Commit:   a1b2c3d
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Next Steps:
+1️⃣  Locate the file:
+   Open Finder and navigate to:
+   ~/mobile-devtools/shared-repros/swift-repro-a1b2c3d-20260422-143052.zip
+
+2️⃣  Upload to Jira:
+   • Open the Jira issue in your browser
+   • Click 'Attach' or drag the zip file onto the issue
+   • Add a comment describing what you changed
+
+3️⃣  Or share via email:
+   • Attach the zip file to your email
+   • Mention the commit hash: a1b2c3d
+```
+
+### Uploading to Jira (Step-by-Step)
+
+Once you have the zip file, here's how to attach it to a Jira issue:
+
+**Step 1: Locate the zip file**
+The share command tells you exactly where the file is. On macOS, it's copied to your clipboard, so you can just paste it into Finder's "Go to Folder" (Command+Shift+G).
+
+Or navigate manually:
+1. Open **Finder**
+2. Press **Command+Shift+G** (Go to Folder)
+3. Paste or type: `~/mobile-devtools/shared-repros`
+4. Press Enter
+5. Find your zip file (it has today's date in the name)
+
+**Step 2: Open the Jira issue**
+1. Go to your Jira instance (e.g., `yourcompany.atlassian.net`)
+2. Find and open the customer's issue
+3. Make sure you're looking at the issue details page
+
+**Step 3: Attach the file**
+
+**Option A: Drag and drop (easiest)**
+1. Drag the zip file from Finder
+2. Drop it onto the Jira issue page
+3. Wait for the upload to complete
+
+**Option B: Use the attach button**
+1. Look for the **Attach** button or paperclip icon (usually at the top or bottom of the issue)
+2. Click it
+3. Select your zip file from the file picker
+4. Click **Open** or **Choose**
+5. Wait for the upload to complete
+
+**Step 4: Add a comment**
+Always add a comment explaining what you did:
+
+```
+Attached reproduction case for the reported SDK issue.
+
+What I changed:
+- Modified ContentView.swift to replicate customer's identify call
+- Used customer's exact user ID format
+- Testing with SDK version 1.6.2
+
+To run:
+1. Extract the zip file
+2. cd into the directory
+3. Run: devbox run --pure start:app
+4. Tap "Identify User" to reproduce the issue
+
+The issue reproduces consistently - check Terminal output for details.
+```
+
+**Step 5: Notify the team**
+Mention relevant team members in the comment using `@username` so they get notified.
+
+### Sharing via Email
+
+If you need to share via email instead of Jira:
+
+1. Compose a new email to the Mobile SDK team
+2. Attach the zip file
+3. In the email body, include:
+   - Jira issue link
+   - Brief description of the issue
+   - What you changed to reproduce it
+   - The commit hash (from the share command output)
+   - Instructions: "Extract and run `devbox run --pure start:app`"
+
+### Sharing via Slack
+
+For quick sharing with the team:
+
+1. Open the relevant Slack channel
+2. Drag the zip file into the message box
+3. Add a message:
+   ```
+   Reproduction for JIRA-123: Customer reports identify not working
+   
+   Changes: Modified identify call to match customer's setup
+   Commit: a1b2c3d
+   
+   Extract and run: devbox run --pure start:app
+   ```
+
+### What's Inside the Zip File?
+
+The share command creates a self-contained reproduction package:
+
+- **All source code** - The modified Swift files that demonstrate the issue
+- **Project files** - Xcode project configuration
+- **Device definitions** - Simulator settings
+- **Configuration** - devbox.json and plugin setup
+- **REPRO-INFO.txt** - Instructions for the person receiving the file
+- **changes.patch** - Git patch showing exactly what you modified
+
+**What's NOT included** (to keep the file small):
+- Build artifacts (DerivedData)
+- Xcode user data
+- Git history
+- Devbox cache
+
+This means the recipient can extract and immediately run `devbox run --pure start:app` to see the issue.
+
+### Advanced: Manual Sharing (If Share Command Doesn't Work)
+
+If you need to share manually without the share command:
+
+```bash
+# Clean build artifacts first
 devbox run --pure build:clean
 
 # Commit your changes
-git add ios/ContentView.swift
-git commit -m "Reproduce: [brief description of the bug]"
+git add .
+git commit -m "Reproduce: [describe the issue]"
 
-# Share via Git branch or patch file
-git format-patch HEAD~1
+# Create a patch file
+git format-patch -1 HEAD --stdout > my-repro.patch
+
+# Share the patch file via Jira/email
+```
+
+The recipient can apply your patch:
+```bash
+git apply my-repro.patch
+devbox run --pure start:app
 ```
 
 ## Troubleshooting Common Issues
