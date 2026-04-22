@@ -1,0 +1,28 @@
+/*
+ * React Native Devbox Plugin - Gradle Init Script
+ *
+ * Automatically configures React Native projects to use NODE_BINARY from devbox environment.
+ * This ensures Gradle can find node/npx when spawning subprocesses for autolinking.
+ *
+ * This script is automatically loaded by Gradle when GRADLE_USER_HOME points to the plugin's
+ * virtenv/gradle directory.
+ */
+
+allprojects {
+    pluginManager.withPlugin('com.facebook.react') {
+        def nodeBinary = System.getenv("NODE_BINARY")
+        if (nodeBinary) {
+            // Configure the React Native extension after evaluation
+            afterEvaluate {
+                if (extensions.findByName('react')) {
+                    react {
+                        nodeExecutableAndArgs = [nodeBinary]
+                    }
+                    logger.quiet("React Native Devbox: Using node from: ${nodeBinary}")
+                }
+            }
+        } else {
+            logger.warn("React Native Devbox: NODE_BINARY not set, React Native may not find node/npx")
+        }
+    }
+}

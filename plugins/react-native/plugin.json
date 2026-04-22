@@ -19,6 +19,7 @@
     "REACT_NATIVE_SCRIPTS_DIR": "{{ .Virtenv }}/scripts",
     "REACT_NATIVE_WEB_BUILD_PATH": "web/build",
     "METRO_CACHE_DIR": "{{ .Virtenv }}/metro/cache",
+    "GRADLE_USER_HOME": "{{ .Virtenv }}/gradle",
     "RN_METRO_PORT_START": "8091",
     "RN_METRO_PORT_END": "8199",
     "ANDROID_DEVICES": "",
@@ -33,6 +34,8 @@
   },
   "create_files": {
     "{{ .Virtenv }}/metro": "",
+    "{{ .Virtenv }}/gradle/init.d": "",
+    "{{ .Virtenv }}/gradle/init.d/react-native-node.gradle": "virtenv/gradle/init.d/react-native-node.gradle",
     "{{ .Virtenv }}/scripts/init/init-hook.sh": "virtenv/scripts/init/init-hook.sh",
     "{{ .Virtenv }}/scripts/lib/lib.sh": "virtenv/scripts/lib/lib.sh",
     "{{ .Virtenv }}/scripts/user/rn.sh": "virtenv/scripts/user/rn.sh",
