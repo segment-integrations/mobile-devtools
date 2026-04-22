@@ -41,23 +41,23 @@ jobs:
           enable-cache: true
 
       - name: Run Android lib.sh tests
-        run: bash plugins/tests/android/test-lib.sh
+        run: devbox run bash plugins/tests/android/test-lib.sh
 
       - name: Run Android apk-detection tests
         working-directory: examples/android
         run: devbox run bash ../../plugins/tests/android/test-apk-detection.sh
 
       - name: Run Android apk-resolution tests
-        run: bash plugins/tests/android/test-apk-resolution.sh
+        run: devbox run bash plugins/tests/android/test-apk-resolution.sh
 
       - name: Run iOS lib.sh tests
-        run: bash plugins/tests/ios/test-lib.sh
+        run: devbox run bash plugins/tests/ios/test-lib.sh
 
       - name: Run iOS app-resolution tests
-        run: bash plugins/tests/ios/test-app-resolution.sh
+        run: devbox run bash plugins/tests/ios/test-app-resolution.sh
 
       - name: Run React Native lib.sh tests
-        run: bash plugins/tests/react-native/test-lib.sh
+        run: devbox run bash plugins/tests/react-native/test-lib.sh
 
       - name: Upload logs
         if: always()
@@ -83,12 +83,12 @@ jobs:
       - name: Run Android device config tests
         env:
           ANDROID_SDK_REQUIRED: "0"
-        run: bash plugins/tests/android/test-devices.sh
+        run: devbox run bash plugins/tests/android/test-devices.sh
 
       - name: Run iOS device config tests
         env:
           IOS_SDK_REQUIRED: "0"
-        run: bash plugins/tests/ios/test-devices.sh
+        run: devbox run bash plugins/tests/ios/test-devices.sh
 
       - name: Upload logs
         if: always()
