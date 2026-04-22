@@ -1,6 +1,6 @@
 # Segment Swift Bug Reproduction Example
 
-This is a ready-to-use iOS app for reproducing and debugging issues with the Segment Analytics Swift SDK. If a customer reports a bug or unexpected behavior, you can use this example to quickly replicate and investigate the issue.
+A ready-to-use iOS app for reproducing and debugging issues with the Segment Analytics Swift SDK. Use this to demonstrate bugs, test unexpected behavior, or create minimal reproductions for issue reports.
 
 ## What This Example Provides
 
@@ -404,7 +404,7 @@ Build succeeded
 
 ## How to Create Bug Reproductions
 
-When a customer reports a bug with the Segment SDK, here's how to reproduce it using this example:
+When you encounter a bug with the Segment SDK, here's how to create a reproduction using this example:
 
 ### Step 1: Start Fresh
 
@@ -414,24 +414,24 @@ cd examples/repro/swift
 devbox run --pure build:clean
 ```
 
-### Step 2: Replicate Customer Setup
+### Step 2: Configure the SDK
 
-If the customer is using their own write key, update `ios/Config.swift` with their key (get permission first!).
+Update `ios/Config.swift` with your Segment write key if needed (to see events in your debugger).
 
-### Step 3: Modify the Code to Match Their Use Case
+### Step 3: Modify the Code to Match Your Use Case
 
-Open `ios/ContentView.swift` in a text editor (you can use Xcode, VS Code, or any editor). Find the function that relates to the customer's issue and modify it.
+Open `ios/ContentView.swift` in a text editor (you can use Xcode, VS Code, or any editor). Find the function that relates to the issue and modify it.
 
-For example, if a customer reports that identify isn't working:
+For example, if you're seeing an issue with identify:
 
 ```swift
 private func identifyUser() {
-    // Change this to match exactly what the customer is doing
+    // Change this to match exactly what you're doing
     analytics.identify(
-        userId: "their-user-id",
+        userId: "your-user-id",
         traits: [
-            "name": "Their Name",
-            "email": "their@email.com"
+            "name": "Your Name",
+            "email": "your@email.com"
         ]
     )
 }
@@ -468,7 +468,7 @@ Once you've reproduced the bug, package it for sharing:
 devbox run share
 ```
 
-This command creates a zip file with everything needed. For complete instructions on uploading to Jira, sharing via email, or Slack, see the **[Sharing Reproductions](../README.md#sharing-reproductions)** section in the main repro README.
+This command creates a zip file with everything needed. For complete instructions on uploading to issue trackers, sharing via email, or chat, see the **[Sharing Reproductions](../README.md#sharing-reproductions)** section in the main repro README.
 
 ## Troubleshooting Common Issues
 
