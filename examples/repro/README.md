@@ -18,47 +18,23 @@ Fully-configured iOS app for reproducing Segment Analytics Swift SDK issues.
 
 ## Purpose
 
-### For Customer Support and CSMs
+These examples help you reproduce and demonstrate Segment SDK issues in a consistent, isolated environment.
 
-When a customer reports a bug:
-1. Use an example that matches their SDK (Swift, Android, React Native)
-2. Modify the code to replicate their exact use case
-3. Run the reproduction to confirm the issue
-4. Share the packaged reproduction with engineering (one command!)
-5. Test fixes across different SDK versions
+**Why use a reproduction example?**
 
-No need to set up development environments from scratch - everything is pre-configured.
+- **Demonstrate issues clearly:** Show exactly what's happening with minimal code
+- **Ensure reproducibility:** Everyone sees the same behavior, eliminating "works on my machine" problems
+- **Speed up resolution:** Isolated examples help identify root causes faster
+- **Test across versions:** Easily verify when a bug was introduced or if a fix works
+- **Share easily:** Package everything into a zip file with one command
 
-### For Customers
+**When to use these:**
 
-Use these examples as templates when reporting issues:
-1. Clone this repository
-2. Modify the example to demonstrate the bug
-3. Share it with support
-4. Everyone sees identical behavior (reproducible environment)
-
-This eliminates "works on my machine" problems.
-
-### For Engineering
-
-- Validate bug reports with exact reproduction steps
-- Test fixes across different SDK versions
-- Create regression tests
-- Verify behavior is consistent across platforms
-
-## Why Devbox?
-
-**Reproducibility:** Everyone runs the exact same toolchain. No "works on my machine" problems.
-
-**Isolation:** Each example has its own build directory and configuration. Multiple reproductions can coexist without conflicts.
-
-**Speed:** Run reproductions in minutes without manual environment setup.
-
-**Consistency:** CI, developers, and support all use identical environments.
-
-**Simplicity:** One command (`devbox run --pure start:app`) to build and launch.
-
-## General Workflow
+- You've found a bug in a Segment SDK
+- You need to demonstrate unexpected behavior
+- You're reporting an issue and want to provide a reproduction
+- You want to test SDK behavior across different versions
+- You need a minimal example to isolate a problem
 
 This is the conceptual workflow for using any reproduction example. See the specific example's README for detailed commands.
 
