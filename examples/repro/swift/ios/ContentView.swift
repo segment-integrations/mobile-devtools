@@ -18,9 +18,11 @@ struct ContentView: View {
     private let amplitudePlugin = AmplitudeSession()
 
     init() {
-        // Initialize Segment Analytics
+        // Initialize Segment Analytics with demo configuration
+        // Events are queued locally but not sent (flushAt disabled)
         let configuration = Configuration(writeKey: Config.segmentWriteKey)
-            .flushInterval(10)
+            .flushAt(1000)           // Only flush after 1000 events (effectively disabled)
+            .flushInterval(0)        // Disable time-based flushing
 
         self.analytics = Analytics(configuration: configuration)
 
