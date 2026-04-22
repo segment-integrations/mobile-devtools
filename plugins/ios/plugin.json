@@ -57,7 +57,8 @@
     "{{ .Virtenv }}/scripts/init/doctor.sh": "virtenv/scripts/init/doctor.sh",
     "{{ .DevboxDir }}/devices/min.json": "config/devices/min.json",
     "{{ .DevboxDir }}/devices/max.json": "config/devices/max.json",
-    "{{ .Virtenv }}/scripts/lib/doctor.sh": "virtenv/scripts/lib/doctor.sh"
+    "{{ .Virtenv }}/scripts/lib/doctor.sh": "virtenv/scripts/lib/doctor.sh",
+    "{{ .Virtenv }}/scripts/user/doctor.sh": "virtenv/scripts/user/doctor.sh"
   },
   "shell": {
     "init_hook": [
@@ -78,21 +79,7 @@
         "bash -c '. {{ .Virtenv }}/scripts/lib/lib.sh && . {{ .Virtenv }}/scripts/platform/core.sh && . {{ .Virtenv }}/scripts/domain/simulator.sh && ios_stop'"
       ],
       "doctor": [
-        "echo 'iOS Environment Check'",
-        "echo '===================='",
-        "echo ''",
-        "echo 'Xcode and Tools:'",
-        "echo '  IOS_DEVELOPER_DIR:' ${IOS_DEVELOPER_DIR:-'NOT SET (using xcode-select)'}",
-        "xcrun --show-sdk-path >/dev/null 2>&1 && echo '  ✓ Xcode command line tools available' || echo '  ✗ Xcode command line tools not found'",
-        "command -v xcrun >/dev/null 2>&1 && echo '  ✓ xcrun is in PATH' || echo '  ✗ xcrun is not in PATH'",
-        "command -v simctl >/dev/null 2>&1 && echo '  ✓ simctl is available' || echo '  ⚠ simctl not in PATH (use xcrun simctl)'",
-        "xcrun simctl list devices >/dev/null 2>&1 && echo '  ✓ xcrun simctl working' || echo '  ✗ xcrun simctl not working'",
-        "echo ''",
-        "echo 'Device Configuration:'",
-        "ls -1 ${IOS_DEVICES_DIR}/*.json 2>/dev/null | wc -l | xargs echo '  Device files:'",
-        "echo '  IOS_DEVICES:' ${IOS_DEVICES:-'(all devices)'}",
-        "test -f ${IOS_DEVICES_DIR}/devices.lock && echo '  ✓ devices.lock exists' || echo '  ⚠ devices.lock not generated yet (run devbox shell)'",
-        "echo ''"
+        "bash {{ .Virtenv }}/scripts/user/doctor.sh"
       ],
       "verify:setup": [
         "xcrun --show-sdk-path >/dev/null 2>&1 && xcrun simctl list devices >/dev/null 2>&1 && echo '✓ iOS environment OK' || (echo '✗ iOS environment check failed. Run: devbox run doctor' && exit 1)"
