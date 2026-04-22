@@ -69,10 +69,8 @@ resolve_flake_sdk_root() {
 
   root="${ANDROID_SDK_FLAKE_PATH:-}"
   if [ -z "$root" ]; then
-    # Flake is in the config directory (devbox.d/) where device configs live
-    if [ -n "${ANDROID_CONFIG_DIR:-}" ] && [ -d "${ANDROID_CONFIG_DIR}" ]; then
-      root="${ANDROID_CONFIG_DIR}"
-    elif [ -n "${ANDROID_RUNTIME_DIR:-}" ] && [ -d "${ANDROID_RUNTIME_DIR}" ]; then
+    # Flake is in the runtime directory (.devbox/virtenv/android/)
+    if [ -n "${ANDROID_RUNTIME_DIR:-}" ] && [ -d "${ANDROID_RUNTIME_DIR}" ]; then
       root="${ANDROID_RUNTIME_DIR}"
     elif [ -n "${ANDROID_SCRIPTS_DIR:-}" ] && [ -d "${ANDROID_SCRIPTS_DIR}" ]; then
       # Fallback: flake in same directory as scripts (virtenv) - deprecated
@@ -104,13 +102,14 @@ resolve_flake_sdk_root() {
   fi
 
   # Build the SDK to ensure it's in the Nix store
+  # Use --impure to allow flake to read ANDROID_CONFIG_DIR for android.lock location
   # Capture stderr so failures are visible instead of silently swallowed
   [ -n "${ANDROID_DEBUG_SETUP:-}" ] && echo "[CORE-$$] Building SDK: path:${root}#${output}" >&2
   _nix_stderr=""
   _nix_stderr_file="$(mktemp "${TMPDIR:-/tmp}/android-nix-build-XXXXXX.stderr")"
   sdk_out=$(
     nix --extra-experimental-features 'nix-command flakes' \
-      build "path:${root}#${output}" --no-link --print-out-paths 2>"$_nix_stderr_file"
+      build "path:${root}#${output}" --no-link --print-out-paths --impure 2>"$_nix_stderr_file"
   ) || true
   _nix_stderr=""
   if [ -f "$_nix_stderr_file" ]; then
