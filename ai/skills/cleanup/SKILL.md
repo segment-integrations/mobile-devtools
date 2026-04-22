@@ -201,6 +201,59 @@ git ls-files | grep -E '(backup|reports)-[0-9]{4}'
 git ls-files | grep -E '\.(orig|bak)$'
 ```
 
+### 9. AI-Generated Artifacts & Misplaced Documentation
+
+AI-generated diagnostic files, implementation notes, and documentation in wrong locations.
+
+**Common patterns:**
+```
+*DIAGNOSIS*.md
+*ANALYSIS*.md
+*SUMMARY*.md
+*DEBUG*.md
+*REPORT*.md (uppercase = often AI-generated)
+claude_conversation_*
+chatgpt_export_*
+conversation_*.md
+transcript_*
+scratch_*
+draft_*
+wip_*
+notes_* (in root, not docs/)
+```
+
+**Internal docs that don't belong in repos:**
+- Implementation notes → GitHub issues or PR descriptions
+- Diagnostic reports → GitHub issues with links to failed runs
+- Meeting notes → Confluence, Notion, or team wiki
+- Architecture drafts → Confluence or team wiki
+- Internal process docs → Confluence or team wiki
+- Only public-facing docs belong in repos (README, API docs, user guides)
+- Non-standard .md files (excluding: README, CHANGELOG, LICENSE, CONTRIBUTING, CODE_OF_CONDUCT, CLAUDE)
+
+Check:
+```bash
+# AI diagnostic/summary files (case-insensitive uppercase patterns)
+git ls-files | grep -iE '(DIAGNOSIS|ANALYSIS|SUMMARY|DEBUG|REPORT).*\.md$'
+
+# AI conversation exports
+git ls-files | grep -E '(claude_|chatgpt_|conversation_|transcript_)'
+
+# Scratch/draft files
+git ls-files | grep -iE '(scratch|draft|wip|todo)_'
+
+# Root-level docs (excluding standard files)
+git ls-files | grep -E '^[^/]+\.md$' | grep -vE '^(README|CHANGELOG|LICENSE|CONTRIBUTING|CODE_OF_CONDUCT|CLAUDE)\.md$'
+```
+
+**Why these shouldn't be committed:**
+- Implementation notes become stale as code evolves
+- AI diagnostic files are point-in-time snapshots with no long-term value
+- Internal docs belong in external systems (Confluence, GitHub issues, PR descriptions)
+- Only public-facing documentation should be in version control
+- Committing internal docs creates noise and makes git history harder to navigate
+- Better to document decisions in code comments, commit messages, or team wiki
+
 ## Scanning Workflow
 
 1. **Validate git repo:**
@@ -274,6 +327,21 @@ git ls-files | grep -E '\.(orig|bak)$'
 git ls-files | grep -E '\.devbox/virtenv/'
 ```
 
+10. **Check for AI artifacts and misplaced docs:**
+```bash
+# AI diagnostic/summary files
+git ls-files | grep -iE '(DIAGNOSIS|ANALYSIS|SUMMARY|DEBUG|REPORT).*\.md$'
+
+# AI conversation exports
+git ls-files | grep -E '(claude_|chatgpt_|conversation_|transcript_)'
+
+# Scratch/draft files
+git ls-files | grep -iE '(scratch|draft|wip|todo)_'
+
+# Root-level non-standard docs
+git ls-files | grep -E '^[^/]+\.md$' | grep -vE '^(README|CHANGELOG|LICENSE|CONTRIBUTING|CODE_OF_CONDUCT|CLAUDE)\.md$'
+```
+
 ## Output Format
 
 ```markdown
@@ -295,6 +363,7 @@ git ls-files | grep -E '\.devbox/virtenv/'
 - Environment/secrets: C
 - Large files (>1MB): D
 - Outdated files: E
+- AI artifacts & misplaced docs: F
 
 **Total cleanup candidates:** [sum]
 
@@ -468,6 +537,63 @@ git commit -m "chore: remove outdated files"
 
 ---
 
+## 9. AI-Generated Artifacts & Misplaced Documentation
+
+AI-generated diagnostic files and root-level documentation that should be elsewhere.
+
+**AI diagnostic/summary files:**
+```
+CI_FAILURE_DIAGNOSIS.md (root-level diagnostic)
+IMPLEMENTATION_SUMMARY.md (root-level implementation notes)
+DEBUG_ANALYSIS.md
+```
+
+**Why problematic:**
+- Point-in-time snapshots that become outdated quickly
+- Clutter repository root and git history
+- Belong in external systems, not version control
+
+**AI conversation exports:**
+```
+claude_conversation_2024-03-15.md
+chatgpt_export.txt
+```
+
+**Scratch/draft files:**
+```
+scratch_notes.md
+draft_architecture.md
+wip_design.md
+```
+
+**Fix:**
+```bash
+# Remove from repository
+git rm --cached CI_FAILURE_DIAGNOSIS.md IMPLEMENTATION_SUMMARY.md
+git commit -m "chore: remove AI-generated diagnostic files"
+
+# Before removing, extract valuable info to appropriate systems:
+# 1. Create GitHub issue if tracking a bug/feature
+# 2. Add to PR description if implementation context
+# 3. Document in Confluence/Notion if team knowledge
+# 4. Add to code comments if explaining complex logic
+```
+
+**Where this content should go instead:**
+- **CI failures** → GitHub issue with diagnosis + link to failed run
+- **Implementation notes** → PR description or commit messages
+- **Architecture decisions** → Confluence, Notion, or team wiki
+- **Diagnostics** → Code comments or test documentation
+- **Meeting notes** → Confluence, Notion, or team wiki
+- **Scratch notes** → Local files, don't commit
+
+**Repository documentation philosophy:**
+- **Only commit public-facing docs**: README, API docs, user guides, quickstarts
+- **Everything else belongs elsewhere**: internal notes, diagnostics, meeting minutes, drafts
+- **Use external systems**: Confluence for team docs, GitHub issues for tracking, PRs for implementation context
+
+---
+
 ## Next Steps
 
 1. **Review candidates** - Verify each file should be removed
@@ -551,6 +677,21 @@ git ls-files -z | xargs -0 du -k 2>/dev/null | awk '$1 > 1024 {printf "%s (%d KB
 git ls-files | grep -E '(backup|reports)-[0-9]{4}|\.devbox/virtenv/|\.(orig|bak)$'
 ```
 
+### AI Artifacts & Misplaced Docs
+```bash
+# AI diagnostic/summary files (case-insensitive)
+git ls-files | grep -iE '(DIAGNOSIS|ANALYSIS|SUMMARY|DEBUG|REPORT).*\.md$'
+
+# AI conversation exports
+git ls-files | grep -E '(claude_|chatgpt_|conversation_|transcript_)'
+
+# Scratch/draft files
+git ls-files | grep -iE '(scratch|draft|wip|todo)_'
+
+# Root-level non-standard docs
+git ls-files | grep -E '^[^/]+\.md$' | grep -vE '^(README|CHANGELOG|LICENSE|CONTRIBUTING|CODE_OF_CONDUCT|CLAUDE)\.md$'
+```
+
 ## Gitignore Recommendations
 
 After cleanup, suggest adding to .gitignore:
@@ -610,6 +751,20 @@ android/captures/
 ios/Pods/
 .expo/
 .expo-shared/
+
+# AI-generated artifacts (don't commit these)
+*DIAGNOSIS*.md
+*ANALYSIS*.md
+*SUMMARY*.md
+*DEBUG*.md
+*REPORT*.md
+claude_conversation_*
+chatgpt_export_*
+conversation_*.md
+transcript_*
+scratch_*
+draft_*
+notes_*.md
 ```
 
 ## Safety Rules
@@ -652,6 +807,7 @@ git ls-files | xargs file | grep -v text
 | Env files | `git ls-files \| grep -E '\.env'` |
 | Large files | `git ls-files -z \| xargs -0 du -k` |
 | Outdated | `git ls-files \| grep -E '\.orig$'` |
+| AI artifacts | `git ls-files \| grep -iE 'DIAGNOSIS\|SUMMARY'` |
 
 ## Integration Steps
 
