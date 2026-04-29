@@ -36,9 +36,10 @@ metro_start() {
   echo "Starting Metro on port $metro_port..."
   echo "Cache dir: ${REACT_NATIVE_VIRTENV}/metro/cache"
 
-  # Start Metro with allocated port
+  # Start Metro with allocated port and timeout
   # Use exec to replace shell process - avoids "Terminated: 15" message on shutdown
-  exec npx react-native start \
+  # Timeout ensures Metro either starts within 90s or exits with error
+  exec timeout 90s npx react-native start \
     --port "$metro_port" \
     --reset-cache
 }
@@ -93,6 +94,7 @@ metro_health() {
 
   # Check if Metro environment exists
   if [ ! -f "$env_file" ] && [ ! -L "$env_file" ]; then
+    echo "Metro health check failed: environment file not found: $env_file" >&2
     return 1
   fi
 
@@ -101,16 +103,19 @@ metro_health() {
 
   # Check if port is set
   if [ -z "${METRO_PORT:-}" ]; then
+    echo "Metro health check failed: METRO_PORT not set" >&2
     return 1
   fi
 
   # Check if Metro server is up
   if ! curl -sf "http://localhost:$METRO_PORT/status" >/dev/null 2>&1; then
+    echo "Metro health check failed: /status endpoint not responding on port $METRO_PORT" >&2
     return 1
   fi
 
   # Verify Metro can serve bundles for the platform
   if ! curl -sf -I "http://localhost:$METRO_PORT/index.bundle?platform=$platform&dev=true" 2>/dev/null | grep -q "HTTP.*200"; then
+    echo "Metro health check failed: /index.bundle endpoint not ready for platform $platform" >&2
     return 1
   fi
 

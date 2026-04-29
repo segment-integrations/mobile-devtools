@@ -175,11 +175,14 @@ processes:
     readiness_probe:
       exec:
         command: "metro.sh health ios ios"
-      initial_delay_seconds: 5
+      initial_delay_seconds: 10
       period_seconds: 5
-      timeout_seconds: 5
+      timeout_seconds: 10
       success_threshold: 1
-      failure_threshold: 12
+      failure_threshold: 24
+    shutdown:
+      signal: 15
+      timeout_seconds: 5
 
   # Phase 6a: Build iOS app (depends on simulator so runtime is installed)
   build-ios:
@@ -239,6 +242,13 @@ processes:
       _step_dir="reports/steps"
       mkdir -p "$_step_dir"
       trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
+      # Verify Metro is healthy before attempting deploy
+      if ! metro.sh health ios ios; then
+        echo "ERROR: Metro bundler is not healthy, cannot deploy" >&2
+        printf 'fail\nMetro bundler not healthy\n' > "$_step_dir/$_step.status"
+        exit 1
+      fi
 
       ios.sh deploy
       echo "App deployed and launched successfully"
