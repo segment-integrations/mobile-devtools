@@ -204,8 +204,9 @@ assert_command_success() {
 # Record the start time of an E2E step. Call at the beginning of a step.
 e2e_step_start() {
   local step_name="$1"
-  mkdir -p reports/steps
-  date +%s > "reports/steps/${step_name}.start"
+  local steps_dir="${E2E_STEPS_DIR:-${REPO_ROOT:-.}/reports/steps}"
+  mkdir -p "$steps_dir"
+  date +%s > "$steps_dir/${step_name}.start"
 }
 
 # Record the end time of an E2E step. Call at the end of a step.
@@ -215,15 +216,16 @@ e2e_step_end() {
   local status="${2:-pass}"
   local reason="${3:-}"
 
-  mkdir -p reports/steps
+  local steps_dir="${E2E_STEPS_DIR:-${REPO_ROOT:-.}/reports/steps}"
+  mkdir -p "$steps_dir"
   local end_time
   end_time=$(date +%s)
 
   # Calculate duration if start time exists
   local duration=""
-  if [ -f "reports/steps/${step_name}.start" ]; then
+  if [ -f "$steps_dir/${step_name}.start" ]; then
     local start_time
-    start_time=$(cat "reports/steps/${step_name}.start")
+    start_time=$(cat "$steps_dir/${step_name}.start")
     local elapsed=$((end_time - start_time))
     duration="${elapsed}s"
   fi
@@ -231,15 +233,15 @@ e2e_step_end() {
   # Write status file with duration
   if [ "$status" = "pass" ]; then
     if [ -n "$duration" ]; then
-      printf 'pass\n%s\n' "$duration" > "reports/steps/${step_name}.status"
+      printf 'pass\n%s\n' "$duration" > "$steps_dir/${step_name}.status"
     else
-      echo "pass" > "reports/steps/${step_name}.status"
+      echo "pass" > "$steps_dir/${step_name}.status"
     fi
   else
     if [ -n "$duration" ]; then
-      printf 'fail\n%s\n%s\n' "$reason" "$duration" > "reports/steps/${step_name}.status"
+      printf 'fail\n%s\n%s\n' "$reason" "$duration" > "$steps_dir/${step_name}.status"
     else
-      printf 'fail\n%s\n' "$reason" > "reports/steps/${step_name}.status"
+      printf 'fail\n%s\n' "$reason" > "$steps_dir/${step_name}.status"
     fi
   fi
 }
