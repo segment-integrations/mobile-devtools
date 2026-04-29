@@ -78,6 +78,9 @@
       "android:devices:eval": [
         "ANDROID_SDK_REQUIRED=0 android.sh devices eval"
       ],
+      "start:android": [
+        "android.sh run \"${1:-}\""
+      ],
       "start:emu": [
         "android.sh emulator start \"${1:-}\""
       ],

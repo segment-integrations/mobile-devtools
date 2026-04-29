@@ -50,6 +50,18 @@
       "setup": [
         "bash {{ .Virtenv }}/scripts/user/setup.sh"
       ],
+      "start:metro": [
+        "metro.sh start ${1:-default}"
+      ],
+      "stop:metro": [
+        "metro.sh stop ${1:-default}"
+      ],
+      "start:android": [
+        "android.sh run \"${1:-}\""
+      ],
+      "start:ios": [
+        "ios.sh run \"${1:-}\""
+      ],
       "rn:metro:port": [
         "rn.sh metro port ${1:-default}"
       ],
