@@ -201,20 +201,49 @@ assert_command_success() {
 # E2E Step Tracking
 # ============================================================================
 
-# Record a passing E2E step. Call from process-compose YAML processes.
-e2e_step_pass() {
+# Record the start time of an E2E step. Call at the beginning of a step.
+e2e_step_start() {
   local step_name="$1"
   mkdir -p reports/steps
-  echo "pass" > "reports/steps/${step_name}.status"
+  date +%s > "reports/steps/${step_name}.start"
 }
 
-# Record a failing E2E step with an optional reason.
-e2e_step_fail() {
+# Record the end time of an E2E step. Call at the end of a step.
+# Calculates duration from start time if available.
+e2e_step_end() {
   local step_name="$1"
-  local reason="${2:-Unknown error}"
+  local status="${2:-pass}"
+  local reason="${3:-}"
+
   mkdir -p reports/steps
-  printf 'fail\n%s\n' "$reason" > "reports/steps/${step_name}.status"
+  local end_time
+  end_time=$(date +%s)
+
+  # Calculate duration if start time exists
+  local duration=""
+  if [ -f "reports/steps/${step_name}.start" ]; then
+    local start_time
+    start_time=$(cat "reports/steps/${step_name}.start")
+    local elapsed=$((end_time - start_time))
+    duration="${elapsed}s"
+  fi
+
+  # Write status file with duration
+  if [ "$status" = "pass" ]; then
+    if [ -n "$duration" ]; then
+      printf 'pass\n%s\n' "$duration" > "reports/steps/${step_name}.status"
+    else
+      echo "pass" > "reports/steps/${step_name}.status"
+    fi
+  else
+    if [ -n "$duration" ]; then
+      printf 'fail\n%s\n%s\n' "$reason" "$duration" > "reports/steps/${step_name}.status"
+    else
+      printf 'fail\n%s\n' "$reason" > "reports/steps/${step_name}.status"
+    fi
+  fi
 }
+
 
 # Read all step status files and report results. Replaces assert_file_exists
 # for E2E summaries. Returns 0 if all steps passed, 1 otherwise.
@@ -247,13 +276,36 @@ e2e_report_steps() {
       found_steps+=("$step_name")
       local status
       status="$(head -1 "$status_file")"
+
+      # Parse file content: line 1 = status, line 2+ = reason/duration
+      local file_content
+      file_content="$(tail -n +2 "$status_file")"
+
       if [ "$status" = "pass" ]; then
-        echo "  ✓ PASS: $step_name"
+        # For pass: line 2 is duration (if present)
+        local duration="$file_content"
+        if [ -n "$duration" ]; then
+          echo "  ✓ PASS: $step_name ($duration)"
+        else
+          echo "  ✓ PASS: $step_name"
+        fi
         test_passed=$((test_passed + 1))
       else
-        local reason
-        reason="$(tail -n +2 "$status_file")"
-        echo "  ✗ FAIL: $step_name"
+        # For fail: line 2 is reason, line 3 is duration (if present)
+        local reason duration
+        reason="$(echo "$file_content" | head -1)"
+        duration="$(echo "$file_content" | tail -1)"
+
+        # If reason and duration are the same, there's no duration
+        if [ "$reason" = "$duration" ]; then
+          duration=""
+        fi
+
+        if [ -n "$duration" ]; then
+          echo "  ✗ FAIL: $step_name ($duration)"
+        else
+          echo "  ✗ FAIL: $step_name"
+        fi
         [ -n "$reason" ] && echo "    Reason: $reason"
         test_failed=$((test_failed + 1))
         any_failure=1

@@ -61,11 +61,21 @@ processes:
       _step="build-node"
       _step_dir="reports/steps"
       mkdir -p "$_step_dir"
-      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
+      # Source test framework for timing functions
+      export REPO_ROOT="$(cd ../.. && pwd)"
+      . "$REPO_ROOT/plugins/tests/test-framework.sh"
+
+      # Record start time
+      e2e_step_start "$_step"
+
+      # Trap errors and record failure with timing
+      trap 'e2e_step_end "$_step" "fail" "Exited with error (exit code $?)"' ERR
 
       npm install
 
-      echo "pass" > "$_step_dir/$_step.status"
+      # Record success with timing
+      e2e_step_end "$_step" "pass"
     availability:
       restart: "no"
 
@@ -76,14 +86,24 @@ processes:
       _step="install-pods"
       _step_dir="$PWD/reports/steps"
       mkdir -p "$_step_dir"
-      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
+      # Source test framework for timing functions
+      export REPO_ROOT="$(cd ../.. && pwd)"
+      . "$REPO_ROOT/plugins/tests/test-framework.sh"
+
+      # Record start time
+      e2e_step_start "$_step"
+
+      # Trap errors and record failure with timing
+      trap 'e2e_step_end "$_step" "fail" "Exited with error (exit code $?)"' ERR
 
       cd ios
       echo "Installing CocoaPods dependencies..."
       pod install --repo-update
       echo 'Pod install complete'
 
-      echo "pass" > "$_step_dir/$_step.status"
+      # Record success with timing
+      e2e_step_end "$_step" "pass"
     depends_on:
       build-node:
         condition: process_completed_successfully
@@ -191,7 +211,16 @@ processes:
       _step="build-ios"
       _step_dir="$PWD/reports/steps"
       mkdir -p "$_step_dir"
-      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
+      # Source test framework for timing functions
+      export REPO_ROOT="$(cd ../.. && pwd)"
+      . "$REPO_ROOT/plugins/tests/test-framework.sh"
+
+      # Record start time
+      e2e_step_start "$_step"
+
+      # Trap errors and record failure with timing
+      trap 'e2e_step_end "$_step" "fail" "Exited with error (exit code $?)"' ERR
 
       # Source iOS setup (process-compose processes have isolated environments)
       if [ -n "${IOS_SCRIPTS_DIR:-}" ] && [ -f "${IOS_SCRIPTS_DIR}/init/setup.sh" ]; then
@@ -223,7 +252,8 @@ processes:
 
       echo "Build complete"
 
-      echo "pass" > "$_step_dir/$_step.status"
+      # Record success with timing
+      e2e_step_end "$_step" "pass"
     depends_on:
       install-pods:
         condition: process_completed_successfully
@@ -241,19 +271,29 @@ processes:
       _step="deploy"
       _step_dir="reports/steps"
       mkdir -p "$_step_dir"
-      trap 'printf "fail\nExited with error (exit code $?)\n" > "$_step_dir/$_step.status"' ERR
+
+      # Source test framework for timing functions
+      export REPO_ROOT="$(cd ../.. && pwd)"
+      . "$REPO_ROOT/plugins/tests/test-framework.sh"
+
+      # Record start time
+      e2e_step_start "$_step"
+
+      # Trap errors and record failure with timing
+      trap 'e2e_step_end "$_step" "fail" "Exited with error (exit code $?)"' ERR
 
       # Verify Metro is healthy before attempting deploy
       if ! metro.sh health ios ios; then
         echo "ERROR: Metro bundler is not healthy, cannot deploy" >&2
-        printf 'fail\nMetro bundler not healthy\n' > "$_step_dir/$_step.status"
+        e2e_step_end "$_step" "fail" "Metro bundler not healthy"
         exit 1
       fi
 
       ios.sh deploy
       echo "App deployed and launched successfully"
 
-      echo "pass" > "$_step_dir/$_step.status"
+      # Record success with timing
+      e2e_step_end "$_step" "pass"
     depends_on:
       build-ios:
         condition: process_completed_successfully
@@ -272,6 +312,16 @@ processes:
       _step_dir="reports/steps"
       _logs_dir="reports/logs"
       mkdir -p "$_step_dir" "$_logs_dir"
+
+      # Source test framework for timing functions
+      export REPO_ROOT="$(cd ../.. && pwd)"
+      . "$REPO_ROOT/plugins/tests/test-framework.sh"
+
+      # Record start time
+      e2e_step_start "$_step"
+
+      # Trap errors and record failure with timing
+      trap 'e2e_step_end "$_step" "fail" "Exited with error (exit code $?)"' ERR
 
       UDID=$(cat "${IOS_RUNTIME_DIR:-/tmp}/rn-ios-e2e/simulator-udid.txt" 2>/dev/null || cat "${IOS_RUNTIME_DIR:-/tmp}/${SUITE_NAME:-rn-ios-e2e}/simulator-udid.txt" 2>/dev/null || true)
 
@@ -295,7 +345,7 @@ processes:
           xcrun simctl spawn "$UDID" log show --predicate 'eventMessage contains "crash" OR eventMessage contains "fatal" OR eventMessage contains "terminate"' --last 5m --style compact > "$_logs_dir/simulator-crash.log" 2>&1 || true
           echo "Simulator crash logs: $_logs_dir/simulator-crash.log"
         fi
-        printf 'fail\nApp not found in running processes\n' > "$_step_dir/$_step.status"
+        e2e_step_end "$_step" "fail" "App not found in running processes"
         exit 1
       fi
 
@@ -309,7 +359,7 @@ processes:
           xcrun simctl spawn "$UDID" log show --predicate 'eventMessage contains "crash" OR eventMessage contains "fatal" OR eventMessage contains "terminate"' --last 5m --style compact > "$_logs_dir/simulator-crash.log" 2>&1 || true
           echo "Simulator crash logs: $_logs_dir/simulator-crash.log"
         fi
-        printf 'fail\nApp crashed during soak period\n' > "$_step_dir/$_step.status"
+        e2e_step_end "$_step" "fail" "App crashed during soak period"
         exit 1
       fi
 
@@ -326,7 +376,7 @@ processes:
           grep -iE "$error_patterns" "$_logs_dir/simulator-app.log" | head -20
           echo "---"
           echo "Full logs: $_logs_dir/simulator-app.log"
-          printf 'fail\nCrash patterns detected in simulator logs\n' > "$_step_dir/$_step.status"
+          e2e_step_end "$_step" "fail" "Crash patterns detected in simulator logs"
           exit 1
         fi
 
@@ -339,12 +389,13 @@ processes:
           grep -iE "$rn_error_patterns" "$_logs_dir/simulator-app.log" | head -20
           echo "---"
           echo "Full logs: $_logs_dir/simulator-app.log"
-          printf 'fail\nReact Native error detected in simulator logs\n' > "$_step_dir/$_step.status"
+          e2e_step_end "$_step" "fail" "React Native error detected in simulator logs"
           exit 1
         fi
       fi
 
-      echo "pass" > "$_step_dir/$_step.status"
+      # Record success with timing
+      e2e_step_end "$_step" "pass"
       echo "App verified healthy (process alive, no crashes detected)"
       [ -f "$_logs_dir/simulator-app.log" ] && echo "App logs: $_logs_dir/simulator-app.log"
     depends_on:
