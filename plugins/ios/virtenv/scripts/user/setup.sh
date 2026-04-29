@@ -39,9 +39,11 @@ if ! xcrun simctl list devices >/dev/null 2>&1; then
   exit 1
 fi
 
-# Verify IOS_DEVELOPER_DIR is set
-if [ -z "${IOS_DEVELOPER_DIR:-}" ]; then
-  echo "⚠️  [WARN] IOS_DEVELOPER_DIR not set" >&2
+# Warn only if neither IOS_DEVELOPER_DIR nor DEVELOPER_DIR is set
+# (meaning auto-detection failed)
+if [ -z "${IOS_DEVELOPER_DIR:-}" ] && [ -z "${DEVELOPER_DIR:-}" ]; then
+  echo "⚠️  [WARN] Could not detect Xcode developer directory" >&2
+  echo "         Set IOS_DEVELOPER_DIR or run: xcode-select -p" >&2
 fi
 
 echo "✅ [OK] iOS environment ready"
