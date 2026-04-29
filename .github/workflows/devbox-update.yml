@@ -29,6 +29,33 @@ jobs:
         uses: jetify-com/devbox-install-action@v0.15.0
 
       - name: Update devbox packages
-        uses: xiaolutech/devbox-update-action@v1
+        run: |
+          # Update all devbox packages to latest versions
+          devbox update
+
+          # Check if there are changes
+          if git diff --quiet devbox.lock; then
+            echo "No updates available"
+            echo "has_updates=false" >> $GITHUB_OUTPUT
+          else
+            echo "Updates found"
+            echo "has_updates=true" >> $GITHUB_OUTPUT
+          fi
+        id: update
+
+      - name: Create Pull Request
+        if: steps.update.outputs.has_updates == 'true'
+        uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore(deps): update devbox packages"
+          title: "chore(deps): update devbox packages"
+          body: |
+            Automated devbox package updates.
+
+            This PR updates devbox.lock to the latest available package versions.
+
+            Please review the changes and ensure all tests pass before merging.
+          branch: devbox-updates
+          delete-branch: true
+          labels: dependencies
