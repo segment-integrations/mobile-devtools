@@ -36,10 +36,9 @@ metro_start() {
   echo "Starting Metro on port $metro_port..."
   echo "Cache dir: ${REACT_NATIVE_VIRTENV}/metro/cache"
 
-  # Start Metro with allocated port and timeout
+  # Start Metro with allocated port
   # Use exec to replace shell process - avoids "Terminated: 15" message on shutdown
-  # Timeout ensures Metro either starts within 90s or exits with error
-  exec timeout 90s npx react-native start \
+  exec npx react-native start \
     --port "$metro_port" \
     --reset-cache
 }
