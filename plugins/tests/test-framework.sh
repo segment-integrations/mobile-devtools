@@ -258,7 +258,7 @@ e2e_step_end() {
 # failures with "Step never executed". This catches false successes where
 # processes are skipped due to broken dependency chains.
 e2e_report_steps() {
-  local steps_dir="reports/steps"
+  local steps_dir="${E2E_STEPS_DIR:-${REPO_ROOT:-.}/reports/steps}"
   local any_failure=0
   local expected_steps=("$@")
   local found_steps=()
@@ -336,7 +336,7 @@ e2e_report_steps() {
 
   # List available diagnostic logs when there are failures
   if [ "$any_failure" -eq 1 ]; then
-    local logs_dir="reports/logs"
+    local logs_dir="${E2E_LOGS_DIR:-${REPO_ROOT:-.}/reports/logs}"
     local has_logs=0
     for logfile in "$logs_dir"/*.log "$logs_dir"/*.txt; do
       [ -f "$logfile" ] || continue

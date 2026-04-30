@@ -59,8 +59,6 @@ processes:
     command: |
       set -e
       _step="build-node"
-      _step_dir="reports/steps"
-      mkdir -p "$_step_dir"
 
       # Source test framework for timing functions
       export REPO_ROOT="$(cd ../.. && pwd)"
