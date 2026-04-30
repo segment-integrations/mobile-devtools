@@ -42,16 +42,16 @@ devbox.d/segment-integrations.mobile-devtools.android/
 devbox run android.sh devices list
 
 # Build + install + launch app on emulator
-devbox run start-android
+devbox run start:android
 
 # Stop all emulators
-devbox run stop-emu
+devbox run stop:emu
 
 # Reset emulator state (useful after Nix package updates)
-devbox run reset-emu
+devbox run reset:emu
 ```
 
-`start-android` starts the emulator, builds the app (via `build-android`), and installs/launches the APK matched by `ANDROID_APP_APK`.
+`start:android` starts the emulator, builds the app (via `build:android` or `build` script), and installs/launches the APK matched by `ANDROID_APP_APK`.
 
 ## Configuring SDK Versions
 

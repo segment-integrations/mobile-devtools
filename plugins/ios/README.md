@@ -12,17 +12,14 @@ Configuration is managed via environment variables in `plugin.json`. The plugin 
 # List device definitions
 devbox run ios.sh devices list
 
-# Start simulator
-devbox run start:sim
+# Build, install, and launch app on simulator (full workflow)
+devbox run start:ios
 
-# Build iOS app (define build:ios in devbox.json)
-devbox run build:ios
-
-# Build, install, and launch app on simulator
-ios.sh run
-
-# Stop simulator
-devbox run stop:sim
+# Or use individual commands:
+devbox run start:sim                # Start simulator only
+devbox run build:ios                # Build iOS app (define in devbox.json)
+ios.sh run                          # Build + deploy (CLI alternative)
+devbox run stop:sim                 # Stop simulator
 ```
 
 ## Device Definitions

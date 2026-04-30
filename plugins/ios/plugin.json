@@ -72,6 +72,9 @@
       "ios:devices:eval": [
         "ios.sh devices eval"
       ],
+      "start:ios": [
+        "ios.sh run \"${1:-}\""
+      ],
       "start:sim": [
         "bash -c '. {{ .Virtenv }}/scripts/lib/lib.sh && . {{ .Virtenv }}/scripts/platform/core.sh && . {{ .Virtenv }}/scripts/domain/simulator.sh && ios_start \"${1:-}\"'"
       ],
