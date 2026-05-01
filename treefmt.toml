@@ -1,6 +1,10 @@
 # treefmt configuration
 # Validates shell scripts, GitHub workflows, and process-compose configs
 #
+# Note: Rust checks (rustfmt, clippy) are NOT included here because they are
+# project-level tools that don't work well with treefmt's per-file model.
+# Run them via: devbox run segkit:check
+#
 # Usage:
 #   treefmt                    # Run validators on all files
 #   treefmt --fail-on-change   # Exit 1 if any file fails validation
@@ -30,6 +34,7 @@ excludes = [
   "test-results/*",
   "tests/test-results/*",
   "reports/*",
+  "segkit/target/*",
 ]
 
 # Shellcheck for shell scripts

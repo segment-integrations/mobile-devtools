@@ -6,7 +6,10 @@
     "nodejs":          "latest",
     "treefmt":         "latest",
     "gh":              "latest",
-    "claude-code":     "latest"
+    "claude-code":     "latest",
+    "cargo":           "latest",
+    "rustfmt":         "latest",
+    "clippy":          "latest"
   },
   "env": {
     "REPORTS_DIR":      "reports",
@@ -198,6 +201,27 @@
         "devbox run lint",
         "devbox run test:unit",
         "bash tests/test-summary.sh"
+      ],
+      "segkit:build": [
+        "cargo build --manifest-path segkit/Cargo.toml"
+      ],
+      "segkit:test": [
+        "cargo test --manifest-path segkit/Cargo.toml"
+      ],
+      "segkit:clippy": [
+        "cargo clippy --manifest-path segkit/Cargo.toml -- -D warnings"
+      ],
+      "segkit:fmt": [
+        "cargo fmt --manifest-path segkit/Cargo.toml"
+      ],
+      "segkit:fmt:check": [
+        "cargo fmt --manifest-path segkit/Cargo.toml -- --check"
+      ],
+      "segkit:check": [
+        "echo 'Running segkit checks (fmt + clippy + test)...'",
+        "devbox run segkit:fmt:check",
+        "devbox run segkit:clippy",
+        "devbox run segkit:test"
       ]
     }
   }
