@@ -70,16 +70,16 @@
         "bash {{ .Virtenv }}/scripts/user/setup.sh"
       ],
       "ios:devices:eval": [
-        "ios.sh devices eval"
+        "segkit ios devices eval"
       ],
       "start:ios": [
-        "ios.sh run \"${1:-}\""
+        "segkit ios run \"${1:-}\""
       ],
       "start:sim": [
-        "bash -c '. {{ .Virtenv }}/scripts/lib/lib.sh && . {{ .Virtenv }}/scripts/platform/core.sh && . {{ .Virtenv }}/scripts/domain/simulator.sh && ios_start \"${1:-}\"'"
+        "segkit ios simulator start \"${1:-}\""
       ],
       "stop:sim": [
-        "bash -c '. {{ .Virtenv }}/scripts/lib/lib.sh && . {{ .Virtenv }}/scripts/platform/core.sh && . {{ .Virtenv }}/scripts/domain/simulator.sh && ios_stop'"
+        "segkit ios simulator stop"
       ],
       "doctor": [
         "bash {{ .Virtenv }}/scripts/user/doctor.sh"
