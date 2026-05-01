@@ -1,0 +1,300 @@
+{
+  "version": 1,
+  "summary": {
+    "total_scripts": 41,
+    "total_lines": 10236,
+    "shell": 41,
+    "delegated": 0,
+    "converted": 0,
+    "removed": 0
+  },
+  "scripts": [
+    {
+      "path": "plugins/android/virtenv/scripts/lib/lib.sh",
+      "platform": "android",
+      "layer": "lib",
+      "lines": 198,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/android/virtenv/scripts/lib/doctor.sh",
+      "platform": "android",
+      "layer": "lib",
+      "lines": 338,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/android/virtenv/scripts/platform/core.sh",
+      "platform": "android",
+      "layer": "platform",
+      "lines": 367,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/android/virtenv/scripts/platform/device_config.sh",
+      "platform": "android",
+      "layer": "platform",
+      "lines": 121,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/android/virtenv/scripts/platform/drift.sh",
+      "platform": "android",
+      "layer": "platform",
+      "lines": 79,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/android/virtenv/scripts/domain/avd.sh",
+      "platform": "android",
+      "layer": "domain",
+      "lines": 662,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/android/virtenv/scripts/domain/avd-reset.sh",
+      "platform": "android",
+      "layer": "domain",
+      "lines": 272,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/android/virtenv/scripts/domain/deploy.sh",
+      "platform": "android",
+      "layer": "domain",
+      "lines": 448,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/android/virtenv/scripts/domain/emulator.sh",
+      "platform": "android",
+      "layer": "domain",
+      "lines": 509,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/android/virtenv/scripts/domain/validate.sh",
+      "platform": "android",
+      "layer": "domain",
+      "lines": 92,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/android/virtenv/scripts/user/android.sh",
+      "platform": "android",
+      "layer": "user",
+      "lines": 699,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/android/virtenv/scripts/user/config.sh",
+      "platform": "android",
+      "layer": "user",
+      "lines": 118,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/android/virtenv/scripts/user/devices.sh",
+      "platform": "android",
+      "layer": "user",
+      "lines": 895,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/android/virtenv/scripts/user/doctor.sh",
+      "platform": "android",
+      "layer": "user",
+      "lines": 254,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/android/virtenv/scripts/user/setup.sh",
+      "platform": "android",
+      "layer": "user",
+      "lines": 154,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/android/virtenv/scripts/init/init-hook.sh",
+      "platform": "android",
+      "layer": "init",
+      "lines": 141,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/android/virtenv/scripts/init/setup.sh",
+      "platform": "android",
+      "layer": "init",
+      "lines": 90,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/android/virtenv/scripts/init/doctor.sh",
+      "platform": "android",
+      "layer": "init",
+      "lines": 89,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/ios/virtenv/scripts/lib/lib.sh",
+      "platform": "ios",
+      "layer": "lib",
+      "lines": 196,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/ios/virtenv/scripts/lib/doctor.sh",
+      "platform": "ios",
+      "layer": "lib",
+      "lines": 338,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/ios/virtenv/scripts/platform/core.sh",
+      "platform": "ios",
+      "layer": "platform",
+      "lines": 302,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/ios/virtenv/scripts/platform/device_config.sh",
+      "platform": "ios",
+      "layer": "platform",
+      "lines": 137,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/ios/virtenv/scripts/domain/deploy.sh",
+      "platform": "ios",
+      "layer": "domain",
+      "lines": 469,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/ios/virtenv/scripts/domain/device_manager.sh",
+      "platform": "ios",
+      "layer": "domain",
+      "lines": 317,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/ios/virtenv/scripts/domain/simulator.sh",
+      "platform": "ios",
+      "layer": "domain",
+      "lines": 232,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/ios/virtenv/scripts/domain/validate.sh",
+      "platform": "ios",
+      "layer": "domain",
+      "lines": 47,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/ios/virtenv/scripts/user/ios.sh",
+      "platform": "ios",
+      "layer": "user",
+      "lines": 564,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/ios/virtenv/scripts/user/config.sh",
+      "platform": "ios",
+      "layer": "user",
+      "lines": 66,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/ios/virtenv/scripts/user/devices.sh",
+      "platform": "ios",
+      "layer": "user",
+      "lines": 347,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/ios/virtenv/scripts/user/doctor.sh",
+      "platform": "ios",
+      "layer": "user",
+      "lines": 295,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/ios/virtenv/scripts/user/setup.sh",
+      "platform": "ios",
+      "layer": "user",
+      "lines": 53,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/ios/virtenv/scripts/init/init-hook.sh",
+      "platform": "ios",
+      "layer": "init",
+      "lines": 116,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/ios/virtenv/scripts/init/setup.sh",
+      "platform": "ios",
+      "layer": "init",
+      "lines": 91,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/ios/virtenv/scripts/init/doctor.sh",
+      "platform": "ios",
+      "layer": "init",
+      "lines": 71,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/react-native/virtenv/scripts/lib/lib.sh",
+      "platform": "react-native",
+      "layer": "lib",
+      "lines": 332,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/react-native/virtenv/scripts/lib/doctor.sh",
+      "platform": "react-native",
+      "layer": "lib",
+      "lines": 96,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/react-native/virtenv/scripts/user/rn.sh",
+      "platform": "react-native",
+      "layer": "user",
+      "lines": 61,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/react-native/virtenv/scripts/user/metro.sh",
+      "platform": "react-native",
+      "layer": "user",
+      "lines": 209,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/react-native/virtenv/scripts/user/doctor.sh",
+      "platform": "react-native",
+      "layer": "user",
+      "lines": 296,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/react-native/virtenv/scripts/user/setup.sh",
+      "platform": "react-native",
+      "layer": "user",
+      "lines": 54,
+      "status": "shell"
+    },
+    {
+      "path": "plugins/react-native/virtenv/scripts/init/init-hook.sh",
+      "platform": "react-native",
+      "layer": "init",
+      "lines": 21,
+      "status": "shell"
+    }
+  ]
+}
