@@ -1,16 +1,10 @@
-#![allow(dead_code)]
-
-mod commands;
-mod sdks;
-mod utils;
-
 use clap::Parser;
-use commands::Cli;
+
+#[derive(Parser)]
+#[command(name = "segkit", version, about = "Segment SDK developer toolkit")]
+struct Cli {}
 
 fn main() {
-    let cli = Cli::parse();
-    if let Err(e) = commands::run(cli) {
-        eprintln!("Error: {e}");
-        std::process::exit(1);
-    }
+    let _cli = Cli::parse();
+    println!("segkit {}", env!("CARGO_PKG_VERSION"));
 }

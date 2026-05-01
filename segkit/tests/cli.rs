@@ -6,11 +6,11 @@ fn segkit() -> Command {
 }
 
 #[test]
-fn no_args_shows_help() {
+fn no_args_prints_version() {
     segkit()
         .assert()
-        .failure()
-        .stderr(predicate::str::contains("Usage"));
+        .success()
+        .stdout(predicate::str::contains("segkit 0.1.0"));
 }
 
 #[test]
@@ -23,67 +23,10 @@ fn help_flag() {
 }
 
 #[test]
-fn init_help() {
+fn version_flag() {
     segkit()
-        .args(["init", "--help"])
+        .arg("--version")
         .assert()
         .success()
-        .stdout(predicate::str::contains("--sdk"))
-        .stdout(predicate::str::contains("--name"))
-        .stdout(predicate::str::contains("--issue"));
-}
-
-#[test]
-fn repro_help() {
-    segkit()
-        .args(["repro", "--help"])
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("package"))
-        .stdout(predicate::str::contains("share"));
-}
-
-#[test]
-fn init_requires_sdk() {
-    segkit()
-        .args(["init", "--name", "test"])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("--sdk"));
-}
-
-#[test]
-fn init_requires_name_or_issue() {
-    segkit()
-        .args(["init", "--sdk", "swift"])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("--name or --issue"));
-}
-
-#[test]
-fn init_invalid_sdk() {
-    segkit()
-        .args(["init", "--sdk", "java", "--name", "test"])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("unknown SDK"));
-}
-
-#[test]
-fn init_accepts_rn_shorthand() {
-    segkit()
-        .args(["init", "--sdk", "rn", "--name", "test"])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("not yet implemented"));
-}
-
-#[test]
-fn repro_share_requires_issue() {
-    segkit()
-        .args(["repro", "share"])
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("--issue"));
+        .stdout(predicate::str::contains("segkit"));
 }
