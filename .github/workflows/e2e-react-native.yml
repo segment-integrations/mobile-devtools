@@ -49,6 +49,7 @@ jobs:
           path: |
             ~/.gradle/caches
             ~/.gradle/wrapper
+            ~/.gradle/configuration-cache
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
@@ -105,8 +106,11 @@ jobs:
         run: bash scripts/dev/rewrite-plugin-urls.sh --to-local examples/
 
       - name: Run React Native E2E test
+        id: e2e
         working-directory: examples/react-native
         run: |
+          START=$SECONDS
+          set +e
           if [ "${{ matrix.platform }}" = "android" ]; then
             devbox run --pure -e IOS_SKIP_SETUP=1 -e EMU_HEADLESS=1 -e ANDROID_DEVICES=${{ matrix.device }} test:e2e:android
           elif [ "${{ matrix.platform }}" = "ios" ]; then
@@ -114,6 +118,34 @@ jobs:
           elif [ "${{ matrix.platform }}" = "web" ]; then
             devbox run --pure -e ANDROID_SKIP_SETUP=1 -e IOS_SKIP_SETUP=1 test:e2e:web
           fi
+          E2E_EXIT=$?
+          set -e
+          echo "e2e_duration=$(( SECONDS - START ))" >> "$GITHUB_OUTPUT"
+          exit $E2E_EXIT
+
+      - name: Write timing summary
+        if: always()
+        run: |
+          DURATION="${{ steps.e2e.outputs.e2e_duration }}"
+          RESULT="${{ steps.e2e.outcome }}"
+          PLATFORM="${{ matrix.platform }}"
+          DEVICE="${{ matrix.device }}"
+          MINUTES=$(( ${DURATION:-0} / 60 ))
+          SECS=$(( ${DURATION:-0} % 60 ))
+
+          mkdir -p examples/react-native/reports
+          cat > examples/react-native/reports/timing-${PLATFORM}.json <<TJSON
+          {"platform":"react-native-${PLATFORM}","device":"${DEVICE}","e2e_seconds":${DURATION:-0},"result":"${RESULT}","run_id":"${{ github.run_id }}"}
+          TJSON
+
+          echo "## React Native E2E Timing - ${PLATFORM}-${DEVICE}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Metric | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Platform | ${PLATFORM} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Device | ${DEVICE} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| E2E duration | ${MINUTES}m ${SECS}s |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Result | ${RESULT} |" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload reports and logs
         if: always()
