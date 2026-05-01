@@ -73,22 +73,22 @@
         "bash {{ .Virtenv }}/scripts/user/setup.sh"
       ],
       "android:sync": [
-        "android.sh devices sync"
+        "segkit android devices sync"
       ],
       "android:devices:eval": [
-        "ANDROID_SDK_REQUIRED=0 android.sh devices eval"
+        "ANDROID_SDK_REQUIRED=0 segkit android devices eval"
       ],
       "start:android": [
-        "android.sh run \"${1:-}\""
+        "segkit android run \"${1:-}\""
       ],
       "start:emu": [
-        "android.sh emulator start \"${1:-}\""
+        "segkit android emulator start \"${1:-}\""
       ],
       "stop:emu": [
-        "android.sh emulator stop"
+        "segkit android emulator stop"
       ],
       "reset:emu": [
-        "android.sh emulator reset"
+        "segkit android emulator reset"
       ],
       "doctor": [
         "bash {{ .Virtenv }}/scripts/user/doctor.sh"
