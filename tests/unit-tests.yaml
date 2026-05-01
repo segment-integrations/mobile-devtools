@@ -75,12 +75,6 @@ processes:
     availability:
       restart: "no"
 
-  # devbox-mcp plugin tests
-  test-devbox-mcp:
-    command: "process-compose -f plugins/devbox-mcp/tests/test-suite.yaml --no-server --tui=false"
-    availability:
-      restart: "no"
-
   # Summary - only runs when all tests pass
   summary:
     command: |
@@ -107,9 +101,6 @@ processes:
       echo ""
       echo "React Native Tests:"
       echo "  - lib.sh"
-      echo ""
-      echo "devbox-mcp Tests:"
-      echo "  - All tests"
       echo ""
       echo "========================================"
       echo "     ALL UNIT TESTS PASSED"
@@ -149,8 +140,6 @@ processes:
       test-ios-cache:
         condition: process_completed_successfully
       test-rn-lib:
-        condition: process_completed_successfully
-      test-devbox-mcp:
         condition: process_completed_successfully
     availability:
       restart: "no"

@@ -232,60 +232,6 @@ devbox list                        # List packages
 devbox init                        # Create devbox.json
 ```
 
-### Using Devbox MCP Tools (Model Context Protocol)
-
-**IMPORTANT: Always prefer devbox-mcp tools over direct Bash commands when available.**
-
-This repository includes a devbox-mcp plugin that provides MCP tools for interacting with devbox. These tools should be your first choice because they:
-- Run commands in the correct devbox environment with all packages available
-- Automatically use the project's `devbox.json` configuration
-- Handle environment variables and PATH correctly
-- Work across different project directories via the `cwd` parameter
-
-**Preferred approach:**
-```javascript
-// Use devbox-mcp tools
-devbox_run({ command: "android.sh devices list", cwd: "/path/to/project" })
-devbox_run({ command: "test", cwd: "/path/to/project" })
-devbox_list({ cwd: "/path/to/project" })
-```
-
-**Avoid when possible:**
-```bash
-# Direct Bash commands run outside devbox environment
-bash -c "cd /path/to/project && android.sh devices list"
-```
-
-**When you need Bash commands, wrap them with devbox_run:**
-```javascript
-// This ensures the command runs in the devbox environment
-devbox_run({
-  command: "bash",
-  args: ["-c", "echo $ANDROID_SDK_ROOT"],
-  cwd: "/path/to/project"
-})
-```
-
-**Available devbox-mcp tools:**
-- `devbox_run` - Execute any command or script in devbox environment
-- `devbox_list` - List installed packages
-- `devbox_add` - Add packages to devbox.json
-- `devbox_info` - Get package information
-- `devbox_search` - Search Nix package registry
-- `devbox_shell_env` - Get environment variables
-- `devbox_sync` - Regenerate .devbox/virtenv/ from devbox.json (useful when virtenv is stale)
-- `devbox_init` - Initialize devbox.json
-- `devbox_docs_search` - Search devbox documentation
-- `devbox_docs_list` - List available docs
-- `devbox_docs_read` - Read documentation files
-
-All tools (except `devbox_search`) support the `cwd` parameter to specify which project directory to operate in.
-
-**Important notes:**
-- The `.devbox/virtenv/` directory is temporary and auto-regenerated - never edit files there directly
-- Use `devbox_sync` if you suspect the virtenv is stale or after modifying devbox.json
-- The `devbox.d/` directory is for per-project configuration (e.g., device definitions)
-
 ### Setup
 ```bash
 # Install devbox dependencies

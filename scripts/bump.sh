@@ -19,7 +19,6 @@ PLUGINS=(
   "plugins/android:plugins/android/plugin.json:.version"
   "plugins/ios:plugins/ios/plugin.json:.version"
   "plugins/react-native:plugins/react-native/plugin.json:.version"
-  "plugins/devbox-mcp:plugins/devbox-mcp/package.json:.version"
 )
 
 # ---------------------------------------------------------------------------
@@ -201,7 +200,7 @@ echo ""
 # Step 7: Stage, commit, and tag
 # ---------------------------------------------------------------------------
 
-# Build scoped tag list for commit message (e.g. android/v0.0.3, devbox-mcp/v0.1.3)
+# Build scoped tag list for commit message (e.g. android/v0.0.3, ios/v0.1.3)
 SCOPED_TAGS=""
 for entry in "${CHANGED_PLUGINS[@]}"; do
   IFS=':' read -r plugin_dir version_file jq_path <<< "$entry"
