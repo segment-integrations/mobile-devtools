@@ -35,6 +35,14 @@ jobs:
           cache: 'npm'
           cache-dependency-path: examples/react-native/package-lock.json
 
+      - name: Cache node_modules
+        uses: actions/cache@v5
+        with:
+          path: examples/react-native/node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('examples/react-native/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
       - name: Enable KVM (Android only)
         if: matrix.platform == 'android'
         run: |
