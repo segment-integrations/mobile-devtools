@@ -16,6 +16,7 @@
 .idea/
 
 # Build artifacts
+**/target/
 **/.gradle/
 **/build/
 **/node_modules/
