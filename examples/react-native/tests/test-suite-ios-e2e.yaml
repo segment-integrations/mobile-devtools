@@ -313,9 +313,10 @@ processes:
         exit 1
       fi
 
-      # Capture simulator logs for analysis
+      # Capture simulator logs for analysis (scoped to our app process)
       if [ -n "$UDID" ]; then
-        xcrun simctl spawn "$UDID" log show --last 2m --style compact > "$_logs_dir/simulator-app.log" 2>&1 || true
+        APP_PROCESS="${IOS_APP_SCHEME:-ReactNativeExample}"
+        xcrun simctl spawn "$UDID" log show --last 2m --predicate "process == \"$APP_PROCESS\"" --style compact > "$_logs_dir/simulator-app.log" 2>&1 || true
 
         # Scan for native crash patterns
         error_patterns="Terminating app|SIGABRT|EXC_BAD_ACCESS|EXC_CRASH|Assertion failure"
