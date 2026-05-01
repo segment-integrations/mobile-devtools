@@ -22,7 +22,8 @@ fn help_flag() {
         .stdout(predicate::str::contains("Segment SDK developer toolkit"))
         .stdout(predicate::str::contains("android"))
         .stdout(predicate::str::contains("ios"))
-        .stdout(predicate::str::contains("rn"));
+        .stdout(predicate::str::contains("rn"))
+        .stdout(predicate::str::contains("setup"));
 }
 
 #[test]
@@ -65,4 +66,12 @@ fn rn_subcommand_without_script_fails_gracefully() {
         .assert()
         .failure()
         .stderr(predicate::str::contains("rn.sh not found"));
+}
+
+#[test]
+fn setup_detects_devbox() {
+    segkit()
+        .arg("setup")
+        .assert()
+        .stdout(predicate::str::contains("devbox:"));
 }
