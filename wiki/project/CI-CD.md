@@ -10,7 +10,6 @@ The repository uses GitHub Actions with three main workflows to ensure code qual
 
 1. **PR Fast Checks** - Quick validation for every PR
 2. **Full E2E Tests** - Comprehensive platform testing
-3. **MCP Publishing** - Automated semantic versioning and NPM publishing
 
 ### Design Philosophy
 
@@ -275,113 +274,6 @@ Similar to PR checks but with extended timeouts.
 - All Android and iOS versions above
 - Web build (no device needed)
 
-## MCP Publishing Workflow (`publish-mcp.yml`)
-
-### Purpose
-
-Automatically publishes the `devbox-mcp` NPM package using semantic-release for versioning.
-
-### Triggers
-
-Runs on:
-- **Push to main** with changes to `plugins/devbox-mcp/**` or workflow file
-- **Manual dispatch** with optional dry-run mode
-
-```yaml
-on:
-  workflow_dispatch:
-    inputs:
-      dry_run: false
-  push:
-    branches: [main]
-    paths:
-      - 'plugins/devbox-mcp/**'
-      - '.github/workflows/publish-mcp.yml'
-```
-
-### Jobs
-
-#### 1. Test (ubuntu-24.04)
-
-Validates the package before publishing.
-
-```bash
-devbox run test:plugin:devbox-mcp
-```
-
-**Environment:**
-- Node.js 20 with npm cache
-- Devbox with package caching
-
-**Artifacts uploaded:**
-- `test-reports` - Test results from `test-results/` and `reports/`
-
-#### 2. Release (ubuntu-24.04)
-
-Runs semantic-release to determine version and publish to NPM.
-
-**Conditions:**
-- Runs after successful tests
-- Skipped if workflow is manual dispatch with `dry_run: true`
-- Requires `npm-publish` environment with NPM_TOKEN secret
-
-**Semantic Release Process:**
-1. Analyzes commit messages since last release
-2. Determines version bump (major/minor/patch) based on conventional commits
-3. Generates CHANGELOG.md
-4. Creates Git tag
-5. Publishes to NPM registry
-6. Creates GitHub release
-
-**Outputs:**
-- `new_release_published` - Boolean indicating if a new version was released
-- `new_release_version` - Version number of the new release (e.g., "1.2.3")
-
-**Artifacts uploaded:**
-- `release-info` - Updated CHANGELOG.md (only if released)
-
-#### 3. Dry Run (ubuntu-24.04)
-
-Tests the release process without publishing.
-
-**Conditions:**
-- Runs after successful tests
-- Only if workflow is manual dispatch with `dry_run: true`
-
-**Process:**
-```bash
-npx semantic-release --dry-run
-```
-
-Shows what would happen without actually publishing or creating tags.
-
-#### 4. Summary (ubuntu-latest)
-
-Displays release results.
-
-**Outputs:**
-```
-📦 Devbox MCP Server Publish Summary
-=====================================
-
-Tests: success
-Release: success
-
-✅ Successfully published devbox-mcp@1.2.3
-
-NPM: https://www.npmjs.com/package/devbox-mcp/v/1.2.3
-Release: https://github.com/org/repo/releases/tag/v1.2.3
-```
-
-### Semantic Versioning
-
-The workflow uses conventional commits to determine version bumps:
-
-- `feat:` - Minor version bump (1.0.0 → 1.1.0)
-- `fix:` - Patch version bump (1.0.0 → 1.0.1)
-- `BREAKING CHANGE:` - Major version bump (1.0.0 → 2.0.0)
-- `docs:`, `chore:`, etc. - No version bump (no release)
-
 ## Optimization Strategies
 
 ### Device Filtering
@@ -546,9 +438,6 @@ act -W .github/workflows/pr-checks.yml
 
 # Full E2E workflow
 act -W .github/workflows/e2e-full.yml
-
-# MCP publishing workflow (dry run only locally)
-act -W .github/workflows/publish-mcp.yml
 ```
 
 ### Testing Workflow Changes
@@ -916,7 +805,6 @@ jobs:
   publish:
     environment:
       name: production
-      url: https://npmjs.com/package/devbox-mcp
     steps:
       - run: npm publish
 ```
@@ -995,9 +883,6 @@ Update `.github/workflows/README.md` when adding new workflows with:
 
 **Full E2E:**
 - Similar to PR checks but with longer timeouts
-
-**MCP Publishing:**
-- Test + Release (Linux): minimal cost
 
 ### Optimization Impact
 

@@ -75,6 +75,5 @@ options = [
 includes = [
   "tests/process-compose*.yaml",
   "examples/*/tests/*.yaml",
-  "plugins/devbox-mcp/tests/test-suite.yaml",
 ]
 excludes = []

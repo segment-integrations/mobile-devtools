@@ -1,16 +1,10 @@
 # Release Process
 
-This document describes the release process for the devbox-plugins repository, covering both plugin releases and MCP package releases.
+This document describes the release process for the devbox-plugins repository.
 
 ## Overview
 
-This repository follows a dual release strategy:
-
 **Plugins (Android, iOS, React Native)**: GitHub-based, ref-based distribution with no explicit version numbers. Users reference plugins directly via GitHub URLs and can pin to specific commits or tags.
-
-**MCP Package (devbox-mcp)**: Semantic versioning with automated releases to NPM via semantic-release. Version numbers follow semver (0.1.0+) with automated CHANGELOG generation.
-
-The split strategy reflects the different distribution models: plugins are consumed directly from the repository via devbox's plugin system, while the MCP server is a standalone NPM package consumed by MCP clients.
 
 ## Versioning Strategy
 
@@ -48,19 +42,6 @@ git tag -a v1.2.0 -m "Release plugins v1.2.0"
 git push origin v1.2.0
 ```
 
-### MCP Package
-
-The devbox-mcp package follows semantic versioning:
-
-**Version format:** `{major}.{minor}.{patch}` (currently 0.1.0+)
-
-**Version bumps:**
-- **Major (1.0.0)**: Breaking changes to MCP server API or tools
-- **Minor (0.2.0)**: New features, new tools, new capabilities
-- **Patch (0.1.1)**: Bug fixes, documentation updates, refactoring
-
-Versions are automatically determined by semantic-release based on conventional commit messages.
-
 ## Conventional Commits
 
 All commits must follow conventional commit format for automated release notes and version bumping.
@@ -97,7 +78,6 @@ Common scopes in this repository:
 - `android`: Android plugin
 - `ios`: iOS plugin
 - `react-native`: React Native plugin
-- `devbox-mcp`: MCP package
 - `ci`: CI/CD workflows
 - `docs`: Documentation
 - `tests`: Test infrastructure
@@ -114,26 +94,12 @@ AVDs with device definitions in devbox.d/android/devices/.
 Closes #123
 ```
 
-```
-feat(devbox-mcp): add devbox_docs_read tool
-
-Adds a new MCP tool to read full documentation files from the
-devbox docs repository.
-```
-
 **Bug fix commits:**
 ```
 fix(ios): resolve Xcode path caching issue
 
 The Xcode developer directory cache was not being invalidated
 after the TTL expired. Now checks cache age before using cached value.
-```
-
-```
-fix(devbox-mcp): handle missing cwd parameter gracefully
-
-The devbox_run tool now defaults to current directory if cwd
-parameter is not provided, matching bash tool behavior.
 ```
 
 **Breaking changes:**
@@ -144,14 +110,6 @@ BREAKING CHANGE: Device definitions now require explicit ABI field.
 Previous schema used 'preferred_abi', now uses 'abi'.
 
 Migration: Rename 'preferred_abi' to 'abi' in all device JSON files.
-```
-
-**Alternative breaking change syntax:**
-```
-feat(devbox-mcp): redesign tool interface
-
-BREAKING CHANGE: All devbox_* tools now return structured JSON
-instead of plain text. Clients must parse JSON responses.
 ```
 
 **Chore commits (no release):**
@@ -176,122 +134,6 @@ docs: fix typo in RELEASE.md
 ```
 test(react-native): add Metro port management unit tests
 ```
-
-## MCP Package Releases
-
-The devbox-mcp package is released automatically via semantic-release when changes are pushed to the main branch.
-
-### Automated Release Workflow
-
-**Trigger conditions:**
-1. Push to main branch with changes in `plugins/devbox-mcp/**`
-2. Push to main branch with changes in `.github/workflows/publish-mcp.yml`
-3. Manual workflow dispatch via GitHub Actions
-
-**What happens during a release:**
-
-1. **Tests run**: All devbox-mcp tests execute via `devbox run test:plugin:devbox-mcp`
-
-2. **Semantic-release analyzes commits**: Determines if a release is needed and what version bump
-
-3. **Version bump**: Updates `package.json` version
-
-4. **CHANGELOG generation**: Generates/updates `CHANGELOG.md` with release notes
-
-5. **NPM publish**: Publishes package to NPM registry
-
-6. **GitHub release**: Creates GitHub release with notes and tarball
-
-7. **Git commit**: Commits `package.json` and `CHANGELOG.md` changes with message:
-   ```
-   chore(release): 0.2.0 [skip ci]
-
-   ## [0.2.0](https://github.com/segment-integrations/devbox-plugins/compare/v0.1.0...v0.2.0) (2026-02-12)
-
-   ### Features
-
-   * **devbox-mcp:** add devbox_docs_read tool ([abc1234](link))
-   ```
-
-**Workflow concurrency**: Only one release can run at a time (no parallel releases).
-
-### Semantic-Release Configuration
-
-Configuration in `plugins/devbox-mcp/.releaserc.json`:
-
-```json
-{
-  "branches": ["main"],
-  "tagFormat": "v${version}",
-  "plugins": [
-    ["@semantic-release/commit-analyzer", {
-      "preset": "conventionalcommits",
-      "releaseRules": [
-        { "type": "feat", "release": "minor" },
-        { "type": "fix", "release": "patch" },
-        { "type": "perf", "release": "patch" },
-        { "type": "revert", "release": "patch" },
-        { "type": "docs", "scope": "!README", "release": "patch" },
-        { "type": "refactor", "release": "patch" },
-        { "type": "style", "release": "patch" },
-        { "type": "chore", "release": false },
-        { "type": "test", "release": false },
-        { "type": "build", "release": false },
-        { "type": "ci", "release": false },
-        { "breaking": true, "release": "major" }
-      ]
-    }],
-    ["@semantic-release/release-notes-generator", {
-      "preset": "conventionalcommits"
-    }],
-    ["@semantic-release/changelog", {
-      "changelogFile": "CHANGELOG.md"
-    }],
-    ["@semantic-release/npm", {
-      "npmPublish": true
-    }],
-    ["@semantic-release/git", {
-      "assets": ["package.json", "CHANGELOG.md"]
-    }],
-    ["@semantic-release/github"]
-  ]
-}
-```
-
-### Dry-Run Testing
-
-Test release process without publishing:
-
-```bash
-# Via GitHub Actions UI:
-# 1. Go to Actions tab
-# 2. Select "Publish Devbox MCP Server" workflow
-# 3. Click "Run workflow"
-# 4. Check "Dry run (do not publish)"
-# 5. Click "Run workflow"
-
-# The dry-run will show:
-# - What version would be released
-# - What commits would be included
-# - What CHANGELOG entries would be generated
-# - No actual publish to NPM
-# - No git commits or tags created
-```
-
-### Manual Release Trigger
-
-Force a release check outside the normal push workflow:
-
-```bash
-# Via GitHub Actions UI:
-# 1. Go to Actions tab
-# 2. Select "Publish Devbox MCP Server" workflow
-# 3. Click "Run workflow"
-# 4. Leave "Dry run" unchecked
-# 5. Click "Run workflow"
-```
-
-This runs the full release process if there are commits requiring a release.
 
 ## Plugin Releases
 
@@ -366,15 +208,6 @@ git push origin :refs/tags/v1.2.0
 
 ### Pre-Release
 
-**For MCP package releases:**
-- [ ] All tests pass locally: `devbox run test:plugin:devbox-mcp`
-- [ ] All PR checks pass on GitHub
-- [ ] REFERENCE.md is up to date
-- [ ] Example usage in README is accurate
-- [ ] Breaking changes are documented in commit messages
-- [ ] Conventional commit format followed for all commits
-- [ ] No uncommitted changes in working directory
-
 **For plugin releases (if tagging):**
 - [ ] All plugin tests pass: `cd plugins/tests/{platform} && ./test-*.sh`
 - [ ] Example projects tested: `cd examples/{platform} && devbox run build`
@@ -385,18 +218,6 @@ git push origin :refs/tags/v1.2.0
 
 ### Release Execution
 
-**MCP package (automated):**
-1. Merge PR to main branch
-2. GitHub Actions automatically runs publish workflow
-3. Monitor workflow in Actions tab
-4. Verify no errors in semantic-release step
-
-**MCP package (manual):**
-1. Go to Actions > "Publish Devbox MCP Server"
-2. Run workflow > uncheck dry run > Run workflow
-3. Monitor workflow execution
-4. Check job summary for release info
-
 **Plugin tagging (manual):**
 1. Ensure main branch is at the commit to tag
 2. Create annotated tag: `git tag -a v1.2.0 -m "Release v1.2.0"`
@@ -404,14 +225,6 @@ git push origin :refs/tags/v1.2.0
 4. Verify tag appears on GitHub releases page
 
 ### Post-Release Verification
-
-**For MCP package:**
-- [ ] Check NPM package page: https://www.npmjs.com/package/devbox-mcp
-- [ ] Verify version number is correct
-- [ ] Check GitHub release page for tarball and notes
-- [ ] Verify CHANGELOG.md was updated in repository
-- [ ] Test installation: `npm install devbox-mcp@latest`
-- [ ] Verify package works: `npx devbox-mcp --help` (if applicable)
 
 **For plugin tags:**
 - [ ] Tag appears on GitHub releases page
@@ -426,27 +239,6 @@ git push origin :refs/tags/v1.2.0
 - [ ] Example project using tag works: `devbox shell`
 
 ### Rollback Procedure
-
-**MCP package rollback:**
-
-If a release has critical bugs:
-
-1. **NPM deprecation** (warns users, doesn't unpublish):
-   ```bash
-   npm deprecate devbox-mcp@0.2.0 "Critical bug, use 0.1.9 instead"
-   ```
-
-2. **Publish fixed version**:
-   - Fix bug on main branch
-   - Use conventional commit: `fix(devbox-mcp): critical bug description`
-   - Push to main to trigger new release
-   - Semantic-release will publish patch version (0.2.1)
-
-3. **If complete unpublish needed** (within 72 hours of publish):
-   ```bash
-   npm unpublish devbox-mcp@0.2.0
-   ```
-   Note: Unpublishing is heavily discouraged by NPM. Prefer deprecation + fixed release.
 
 **Plugin rollback:**
 
@@ -482,13 +274,6 @@ If plugin changes cause issues:
 - Changes to script exit codes or output format
 - Removal of supported platform versions
 - Changes to default behavior that affect existing projects
-
-**For MCP package:**
-- Changes to tool names or parameters
-- Changes to tool response format
-- Removal of tools
-- Changes to error handling behavior
-- Changes to Node.js version requirement
 
 ### Communicating Breaking Changes
 
@@ -619,26 +404,6 @@ Hotfixes are NOT needed for:
 
 ### Hotfix Workflow
 
-**For MCP package:**
-
-1. **Create fix on main branch**:
-   ```bash
-   # Fix bug in plugins/devbox-mcp/
-   git add plugins/devbox-mcp/
-   git commit -m "fix(devbox-mcp): critical bug description"
-   git push origin main
-   ```
-
-2. **Automated release**:
-   - Push to main triggers publish workflow
-   - Semantic-release creates patch version
-   - Package published to NPM automatically
-
-3. **Verify hotfix**:
-   - Check NPM for new version
-   - Test installation: `npm install devbox-mcp@latest`
-   - Verify bug is fixed
-
 **For plugins:**
 
 1. **Create fix on main branch**:
@@ -666,7 +431,7 @@ This repository does not maintain release branches. All fixes go to main branch.
 
 **Rationale:**
 - Plugins are consumed from main or tagged commits
-- MCP package uses semantic-release (no release branches)
+- Plugins are distributed via GitHub (no release branches needed)
 - Users can pin to specific tags for stability
 - Maintaining release branches adds complexity without clear benefit
 
@@ -678,22 +443,15 @@ This repository does not maintain release branches. All fixes go to main branch.
 
 ## Release URLs and Resources
 
-**MCP Package:**
-- NPM: https://www.npmjs.com/package/devbox-mcp
-- GitHub Releases: https://github.com/segment-integrations/devbox-plugins/releases
-- CHANGELOG: https://github.com/segment-integrations/devbox-plugins/blob/main/plugins/devbox-mcp/CHANGELOG.md
-
 **Plugins:**
 - Main branch: https://github.com/segment-integrations/devbox-plugins
 - Tags: https://github.com/segment-integrations/devbox-plugins/tags
 - Releases: https://github.com/segment-integrations/devbox-plugins/releases
 
 **CI/CD:**
-- Publish workflow: https://github.com/segment-integrations/devbox-plugins/actions/workflows/publish-mcp.yml
 - PR checks: https://github.com/segment-integrations/devbox-plugins/actions/workflows/pr-checks.yml
 
 **Documentation:**
 - Android Plugin: https://github.com/segment-integrations/devbox-plugins/blob/main/plugins/android/REFERENCE.md
 - iOS Plugin: https://github.com/segment-integrations/devbox-plugins/blob/main/plugins/ios/REFERENCE.md
 - React Native Plugin: https://github.com/segment-integrations/devbox-plugins/blob/main/plugins/react-native/REFERENCE.md
-- MCP Package README: https://github.com/segment-integrations/devbox-plugins/blob/main/plugins/devbox-mcp/README.md
