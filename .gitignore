@@ -20,6 +20,7 @@
 **/build/
 **/node_modules/
 **/Pods/
+**/target/
 *.cache
 .claude/
 
