@@ -80,7 +80,7 @@ processes:
 
       cd ios
       echo "Installing CocoaPods dependencies..."
-      pod install --repo-update
+      pod install
       echo 'Pod install complete'
 
       echo "pass" > "$_step_dir/$_step.status"
