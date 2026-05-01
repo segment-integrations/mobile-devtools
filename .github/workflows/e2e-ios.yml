@@ -77,6 +77,7 @@ jobs:
         run: bash scripts/dev/rewrite-plugin-urls.sh --to-local examples/
 
       - name: Run iOS E2E test
+        id: e2e
         working-directory: examples/ios
         env:
           BOOT_TIMEOUT: ${{ inputs.boot-timeout }}
@@ -84,7 +85,36 @@ jobs:
           IOS_DEFAULT_DEVICE: ${{ matrix.device }}
           IOS_DEVICES: ${{ matrix.device }}
           TEST_TUI: false
-        run: devbox run --pure -e SIM_HEADLESS=1 -e IOS_DEVICES=${{ matrix.device }} test:e2e
+        run: |
+          START=$SECONDS
+          set +e
+          devbox run --pure -e SIM_HEADLESS=1 -e IOS_DEVICES=${{ matrix.device }} test:e2e
+          E2E_EXIT=$?
+          set -e
+          echo "e2e_duration=$(( SECONDS - START ))" >> "$GITHUB_OUTPUT"
+          exit $E2E_EXIT
+
+      - name: Write timing summary
+        if: always()
+        run: |
+          DURATION="${{ steps.e2e.outputs.e2e_duration }}"
+          RESULT="${{ steps.e2e.outcome }}"
+          DEVICE="${{ matrix.device }}"
+          MINUTES=$(( ${DURATION:-0} / 60 ))
+          SECS=$(( ${DURATION:-0} % 60 ))
+
+          mkdir -p examples/ios/reports
+          cat > examples/ios/reports/timing.json <<TJSON
+          {"platform":"ios","device":"${DEVICE}","e2e_seconds":${DURATION:-0},"result":"${RESULT}","run_id":"${{ github.run_id }}"}
+          TJSON
+
+          echo "## iOS E2E Timing - ${DEVICE}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Metric | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Device | ${DEVICE} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| E2E duration | ${MINUTES}m ${SECS}s |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Result | ${RESULT} |" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload reports and logs
         if: always()
