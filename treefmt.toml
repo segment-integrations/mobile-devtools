@@ -1,5 +1,9 @@
 # treefmt configuration
-# Validates shell scripts, GitHub workflows, process-compose configs, and Rust code
+# Validates shell scripts, GitHub workflows, and process-compose configs
+#
+# Note: Rust checks (rustfmt, clippy) are NOT included here because they are
+# project-level tools that don't work well with treefmt's per-file model.
+# Run them via: devbox run segkit:check
 #
 # Usage:
 #   treefmt                    # Run validators on all files
@@ -77,30 +81,4 @@ includes = [
   "tests/process-compose*.yaml",
   "examples/*/tests/*.yaml",
 ]
-excludes = []
-
-# Rust formatting via rustfmt
-[formatter.rustfmt]
-command = "sh"
-options = [
-  "-c",
-  '''
-  cargo fmt --manifest-path segkit/Cargo.toml -- --check "$@" 2>&1 || exit 1
-  ''',
-  "--"
-]
-includes = ["segkit/src/**/*.rs", "segkit/tests/**/*.rs"]
-excludes = []
-
-# Rust linting via clippy
-[formatter.clippy]
-command = "sh"
-options = [
-  "-c",
-  '''
-  cargo clippy --manifest-path segkit/Cargo.toml -- -D warnings 2>&1 || exit 1
-  ''',
-  "--"
-]
-includes = ["segkit/src/**/*.rs", "segkit/tests/**/*.rs"]
 excludes = []
