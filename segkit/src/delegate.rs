@@ -15,25 +15,27 @@ fn resolve_script(name: &str) -> Result<String> {
         "invalid script name: {name}"
     );
 
-    let platform = if name.starts_with("android") {
-        "ANDROID"
+    let env_keys: &[&str] = if name.starts_with("android") {
+        &["ANDROID_SCRIPTS_DIR"]
     } else if name.starts_with("ios") {
-        "IOS"
+        &["IOS_SCRIPTS_DIR"]
     } else {
-        "RN"
+        &["REACT_NATIVE_SCRIPTS_DIR"]
     };
 
-    let env_key = format!("{}_SCRIPTS_DIR", platform);
-    if let Ok(scripts_dir) = std::env::var(&env_key) {
-        let path = format!("{}/user/{}", scripts_dir, name);
-        if std::path::Path::new(&path).exists() {
-            return Ok(path);
+    for env_key in env_keys {
+        if let Ok(scripts_dir) = std::env::var(env_key) {
+            let path = format!("{}/user/{}", scripts_dir, name);
+            if std::path::Path::new(&path).exists() {
+                return Ok(path);
+            }
         }
     }
 
+    let primary_key = env_keys[0];
     which::which(name)
         .map(|p| p.to_string_lossy().into_owned())
-        .with_context(|| format!("{name} not found in PATH or ${env_key}"))
+        .with_context(|| format!("{name} not found in PATH or ${primary_key}"))
 }
 
 fn append_timing(script: &str, args: &[String], duration_ms: u128, exit_code: i32) {

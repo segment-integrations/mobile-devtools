@@ -23,6 +23,7 @@ fn help_flag() {
         .stdout(predicate::str::contains("android"))
         .stdout(predicate::str::contains("ios"))
         .stdout(predicate::str::contains("rn"))
+        .stdout(predicate::str::contains("metro"))
         .stdout(predicate::str::contains("setup"));
 }
 
@@ -61,11 +62,22 @@ fn ios_subcommand_without_script_fails_gracefully() {
 fn rn_subcommand_without_script_fails_gracefully() {
     segkit()
         .args(["rn", "doctor"])
-        .env_remove("RN_SCRIPTS_DIR")
+        .env_remove("REACT_NATIVE_SCRIPTS_DIR")
         .env("PATH", "")
         .assert()
         .failure()
         .stderr(predicate::str::contains("rn.sh not found"));
+}
+
+#[test]
+fn metro_subcommand_without_script_fails_gracefully() {
+    segkit()
+        .args(["metro", "start", "ios"])
+        .env_remove("REACT_NATIVE_SCRIPTS_DIR")
+        .env("PATH", "")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("metro.sh not found"));
 }
 
 #[test]

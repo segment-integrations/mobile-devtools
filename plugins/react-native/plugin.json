@@ -51,22 +51,22 @@
         "bash {{ .Virtenv }}/scripts/user/setup.sh"
       ],
       "start:metro": [
-        "metro.sh start ${1:-default}"
+        "segkit metro start ${1:-default}"
       ],
       "stop:metro": [
-        "metro.sh stop ${1:-default}"
+        "segkit metro stop ${1:-default}"
       ],
       "start:android": [
-        "android.sh run \"${1:-}\""
+        "segkit android run \"${1:-}\""
       ],
       "start:ios": [
-        "ios.sh run \"${1:-}\""
+        "segkit ios run \"${1:-}\""
       ],
       "rn:metro:port": [
-        "rn.sh metro port ${1:-default}"
+        "segkit rn metro port ${1:-default}"
       ],
       "rn:metro:clean": [
-        "rn.sh metro clean ${1:-default}"
+        "segkit rn metro clean ${1:-default}"
       ],
       "doctor": [
         "bash {{ .Virtenv }}/scripts/user/doctor.sh"
