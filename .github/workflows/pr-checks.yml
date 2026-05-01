@@ -11,7 +11,43 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Linting and formatting checks
+  # Detect which paths changed to skip unnecessary jobs
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      segkit: ${{ steps.filter.outputs.segkit }}
+      android: ${{ steps.filter.outputs.android }}
+      ios: ${{ steps.filter.outputs.ios }}
+      rn: ${{ steps.filter.outputs.rn }}
+      shell: ${{ steps.filter.outputs.shell }}
+      ci: ${{ steps.filter.outputs.ci }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            segkit:
+              - 'segkit/**'
+            android:
+              - 'plugins/android/**'
+              - 'examples/android/**'
+              - 'plugins/tests/android/**'
+            ios:
+              - 'plugins/ios/**'
+              - 'examples/ios/**'
+              - 'plugins/tests/ios/**'
+            rn:
+              - 'plugins/react-native/**'
+              - 'examples/react-native/**'
+              - 'plugins/tests/react-native/**'
+            shell:
+              - 'plugins/**/scripts/**'
+            ci:
+              - '.github/**'
+
+  # Linting and formatting checks (always runs)
   lint:
     name: Lint
     runs-on: ubuntu-24.04
@@ -30,6 +66,8 @@ jobs:
   # Shell script unit tests (no SDK required)
   test-shell-scripts:
     name: Shell Script Tests
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.shell == 'true' || needs.detect-changes.outputs.ci == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -66,6 +104,8 @@ jobs:
   # Device config tests (no SDK build, just config validation)
   test-device-config:
     name: Device Config Tests
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.android == 'true' || needs.detect-changes.outputs.ios == 'true' || needs.detect-changes.outputs.ci == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -96,6 +136,8 @@ jobs:
 
   # Android example E2E test (max device only on PRs)
   android-e2e:
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.android == 'true' || needs.detect-changes.outputs.rn == 'true' || needs.detect-changes.outputs.ci == 'true'
     uses: ./.github/workflows/e2e-android.yml
     with:
       devices: '["max"]'
@@ -108,6 +150,8 @@ jobs:
 
   # iOS example E2E test (max device only on PRs)
   ios-e2e:
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.ios == 'true' || needs.detect-changes.outputs.rn == 'true' || needs.detect-changes.outputs.ci == 'true'
     uses: ./.github/workflows/e2e-ios.yml
     with:
       matrix-include: '[{"device":"max","os":"macos-26"}]'
@@ -118,13 +162,15 @@ jobs:
 
   # React Native E2E tests (max device only on PRs, plus web)
   react-native-e2e:
+    needs: [detect-changes]
+    if: needs.detect-changes.outputs.rn == 'true' || needs.detect-changes.outputs.ci == 'true'
     uses: ./.github/workflows/e2e-react-native.yml
     with:
       matrix-include: '[{"platform":"android","device":"max","os":"ubuntu-24.04"},{"platform":"ios","device":"max","os":"macos-26"},{"platform":"web","device":"none","os":"ubuntu-24.04"}]'
       timeout-minutes: 45
       artifact-prefix: react-native
 
-  # Summary status check
+  # Summary status check (treats skipped jobs as success)
   status-check:
     name: All PR Checks Passed
     runs-on: ubuntu-latest
@@ -142,13 +188,16 @@ jobs:
           echo "  React Native E2E: ${{ needs.react-native-e2e.result }}"
           echo ""
 
-          if [[ "${{ needs.lint.result }}" != "success" ]] || \
-             [[ "${{ needs.test-shell-scripts.result }}" != "success" ]] || \
-             [[ "${{ needs.test-device-config.result }}" != "success" ]] || \
-             [[ "${{ needs.android-e2e.result }}" != "success" ]] || \
-             [[ "${{ needs.ios-e2e.result }}" != "success" ]] || \
-             [[ "${{ needs.react-native-e2e.result }}" != "success" ]]; then
-            echo "::error::One or more PR checks failed"
-            exit 1
-          fi
+          for result in \
+            "${{ needs.lint.result }}" \
+            "${{ needs.test-shell-scripts.result }}" \
+            "${{ needs.test-device-config.result }}" \
+            "${{ needs.android-e2e.result }}" \
+            "${{ needs.ios-e2e.result }}" \
+            "${{ needs.react-native-e2e.result }}"; do
+            if [[ "$result" != "success" && "$result" != "skipped" ]]; then
+              echo "::error::One or more PR checks failed"
+              exit 1
+            fi
+          done
           echo "::notice::All PR checks passed!"
