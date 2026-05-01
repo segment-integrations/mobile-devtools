@@ -404,27 +404,33 @@ processes:
 
       echo "  Checking logs for errors..."
 
-      # Save logcat snapshot to file
+      # Save full logcat for offline analysis, then extract app-only logs
       adb -s "$serial" logcat -d > "$_logs_dir/logcat-verify.txt" 2>&1 || true
+      APP_PID=$(adb -s "$serial" shell pidof "${ANDROID_APP_ID}" 2>/dev/null || true)
+      if [ -n "$APP_PID" ]; then
+        adb -s "$serial" logcat -d --pid="$APP_PID" > "$_logs_dir/logcat-app.txt" 2>&1 || true
+      else
+        grep -F "${ANDROID_APP_ID}" "$_logs_dir/logcat-verify.txt" > "$_logs_dir/logcat-app.txt" 2>/dev/null || true
+      fi
 
       # Check for Metro connection errors (these appear in red box)
       metro_patterns="unable.*load.*script|could.*not.*connect.*metro|connection.*refused.*8081|packaged.*correctly.*for.*release"
-      if grep -qiE "$metro_patterns" "$_logs_dir/logcat-verify.txt" 2>/dev/null; then
+      if grep -qiE "$metro_patterns" "$_logs_dir/logcat-app.txt" 2>/dev/null; then
         echo "FAIL: App cannot connect to Metro bundler"
         echo "--- Error lines ---"
-        grep -iE "unable|load|script|connect|metro|refused|8081|packaged|release|bundle" "$_logs_dir/logcat-verify.txt" | tail -30
+        grep -iE "unable|load|script|connect|metro|refused|8081|packaged|release|bundle" "$_logs_dir/logcat-app.txt" | tail -30
         echo "---"
         echo "Full logcat: $_logs_dir/logcat-verify.txt"
         printf 'fail\nApp cannot connect to Metro bundler\n' > "$_step_dir/$_step.status"
         exit 1
       fi
 
-      # Check for native crash patterns
+      # Check for native crash patterns (scoped to our app)
       crash_patterns="FATAL EXCEPTION|AndroidRuntime.*FATAL"
-      if grep -qiE "$crash_patterns" "$_logs_dir/logcat-verify.txt" 2>/dev/null; then
-        echo "FAIL: Crash patterns detected in logcat"
+      if grep -qiE "$crash_patterns" "$_logs_dir/logcat-app.txt" 2>/dev/null; then
+        echo "FAIL: Crash patterns detected in app logcat"
         echo "--- Error lines ---"
-        grep -iE "$crash_patterns" "$_logs_dir/logcat-verify.txt" | tail -20
+        grep -iE "$crash_patterns" "$_logs_dir/logcat-app.txt" | tail -20
         echo "---"
         echo "Full logcat: $_logs_dir/logcat-verify.txt"
         printf 'fail\nCrash patterns detected in logcat\n' > "$_step_dir/$_step.status"
@@ -433,10 +439,10 @@ processes:
 
       # Check for React Native JS errors
       rn_patterns="ReactNativeJS.*Error|Unhandled JS Exception|RedBoxError"
-      if grep -qiE "$rn_patterns" "$_logs_dir/logcat-verify.txt" 2>/dev/null; then
+      if grep -qiE "$rn_patterns" "$_logs_dir/logcat-app.txt" 2>/dev/null; then
         echo "FAIL: React Native JS error detected"
         echo "--- Error lines ---"
-        grep -iE "$rn_patterns" "$_logs_dir/logcat-verify.txt" | tail -20
+        grep -iE "$rn_patterns" "$_logs_dir/logcat-app.txt" | tail -20
         echo "---"
         echo "Full logcat: $_logs_dir/logcat-verify.txt"
         printf 'fail\nReact Native JS error detected\n' > "$_step_dir/$_step.status"
