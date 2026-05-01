@@ -199,6 +199,9 @@
       "segkit:build": [
         "cargo build --manifest-path segkit/Cargo.toml"
       ],
+      "segkit:install": [
+        "cargo install --path segkit"
+      ],
       "segkit:test": [
         "cargo test --manifest-path segkit/Cargo.toml"
       ],
