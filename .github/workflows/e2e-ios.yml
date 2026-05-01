@@ -1,0 +1,97 @@
+name: iOS E2E
+
+on:
+  workflow_call:
+    inputs:
+      matrix-include:
+        description: 'JSON array of {device, os} objects (e.g. [{"device":"max","os":"macos-26"}])'
+        type: string
+        default: '[{"device":"max","os":"macos-26"}]'
+      timeout-minutes:
+        description: 'Job timeout in minutes'
+        type: number
+        default: 25
+      boot-timeout:
+        description: 'Simulator boot timeout in seconds'
+        type: number
+        default: 120
+      test-timeout:
+        description: 'Test timeout in seconds'
+        type: number
+        default: 300
+      artifact-prefix:
+        description: 'Prefix for artifact names'
+        type: string
+        default: 'ios'
+
+jobs:
+  ios-e2e:
+    name: iOS E2E - ${{ matrix.device }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(inputs.matrix-include) }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Select pinned Xcode
+        if: matrix.device == 'max'
+        run: |
+          XCODE_VERSION=$(jq -r '.env.IOS_XCODE_VERSION' plugins/ios/plugin.json)
+          XCODE_APP=$(ls -d /Applications/Xcode_${XCODE_VERSION}*.app 2>/dev/null | head -1)
+          if [ -z "$XCODE_APP" ]; then
+            XCODE_APP="/Applications/Xcode.app"
+          fi
+          echo "Selecting: $XCODE_APP"
+          sudo xcode-select -s "$XCODE_APP/Contents/Developer"
+          xcodebuild -version
+          xcrun simctl list runtimes | grep -i ios
+
+      - name: Setup CocoaPods cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cocoapods/repos
+            ~/Library/Caches/CocoaPods
+          key: ${{ runner.os }}-pods-${{ hashFiles('**/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+
+      - name: Setup Xcode build cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/Library/Developer/Xcode/DerivedData
+          key: ${{ runner.os }}-xcode-${{ hashFiles('**/*.xcodeproj/**', '**/*.xcworkspace/**') }}
+          restore-keys: |
+            ${{ runner.os }}-xcode-
+
+      - name: Install Devbox
+        uses: jetify-com/devbox-install-action@v0.15.0
+        with:
+          enable-cache: true
+
+      - name: Rewrite plugin URLs to local
+        run: bash scripts/dev/rewrite-plugin-urls.sh --to-local examples/
+
+      - name: Run iOS E2E test
+        working-directory: examples/ios
+        env:
+          BOOT_TIMEOUT: ${{ inputs.boot-timeout }}
+          TEST_TIMEOUT: ${{ inputs.test-timeout }}
+          IOS_DEFAULT_DEVICE: ${{ matrix.device }}
+          IOS_DEVICES: ${{ matrix.device }}
+          TEST_TUI: false
+        run: devbox run --pure -e SIM_HEADLESS=1 -e IOS_DEVICES=${{ matrix.device }} test:e2e
+
+      - name: Upload reports and logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.artifact-prefix }}-${{ matrix.device }}-reports
+          path: |
+            examples/ios/reports/
+            ~/Library/Logs/CoreSimulator/
+          retention-days: 7

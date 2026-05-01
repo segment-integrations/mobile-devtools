@@ -1,0 +1,128 @@
+name: React Native E2E
+
+on:
+  workflow_call:
+    inputs:
+      matrix-include:
+        description: 'JSON array of {platform, device, os} objects'
+        type: string
+        default: '[{"platform":"android","device":"max","os":"ubuntu-24.04"},{"platform":"ios","device":"max","os":"macos-26"},{"platform":"web","device":"none","os":"ubuntu-24.04"}]'
+      timeout-minutes:
+        description: 'Job timeout in minutes'
+        type: number
+        default: 45
+      artifact-prefix:
+        description: 'Prefix for artifact names'
+        type: string
+        default: 'react-native'
+
+jobs:
+  react-native-e2e:
+    name: React Native E2E - ${{ matrix.platform }}-${{ matrix.device }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(inputs.matrix-include) }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js with cache
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: examples/react-native/package-lock.json
+
+      - name: Enable KVM (Android only)
+        if: matrix.platform == 'android'
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Setup Gradle cache (Android only)
+        if: matrix.platform == 'android'
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Select pinned Xcode (iOS only)
+        if: matrix.platform == 'ios' && matrix.device == 'max'
+        run: |
+          XCODE_VERSION=$(jq -r '.env.IOS_XCODE_VERSION' plugins/ios/plugin.json)
+          XCODE_APP=$(ls -d /Applications/Xcode_${XCODE_VERSION}*.app 2>/dev/null | head -1)
+          if [ -z "$XCODE_APP" ]; then
+            XCODE_APP="/Applications/Xcode.app"
+          fi
+          echo "Selecting: $XCODE_APP"
+          sudo xcode-select -s "$XCODE_APP/Contents/Developer"
+          xcodebuild -version
+          xcrun simctl list runtimes | grep -i ios
+
+      - name: Setup CocoaPods cache (iOS only)
+        if: matrix.platform == 'ios'
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cocoapods/repos
+            ~/Library/Caches/CocoaPods
+          key: ${{ runner.os }}-pods-${{ hashFiles('**/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+
+      - name: Setup Xcode build cache (iOS only)
+        if: matrix.platform == 'ios'
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/Library/Developer/Xcode/DerivedData
+          key: ${{ runner.os }}-xcode-${{ hashFiles('**/*.xcodeproj/**', '**/*.xcworkspace/**') }}
+          restore-keys: |
+            ${{ runner.os }}-xcode-
+
+      - name: Free disk space (Android only)
+        if: matrix.platform == 'android'
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc \
+            /usr/local/share/powershell /usr/local/share/chromium \
+            /usr/local/share/boost /opt/hostedtoolcache
+          sudo apt-get clean
+          df -h /
+
+      - name: Install Devbox
+        uses: jetify-com/devbox-install-action@v0.15.0
+        with:
+          enable-cache: true
+
+      - name: Rewrite plugin URLs to local
+        run: bash scripts/dev/rewrite-plugin-urls.sh --to-local examples/
+
+      - name: Run React Native E2E test
+        working-directory: examples/react-native
+        run: |
+          if [ "${{ matrix.platform }}" = "android" ]; then
+            devbox run --pure -e IOS_SKIP_SETUP=1 -e EMU_HEADLESS=1 -e ANDROID_DEVICES=${{ matrix.device }} test:e2e:android
+          elif [ "${{ matrix.platform }}" = "ios" ]; then
+            devbox run --pure -e ANDROID_SKIP_SETUP=1 -e SIM_HEADLESS=1 -e IOS_DEVICES=${{ matrix.device }} test:e2e:ios
+          elif [ "${{ matrix.platform }}" = "web" ]; then
+            devbox run --pure -e ANDROID_SKIP_SETUP=1 -e IOS_SKIP_SETUP=1 test:e2e:web
+          fi
+
+      - name: Upload reports and logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.artifact-prefix }}-${{ matrix.platform }}-${{ matrix.device }}-reports
+          path: |
+            examples/react-native/reports/
+            examples/react-native/android/app/build/outputs/
+            examples/react-native/ios/build/
+            ~/Library/Logs/CoreSimulator/
+          retention-days: 7
