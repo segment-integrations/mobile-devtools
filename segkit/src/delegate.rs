@@ -10,6 +10,11 @@ fn reports_dir() -> String {
 }
 
 fn resolve_script(name: &str) -> Result<String> {
+    anyhow::ensure!(
+        !name.contains("..") && !name.contains('/') && !name.contains('\\'),
+        "invalid script name: {name}"
+    );
+
     let platform = if name.starts_with("android") {
         "ANDROID"
     } else if name.starts_with("ios") {
