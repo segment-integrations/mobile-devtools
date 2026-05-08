@@ -134,8 +134,8 @@ fn check_devbox(fix: bool) -> CheckResult {
     if !fix {
         return CheckResult { name, status: CheckStatus::Missing };
     }
+    eprintln!("segkit: installing devbox...");
     match install_devbox() {
-        Ok(()) if is_installed("devbox") => CheckResult { name, status: CheckStatus::Fixed },
         Ok(()) => CheckResult { name, status: CheckStatus::Fixed },
         Err(e) => CheckResult { name, status: CheckStatus::Failed(e) },
     }
@@ -154,6 +154,7 @@ fn check_homebrew(fix: bool) -> CheckResult {
     if !fix {
         return CheckResult { name, status: CheckStatus::Missing };
     }
+    eprintln!("segkit: installing homebrew...");
     match install_homebrew() {
         Ok(()) => CheckResult { name, status: CheckStatus::Fixed },
         Err(e) => CheckResult { name, status: CheckStatus::Failed(e) },
@@ -179,6 +180,7 @@ fn check_applesimutils(fix: bool) -> CheckResult {
             status: CheckStatus::Failed("Homebrew not available".into()),
         };
     }
+    eprintln!("segkit: installing applesimutils...");
     match install_applesimutils() {
         Ok(()) => {
             ensure_homebrew_in_path();
@@ -218,20 +220,17 @@ pub fn run(fix: bool) -> ExitCode {
         }
     }
 
-    // Only print output if there's something to report
-    if any_missing || any_fixed || any_failed {
-        for r in &results {
-            match &r.status {
-                CheckStatus::Ok => println!("  \u{2713} {}", r.name),
-                CheckStatus::Missing => {
-                    println!("  \u{2717} {} (not installed)", r.name);
-                }
-                CheckStatus::Fixed => {
-                    println!("  \u{2713} {} (installed)", r.name);
-                }
-                CheckStatus::Failed(e) => {
-                    println!("  \u{2717} {} — {}", r.name, e);
-                }
+    for r in &results {
+        match &r.status {
+            CheckStatus::Ok => {}
+            CheckStatus::Missing => {
+                eprintln!("  \u{2717} {} (not installed)", r.name);
+            }
+            CheckStatus::Fixed => {
+                eprintln!("  \u{2713} {} (installed)", r.name);
+            }
+            CheckStatus::Failed(e) => {
+                eprintln!("  \u{2717} {} — {}", r.name, e);
             }
         }
     }
@@ -253,10 +252,10 @@ pub fn run(fix: bool) -> ExitCode {
             .map(|r| r.name)
             .collect();
         eprintln!(
-            "\nInstalled missing dependencies: {}. Please retry your command.",
+            "\nInstalled missing dependencies: {}.",
             fixed_names.join(", ")
         );
-        return ExitCode::from(2);
+        return ExitCode::SUCCESS;
     }
 
     ExitCode::SUCCESS
