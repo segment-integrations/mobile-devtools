@@ -38,7 +38,7 @@
 
             meta = {
               description = "Segment SDK developer toolkit";
-              license = pkgs.lib.licenses.mit;
+              license = pkgs.lib.licenses.asl20;
               mainProgram = "segkit";
             };
           };
