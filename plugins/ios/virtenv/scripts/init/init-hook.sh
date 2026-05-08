@@ -15,6 +15,11 @@ if [ "$(uname -s)" != "Darwin" ]; then
   exit 0
 fi
 
+# Ensure iOS dependencies (Homebrew, applesimutils) are installed
+if command -v segkit >/dev/null 2>&1; then
+  segkit doctor --fix 2>/dev/null || true
+fi
+
 # Find virtenv directory
 VIRTENV_DIR="${IOS_SCRIPTS_DIR:-}/.."
 if [ -z "$VIRTENV_DIR" ] || [ "$VIRTENV_DIR" = "/.." ]; then
