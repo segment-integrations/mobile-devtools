@@ -212,10 +212,27 @@ ios_setup_native_toolchain() {
     done
     IFS="$_ntc_oifs"
 
-    # Prepend Xcode and system tool paths
+    # Prepend Xcode, system, and Homebrew tool paths
     PATH="/usr/bin:/bin:/usr/sbin:/sbin"
     if [ -n "${DEVELOPER_DIR:-}" ]; then
       PATH="$DEVELOPER_DIR/usr/bin:$PATH"
+    fi
+    # Add specific Homebrew-installed tools needed for iOS development.
+    # We symlink individual binaries into a private dir rather than adding
+    # all of /opt/homebrew/bin, to avoid conflicts with user-installed
+    # packages (e.g. node via Homebrew shadowing the Nix-provided one).
+    _ntc_brew_shims="${IOS_SCRIPTS_DIR:-/tmp}/../brew-shims"
+    mkdir -p "$_ntc_brew_shims" 2>/dev/null || true
+    for _ntc_tool in applesimutils; do
+      for _ntc_brew_dir in /opt/homebrew/bin /usr/local/bin; do
+        if [ -x "$_ntc_brew_dir/$_ntc_tool" ] && [ ! -e "$_ntc_brew_shims/$_ntc_tool" ]; then
+          ln -sf "$_ntc_brew_dir/$_ntc_tool" "$_ntc_brew_shims/$_ntc_tool" 2>/dev/null || true
+          break
+        fi
+      done
+    done
+    if [ -d "$_ntc_brew_shims" ]; then
+      PATH="$PATH:$_ntc_brew_shims"
     fi
     PATH="$PATH:$_ntc_clean"
     export PATH

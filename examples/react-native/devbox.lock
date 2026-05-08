@@ -517,6 +517,10 @@
       "last_modified": "2026-02-15T17:45:47Z",
       "resolved": "github:NixOS/nixpkgs/ac055f38c798b0d87695240c7b761b82fc7e5bc2?lastModified=1771177547"
     },
+    "github:segment-integrations/mobile-devtools?dir=segkit&ref=main": {
+      "last_modified": "2026-05-08T18:52:56Z",
+      "resolved": "github:segment-integrations/mobile-devtools/725aff9a75fa0ae7269f0f6dbf36fa5611b0664c?dir=segkit&lastModified=1778266376"
+    },
     "gnugrep@latest": {
       "last_modified": "2026-01-23T17:20:52Z",
       "resolved": "github:NixOS/nixpkgs/a1bab9e494f5f4939442a57a58d0449a109593fe#gnugrep",

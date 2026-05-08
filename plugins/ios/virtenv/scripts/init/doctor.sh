@@ -44,7 +44,15 @@ else
   DOCTOR_CHECKS_PASSED=$((DOCTOR_CHECKS_PASSED + 1))
 fi
 
-# Check 3: Device lock file
+# Check 3: applesimutils (required for Detox iOS testing)
+if command -v applesimutils >/dev/null 2>&1; then
+  DOCTOR_CHECKS_PASSED=$((DOCTOR_CHECKS_PASSED + 1))
+else
+  issues+=("applesimutils not installed (run: segkit setup)")
+  DOCTOR_CHECKS_WARNED=$((DOCTOR_CHECKS_WARNED + 1))
+fi
+
+# Check 4: Device lock file
 config_dir=$(doctor_resolve_config_dir 2>/dev/null || echo "${IOS_CONFIG_DIR:-./devbox.d/ios}")
 devices_dir="${IOS_DEVICES_DIR:-${config_dir}/devices}"
 lock_file="${devices_dir}/devices.lock"

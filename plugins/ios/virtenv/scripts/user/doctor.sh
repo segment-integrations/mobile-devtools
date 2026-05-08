@@ -95,6 +95,13 @@ doctor_check_command "xcodebuild" "xcodebuild" "false"
 doctor_check_command "xcbeautify" "xcbeautify (for pretty build output)" "false"
 doctor_check_command "pod" "CocoaPods" "false"
 
+# applesimutils (required for Detox iOS testing)
+if command -v applesimutils >/dev/null 2>&1; then
+  doctor_check_pass "applesimutils (for Detox iOS testing)"
+else
+  doctor_check_warn "applesimutils" "Not installed. Run: segkit setup"
+fi
+
 # Check jq (needed for config operations)
 doctor_check_command "jq" "jq (for config operations)" "false"
 

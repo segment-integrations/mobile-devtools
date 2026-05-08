@@ -3,7 +3,7 @@ use std::process::ExitCode;
 use clap::{Parser, Subcommand};
 
 mod delegate;
-mod setup;
+mod doctor;
 
 #[derive(Parser)]
 #[command(name = "segkit", version, about = "Segment SDK developer toolkit")]
@@ -34,8 +34,12 @@ enum Commands {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
-    /// Check and install required dependencies (devbox)
-    Setup,
+    /// Check environment health and report missing dependencies
+    Doctor {
+        /// Automatically install missing dependencies
+        #[arg(long)]
+        fix: bool,
+    },
 }
 
 fn main() -> ExitCode {
@@ -46,7 +50,7 @@ fn main() -> ExitCode {
         Some(Commands::Ios { args }) => delegate::run("ios.sh", &args),
         Some(Commands::Rn { args }) => delegate::run("rn.sh", &args),
         Some(Commands::Metro { args }) => delegate::run("metro.sh", &args),
-        Some(Commands::Setup) => setup::run(),
+        Some(Commands::Doctor { fix }) => doctor::run(fix),
         None => {
             println!("segkit {}", env!("CARGO_PKG_VERSION"));
             ExitCode::SUCCESS
