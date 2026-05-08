@@ -42,7 +42,7 @@ jobs:
     if: ${{ github.event_name == 'schedule' || inputs.run_ios }}
     uses: ./.github/workflows/e2e-ios.yml
     with:
-      matrix-include: '[{"device":"min","os":"macos-14"},{"device":"max","os":"macos-26"}]'
+      matrix-include: '[{"device":"min","os":"macos-15"},{"device":"max","os":"macos-26"}]'
       timeout-minutes: 45
       boot-timeout: 180
       test-timeout: 600
@@ -53,7 +53,7 @@ jobs:
     if: ${{ github.event_name == 'schedule' || inputs.run_react_native }}
     uses: ./.github/workflows/e2e-react-native.yml
     with:
-      matrix-include: '[{"platform":"android","device":"min","os":"ubuntu-24.04"},{"platform":"android","device":"max","os":"ubuntu-24.04"},{"platform":"ios","device":"min","os":"macos-14"},{"platform":"ios","device":"max","os":"macos-26"},{"platform":"web","device":"none","os":"ubuntu-24.04"}]'
+      matrix-include: '[{"platform":"android","device":"min","os":"ubuntu-24.04"},{"platform":"android","device":"max","os":"ubuntu-24.04"},{"platform":"ios","device":"min","os":"macos-15"},{"platform":"ios","device":"max","os":"macos-26"},{"platform":"web","device":"none","os":"ubuntu-24.04"}]'
       timeout-minutes: 60
       artifact-prefix: react-native
 
