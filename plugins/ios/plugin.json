@@ -23,6 +23,7 @@
     "LANG": "en_US.UTF-8"
   },
   "packages": {
+    "github:segment-integrations/mobile-devtools?dir=segkit&ref=main": "",
     "bash": "latest",
     "coreutils": "latest",
     "gnused": "latest",
