@@ -212,11 +212,17 @@ ios_setup_native_toolchain() {
     done
     IFS="$_ntc_oifs"
 
-    # Prepend Xcode and system tool paths
+    # Prepend Xcode, system, and Homebrew tool paths
     PATH="/usr/bin:/bin:/usr/sbin:/sbin"
     if [ -n "${DEVELOPER_DIR:-}" ]; then
       PATH="$DEVELOPER_DIR/usr/bin:$PATH"
     fi
+    # Include Homebrew paths for tools like applesimutils
+    for _ntc_brew_dir in /opt/homebrew/bin /usr/local/bin; do
+      if [ -d "$_ntc_brew_dir" ]; then
+        PATH="$PATH:$_ntc_brew_dir"
+      fi
+    done
     PATH="$PATH:$_ntc_clean"
     export PATH
   fi

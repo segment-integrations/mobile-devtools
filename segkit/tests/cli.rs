@@ -24,7 +24,7 @@ fn help_flag() {
         .stdout(predicate::str::contains("ios"))
         .stdout(predicate::str::contains("rn"))
         .stdout(predicate::str::contains("metro"))
-        .stdout(predicate::str::contains("setup"));
+        .stdout(predicate::str::contains("doctor"));
 }
 
 #[test]
@@ -81,9 +81,9 @@ fn metro_subcommand_without_script_fails_gracefully() {
 }
 
 #[test]
-fn setup_detects_devbox() {
+fn doctor_checks_dependencies() {
     segkit()
-        .arg("setup")
+        .arg("doctor")
         .assert()
-        .stdout(predicate::str::contains("devbox:"));
+        .stdout(predicate::str::contains("devbox"));
 }
