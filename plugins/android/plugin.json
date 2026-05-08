@@ -29,6 +29,7 @@
     "REPORTS_DIR": "reports"
   },
   "packages": {
+    "github:segment-integrations/mobile-devtools?dir=segkit&ref=main": "",
     "bash": "latest",
     "coreutils": "latest",
     "gnused": "latest",
