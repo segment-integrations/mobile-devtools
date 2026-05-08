@@ -17,7 +17,7 @@ fi
 
 # Ensure iOS dependencies (Homebrew, applesimutils) are installed
 if command -v segkit >/dev/null 2>&1; then
-  segkit doctor --fix 2>/dev/null || true
+  segkit doctor --fix || true
 fi
 
 # Find virtenv directory

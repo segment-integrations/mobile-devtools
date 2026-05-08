@@ -81,9 +81,9 @@ fn metro_subcommand_without_script_fails_gracefully() {
 }
 
 #[test]
-fn doctor_checks_dependencies() {
+fn doctor_succeeds_when_deps_present() {
     segkit()
         .arg("doctor")
         .assert()
-        .stdout(predicate::str::contains("devbox"));
+        .success();
 }

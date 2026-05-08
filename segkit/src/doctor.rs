@@ -193,12 +193,6 @@ fn check_applesimutils(fix: bool) -> CheckResult {
 // ============================================================================
 
 pub fn run(fix: bool) -> ExitCode {
-    if fix {
-        println!("Checking and fixing dependencies...");
-    } else {
-        println!("Checking dependencies...");
-    }
-
     let results = vec![
         check_devbox(fix),
         check_homebrew(fix),
@@ -211,18 +205,33 @@ pub fn run(fix: bool) -> ExitCode {
 
     for r in &results {
         match &r.status {
-            CheckStatus::Ok => println!("  \u{2713} {}", r.name),
+            CheckStatus::Ok => {}
             CheckStatus::Missing => {
-                println!("  \u{2717} {} (not installed)", r.name);
                 any_missing = true;
             }
             CheckStatus::Fixed => {
-                println!("  \u{2713} {} (just installed)", r.name);
                 any_fixed = true;
             }
-            CheckStatus::Failed(e) => {
-                println!("  \u{2717} {} — {}", r.name, e);
+            CheckStatus::Failed(_) => {
                 any_failed = true;
+            }
+        }
+    }
+
+    // Only print output if there's something to report
+    if any_missing || any_fixed || any_failed {
+        for r in &results {
+            match &r.status {
+                CheckStatus::Ok => println!("  \u{2713} {}", r.name),
+                CheckStatus::Missing => {
+                    println!("  \u{2717} {} (not installed)", r.name);
+                }
+                CheckStatus::Fixed => {
+                    println!("  \u{2713} {} (installed)", r.name);
+                }
+                CheckStatus::Failed(e) => {
+                    println!("  \u{2717} {} — {}", r.name, e);
+                }
             }
         }
     }
@@ -233,15 +242,22 @@ pub fn run(fix: bool) -> ExitCode {
     }
 
     if any_missing {
-        eprintln!("\nMissing dependencies detected. Run `segkit doctor --fix` to install them.");
+        eprintln!("\nMissing dependencies. Run `segkit doctor --fix` to install them.");
         return ExitCode::FAILURE;
     }
 
     if any_fixed {
-        println!("\nDependencies installed. Restart your shell and retry your command.");
+        let fixed_names: Vec<&str> = results
+            .iter()
+            .filter(|r| matches!(r.status, CheckStatus::Fixed))
+            .map(|r| r.name)
+            .collect();
+        eprintln!(
+            "\nInstalled missing dependencies: {}. Please retry your command.",
+            fixed_names.join(", ")
+        );
         return ExitCode::from(2);
     }
 
-    println!("\nAll dependencies OK.");
     ExitCode::SUCCESS
 }
