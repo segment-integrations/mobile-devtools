@@ -45,7 +45,7 @@ jobs:
 
       - name: Create Pull Request
         if: steps.update.outputs.has_updates == 'true'
-        uses: peter-evans/create-pull-request@v8
+        uses: ./.github/actions/create-pull-request
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: "chore(deps): update devbox packages"
@@ -57,5 +57,4 @@ jobs:
 
             Please review the changes and ensure all tests pass before merging.
           branch: devbox-updates
-          delete-branch: true
           labels: dependencies
