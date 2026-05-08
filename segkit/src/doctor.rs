@@ -56,7 +56,10 @@ fn install_devbox() -> Result<(), String> {
 
     match status {
         Ok(s) if s.success() => Ok(()),
-        Ok(s) => Err(format!("installer exited with code {}", s.code().unwrap_or(-1))),
+        Ok(s) => Err(format!(
+            "installer exited with code {}",
+            s.code().unwrap_or(-1)
+        )),
         Err(e) => Err(format!("failed to run installer: {e}")),
     }
 }
@@ -74,7 +77,10 @@ fn install_homebrew() -> Result<(), String> {
             ensure_homebrew_in_path();
             Ok(())
         }
-        Ok(s) => Err(format!("installer exited with code {}", s.code().unwrap_or(-1))),
+        Ok(s) => Err(format!(
+            "installer exited with code {}",
+            s.code().unwrap_or(-1)
+        )),
         Err(e) => Err(format!("failed to run installer: {e}")),
     }
 }
@@ -89,7 +95,10 @@ fn install_applesimutils() -> Result<(), String> {
     let status = Command::new(&brew).args(["tap", "wix/brew"]).status();
     match status {
         Ok(s) if !s.success() => {
-            return Err(format!("brew tap wix/brew failed (code {})", s.code().unwrap_or(-1)));
+            return Err(format!(
+                "brew tap wix/brew failed (code {})",
+                s.code().unwrap_or(-1)
+            ));
         }
         Err(e) => return Err(format!("failed to run brew tap: {e}")),
         _ => {}
@@ -101,7 +110,10 @@ fn install_applesimutils() -> Result<(), String> {
 
     match status {
         Ok(s) if s.success() => Ok(()),
-        Ok(s) => Err(format!("brew install failed (code {})", s.code().unwrap_or(-1))),
+        Ok(s) => Err(format!(
+            "brew install failed (code {})",
+            s.code().unwrap_or(-1)
+        )),
         Err(e) => Err(format!("failed to run brew install: {e}")),
     }
 }
@@ -129,50 +141,86 @@ struct CheckResult {
 fn check_devbox(fix: bool) -> CheckResult {
     let name = "devbox";
     if is_installed("devbox") {
-        return CheckResult { name, status: CheckStatus::Ok };
+        return CheckResult {
+            name,
+            status: CheckStatus::Ok,
+        };
     }
     if !fix {
-        return CheckResult { name, status: CheckStatus::Missing };
+        return CheckResult {
+            name,
+            status: CheckStatus::Missing,
+        };
     }
     eprintln!("segkit: installing devbox...");
     match install_devbox() {
-        Ok(()) => CheckResult { name, status: CheckStatus::Fixed },
-        Err(e) => CheckResult { name, status: CheckStatus::Failed(e) },
+        Ok(()) => CheckResult {
+            name,
+            status: CheckStatus::Fixed,
+        },
+        Err(e) => CheckResult {
+            name,
+            status: CheckStatus::Failed(e),
+        },
     }
 }
 
 fn check_homebrew(fix: bool) -> CheckResult {
     let name = "homebrew";
     if !is_macos() {
-        return CheckResult { name, status: CheckStatus::Ok };
+        return CheckResult {
+            name,
+            status: CheckStatus::Ok,
+        };
     }
 
     ensure_homebrew_in_path();
     if is_installed("brew") {
-        return CheckResult { name, status: CheckStatus::Ok };
+        return CheckResult {
+            name,
+            status: CheckStatus::Ok,
+        };
     }
     if !fix {
-        return CheckResult { name, status: CheckStatus::Missing };
+        return CheckResult {
+            name,
+            status: CheckStatus::Missing,
+        };
     }
     eprintln!("segkit: installing homebrew...");
     match install_homebrew() {
-        Ok(()) => CheckResult { name, status: CheckStatus::Fixed },
-        Err(e) => CheckResult { name, status: CheckStatus::Failed(e) },
+        Ok(()) => CheckResult {
+            name,
+            status: CheckStatus::Fixed,
+        },
+        Err(e) => CheckResult {
+            name,
+            status: CheckStatus::Failed(e),
+        },
     }
 }
 
 fn check_applesimutils(fix: bool) -> CheckResult {
     let name = "applesimutils";
     if !is_macos() {
-        return CheckResult { name, status: CheckStatus::Ok };
+        return CheckResult {
+            name,
+            status: CheckStatus::Ok,
+        };
     }
 
     ensure_homebrew_in_path();
     if is_installed("applesimutils") {
-        return CheckResult { name, status: CheckStatus::Ok };
+        return CheckResult {
+            name,
+            status: CheckStatus::Ok,
+        };
     }
     if !fix {
-        return CheckResult { name, status: CheckStatus::Missing };
+        return CheckResult {
+            name,
+            status: CheckStatus::Missing,
+        };
     }
     if homebrew_bin_dir().is_none() {
         return CheckResult {
@@ -184,9 +232,15 @@ fn check_applesimutils(fix: bool) -> CheckResult {
     match install_applesimutils() {
         Ok(()) => {
             ensure_homebrew_in_path();
-            CheckResult { name, status: CheckStatus::Fixed }
+            CheckResult {
+                name,
+                status: CheckStatus::Fixed,
+            }
         }
-        Err(e) => CheckResult { name, status: CheckStatus::Failed(e) },
+        Err(e) => CheckResult {
+            name,
+            status: CheckStatus::Failed(e),
+        },
     }
 }
 
