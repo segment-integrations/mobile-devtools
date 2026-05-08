@@ -71,8 +71,9 @@ case "$mode" in
       if [ -f "$plugin_file" ] && grep -q "$segkit_github" "$plugin_file"; then
         echo "    Rewriting segkit ref in: $plugin_file"
         # Replace the github flake ref with a local path ref
+        # segkit/ is at repo root, plugins are at plugins/<platform>/
         jq --arg gh "$segkit_github" '.packages = (.packages | to_entries | map(
-          if .key == $gh then .key = "path:./segkit" else . end
+          if .key == $gh then .key = "path:../../segkit" else . end
         ) | from_entries)' "$plugin_file" > "$plugin_file.tmp" \
           && mv "$plugin_file.tmp" "$plugin_file"
       fi
@@ -133,10 +134,10 @@ case "$mode" in
     # Restore segkit package references in plugin.json files
     segkit_github="github:segment-integrations/mobile-devtools?dir=segkit&ref=main"
     for plugin_file in plugins/android/plugin.json plugins/ios/plugin.json; do
-      if [ -f "$plugin_file" ] && grep -q "path:./segkit" "$plugin_file"; then
+      if [ -f "$plugin_file" ] && grep -q "path:../../segkit" "$plugin_file"; then
         echo "    Restoring segkit ref in: $plugin_file"
         jq --arg gh "$segkit_github" '.packages = (.packages | to_entries | map(
-          if .key == "path:./segkit" then .key = $gh else . end
+          if .key == "path:../../segkit" then .key = $gh else . end
         ) | from_entries)' "$plugin_file" > "$plugin_file.tmp" \
           && mv "$plugin_file.tmp" "$plugin_file"
       fi
