@@ -265,6 +265,7 @@ android_generate_android_lock() {
     jq -n \
       --arg build_tools "${ANDROID_BUILD_TOOLS_VERSION:-36.1.0}" \
       --arg cmdline_tools "${ANDROID_CMDLINE_TOOLS_VERSION:-19.0}" \
+      --arg min_sdk "${ANDROID_MIN_SDK:-24}" \
       --arg compile_sdk "${ANDROID_COMPILE_SDK:-36}" \
       --arg target_sdk "${ANDROID_TARGET_SDK:-36}" \
       --arg system_image_tag "${ANDROID_SYSTEM_IMAGE_TAG:-google_apis}" \
@@ -275,6 +276,7 @@ android_generate_android_lock() {
       '{
         ANDROID_BUILD_TOOLS_VERSION: $build_tools,
         ANDROID_CMDLINE_TOOLS_VERSION: $cmdline_tools,
+        ANDROID_MIN_SDK: ($min_sdk | tonumber),
         ANDROID_COMPILE_SDK: ($compile_sdk | tonumber),
         ANDROID_TARGET_SDK: ($target_sdk | tonumber),
         ANDROID_SYSTEM_IMAGE_TAG: $system_image_tag,
@@ -288,6 +290,7 @@ android_generate_android_lock() {
     jq -n \
       --arg build_tools "${ANDROID_BUILD_TOOLS_VERSION:-36.1.0}" \
       --arg cmdline_tools "${ANDROID_CMDLINE_TOOLS_VERSION:-19.0}" \
+      --arg min_sdk "${ANDROID_MIN_SDK:-24}" \
       --arg compile_sdk "${ANDROID_COMPILE_SDK:-36}" \
       --arg target_sdk "${ANDROID_TARGET_SDK:-36}" \
       --arg system_image_tag "${ANDROID_SYSTEM_IMAGE_TAG:-google_apis}" \
@@ -299,6 +302,7 @@ android_generate_android_lock() {
       '{
         ANDROID_BUILD_TOOLS_VERSION: $build_tools,
         ANDROID_CMDLINE_TOOLS_VERSION: $cmdline_tools,
+        ANDROID_MIN_SDK: ($min_sdk | tonumber),
         ANDROID_COMPILE_SDK: ($compile_sdk | tonumber),
         ANDROID_TARGET_SDK: ($target_sdk | tonumber),
         ANDROID_SYSTEM_IMAGE_TAG: $system_image_tag,

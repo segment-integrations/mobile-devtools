@@ -12,6 +12,7 @@
     "ANDROID_SCRIPTS_DIR": "{{ .Virtenv }}/scripts",
     "ANDROID_RUNTIME_DIR": "{{ .Virtenv }}",
     "ANDROID_LOCAL_SDK": "0",
+    "ANDROID_MIN_SDK": "24",
     "ANDROID_COMPILE_SDK": "36",
     "ANDROID_TARGET_SDK": "36",
     "ANDROID_DEFAULT_DEVICE": "max",

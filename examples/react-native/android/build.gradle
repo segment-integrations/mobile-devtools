@@ -3,7 +3,8 @@ buildscript {
         def compileSdkEnv = System.getenv("ANDROID_COMPILE_SDK") ?: System.getenv("ANDROID_MAX_API") ?: "35"
         def targetSdkEnv = System.getenv("ANDROID_TARGET_SDK") ?: System.getenv("ANDROID_MAX_API") ?: "35"
         buildToolsVersion = System.getenv("ANDROID_BUILD_TOOLS_VERSION") ?: "35.0.0"
-        minSdkVersion = 24
+        def minSdkEnv = System.getenv("ANDROID_MIN_SDK") ?: "24"
+        minSdkVersion = minSdkEnv.toInteger()
         compileSdkVersion = compileSdkEnv.toInteger()
         targetSdkVersion = targetSdkEnv.toInteger()
         def ndkVersionEnv = System.getenv("ANDROID_NDK_VERSION")
