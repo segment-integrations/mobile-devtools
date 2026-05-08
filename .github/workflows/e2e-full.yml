@@ -15,6 +15,10 @@ on:
         description: 'Run React Native tests'
         type: boolean
         default: true
+  push:
+    branches: [main]
+    paths:
+      - 'plugins/*/plugin.json'
   schedule:
     # Run weekly on Monday at 00:00 UTC
     - cron: '0 0 * * 1'
@@ -26,7 +30,7 @@ concurrency:
 jobs:
   # Android example E2E tests (min/max devices)
   android-e2e:
-    if: ${{ github.event_name == 'schedule' || inputs.run_android }}
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'push' || inputs.run_android }}
     uses: ./.github/workflows/e2e-android.yml
     with:
       devices: '["min","max"]'
@@ -39,7 +43,7 @@ jobs:
 
   # iOS example E2E tests (min/max devices)
   ios-e2e:
-    if: ${{ github.event_name == 'schedule' || inputs.run_ios }}
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'push' || inputs.run_ios }}
     uses: ./.github/workflows/e2e-ios.yml
     with:
       matrix-include: '[{"device":"min","os":"macos-14"},{"device":"max","os":"macos-26"}]'
@@ -50,7 +54,7 @@ jobs:
 
   # React Native E2E tests (Android min/max, iOS min/max, Web)
   react-native-e2e:
-    if: ${{ github.event_name == 'schedule' || inputs.run_react_native }}
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'push' || inputs.run_react_native }}
     uses: ./.github/workflows/e2e-react-native.yml
     with:
       matrix-include: '[{"platform":"android","device":"min","os":"ubuntu-24.04"},{"platform":"android","device":"max","os":"ubuntu-24.04"},{"platform":"ios","device":"min","os":"macos-14"},{"platform":"ios","device":"max","os":"macos-26"},{"platform":"web","device":"none","os":"ubuntu-24.04"}]'
