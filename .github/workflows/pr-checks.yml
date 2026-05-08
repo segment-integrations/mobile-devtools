@@ -24,28 +24,30 @@ jobs:
       ci: ${{ steps.filter.outputs.ci }}
     steps:
       - uses: actions/checkout@v6
-      - uses: dorny/paths-filter@v4
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/paths-filter
         id: filter
         with:
           filters: |
             segkit:
-              - 'segkit/**'
+              - '^segkit/'
             android:
-              - 'plugins/android/**'
-              - 'examples/android/**'
-              - 'plugins/tests/android/**'
+              - '^plugins/android/'
+              - '^examples/android/'
+              - '^plugins/tests/android/'
             ios:
-              - 'plugins/ios/**'
-              - 'examples/ios/**'
-              - 'plugins/tests/ios/**'
+              - '^plugins/ios/'
+              - '^examples/ios/'
+              - '^plugins/tests/ios/'
             rn:
-              - 'plugins/react-native/**'
-              - 'examples/react-native/**'
-              - 'plugins/tests/react-native/**'
+              - '^plugins/react-native/'
+              - '^examples/react-native/'
+              - '^plugins/tests/react-native/'
             shell:
-              - 'plugins/**/scripts/**'
+              - '^plugins/.*/scripts/'
             ci:
-              - '.github/**'
+              - '^\.github/'
 
   # Linting and formatting checks (always runs)
   lint:

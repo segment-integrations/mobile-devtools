@@ -1,0 +1,141 @@
+name: Create Pull Request
+description: Create or update a pull request from local changes using the gh CLI. Drop-in replacement for peter-evans/create-pull-request without external dependencies.
+
+inputs:
+  token:
+    description: GitHub token for authentication
+    required: true
+  commit-message:
+    description: Commit message for the changes
+    required: true
+  title:
+    description: Pull request title (defaults to commit-message)
+    required: false
+    default: ''
+  body:
+    description: Pull request body/description
+    required: false
+    default: ''
+  branch:
+    description: Branch name to create for the PR
+    required: true
+  base:
+    description: Base branch for the PR (defaults to the repo default branch)
+    required: false
+    default: ''
+  labels:
+    description: Comma-separated list of labels to apply
+    required: false
+    default: ''
+  delete-branch:
+    description: Delete the branch when the PR is merged (sets auto-delete on push)
+    required: false
+    default: 'false'
+  author-name:
+    description: Git author name for the commit
+    required: false
+    default: 'github-actions[bot]'
+  author-email:
+    description: Git author email for the commit
+    required: false
+    default: 'github-actions[bot]@users.noreply.github.com'
+
+outputs:
+  pull-request-number:
+    description: The number of the created/updated pull request
+    value: ${{ steps.pr.outputs.number }}
+  pull-request-url:
+    description: The URL of the created/updated pull request
+    value: ${{ steps.pr.outputs.url }}
+
+runs:
+  using: composite
+  steps:
+    - name: Create or update pull request
+      id: pr
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        INPUT_COMMIT_MESSAGE: ${{ inputs.commit-message }}
+        INPUT_TITLE: ${{ inputs.title }}
+        INPUT_BODY: ${{ inputs.body }}
+        INPUT_BRANCH: ${{ inputs.branch }}
+        INPUT_BASE: ${{ inputs.base }}
+        INPUT_LABELS: ${{ inputs.labels }}
+        INPUT_DELETE_BRANCH: ${{ inputs.delete-branch }}
+        INPUT_AUTHOR_NAME: ${{ inputs.author-name }}
+        INPUT_AUTHOR_EMAIL: ${{ inputs.author-email }}
+      run: |
+        set -euo pipefail
+
+        TITLE="${INPUT_TITLE:-$INPUT_COMMIT_MESSAGE}"
+
+        # Configure git identity
+        git config user.name "$INPUT_AUTHOR_NAME"
+        git config user.email "$INPUT_AUTHOR_EMAIL"
+
+        # Check for changes
+        if git diff --quiet && git diff --cached --quiet; then
+          echo "No changes to commit"
+          echo "number=" >> "$GITHUB_OUTPUT"
+          echo "url=" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        # Create branch and commit
+        git checkout -B "$INPUT_BRANCH"
+        git add -A
+        git commit -m "$INPUT_COMMIT_MESSAGE"
+
+        # Force push (the branch is ephemeral/automated)
+        git push -f origin "$INPUT_BRANCH"
+
+        # Build label args
+        LABEL_ARGS=""
+        if [ -n "$INPUT_LABELS" ]; then
+          IFS=',' read -ra LABEL_ARRAY <<< "$INPUT_LABELS"
+          for label in "${LABEL_ARRAY[@]}"; do
+            label=$(echo "$label" | xargs)
+            LABEL_ARGS="$LABEL_ARGS --label \"$label\""
+          done
+        fi
+
+        # Build base args
+        BASE_ARGS=""
+        if [ -n "$INPUT_BASE" ]; then
+          BASE_ARGS="--base $INPUT_BASE"
+        fi
+
+        # Check if a PR already exists for this branch
+        EXISTING_PR=$(gh pr list --head "$INPUT_BRANCH" --state open --json number,url --jq '.[0]' 2>/dev/null || echo "")
+
+        if [ -n "$EXISTING_PR" ] && [ "$EXISTING_PR" != "null" ]; then
+          # Update existing PR
+          PR_NUMBER=$(echo "$EXISTING_PR" | jq -r '.number')
+          PR_URL=$(echo "$EXISTING_PR" | jq -r '.url')
+          echo "Updating existing PR #${PR_NUMBER}"
+
+          UPDATE_ARGS="--title \"$TITLE\""
+          if [ -n "$INPUT_BODY" ]; then
+            UPDATE_ARGS="$UPDATE_ARGS --body \"$INPUT_BODY\""
+          fi
+
+          eval gh pr edit "$PR_NUMBER" "$UPDATE_ARGS"
+
+          echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "url=$PR_URL" >> "$GITHUB_OUTPUT"
+        else
+          # Create new PR
+          CREATE_CMD="gh pr create --title \"$TITLE\" --head \"$INPUT_BRANCH\""
+          if [ -n "$INPUT_BODY" ]; then
+            CREATE_CMD="$CREATE_CMD --body \"$INPUT_BODY\""
+          fi
+          CREATE_CMD="$CREATE_CMD $BASE_ARGS $LABEL_ARGS"
+
+          PR_URL=$(eval "$CREATE_CMD")
+          PR_NUMBER=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+
+          echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "url=$PR_URL" >> "$GITHUB_OUTPUT"
+          echo "Created PR #${PR_NUMBER}: ${PR_URL}"
+        fi

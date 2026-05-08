@@ -1,0 +1,95 @@
+name: Paths Filter
+description: Detect which paths changed between the PR base and HEAD using native git diff. Drop-in replacement for dorny/paths-filter without external dependencies.
+
+inputs:
+  filters:
+    description: |
+      YAML-style filter definitions. Each key maps to a list of path patterns (grep -E regexes).
+      Example:
+        src:
+          - '^src/'
+        docs:
+          - '^docs/'
+          - 'README\.md'
+    required: true
+  base:
+    description: Base ref to diff against. Defaults to the PR base SHA or HEAD~1 for push events.
+    required: false
+    default: ''
+
+outputs:
+  result:
+    description: JSON object of all filter results
+    value: ${{ steps.filter.outputs.result }}
+
+runs:
+  using: composite
+  steps:
+    - name: Compute changed paths
+      id: filter
+      shell: bash
+      env:
+        INPUT_FILTERS: ${{ inputs.filters }}
+        INPUT_BASE: ${{ inputs.base }}
+      run: |
+        set -euo pipefail
+
+        # Determine base commit
+        if [ -n "$INPUT_BASE" ]; then
+          BASE="$INPUT_BASE"
+        elif [ "${{ github.event_name }}" = "pull_request" ]; then
+          BASE="${{ github.event.pull_request.base.sha }}"
+        else
+          BASE="HEAD~1"
+        fi
+
+        # Get list of changed files
+        CHANGED_FILES=$(git diff --name-only "$BASE"...HEAD 2>/dev/null || git diff --name-only "$BASE" HEAD)
+
+        if [ -z "$CHANGED_FILES" ]; then
+          echo "No changed files detected"
+        else
+          echo "Changed files (first 50):"
+          echo "$CHANGED_FILES" | head -50
+        fi
+
+        # Parse filters and collect results
+        declare -A RESULTS
+        CURRENT_KEY=""
+
+        while IFS= read -r line; do
+          [ -z "$(echo "$line" | tr -d '[:space:]')" ] && continue
+
+          if echo "$line" | grep -qE '^[a-zA-Z_][a-zA-Z0-9_-]*:'; then
+            CURRENT_KEY=$(echo "$line" | sed 's/:.*$//' | tr -d '[:space:]')
+            RESULTS["$CURRENT_KEY"]="false"
+            continue
+          fi
+
+          if [ -n "$CURRENT_KEY" ] && echo "$line" | grep -qE '^\s*-'; then
+            PATTERN=$(echo "$line" | sed "s/^[[:space:]]*-[[:space:]]*//;s/^['\"]//;s/['\"]$//")
+            PATTERN=$(echo "$PATTERN" | tr -d '[:space:]')
+            [ -z "$PATTERN" ] && continue
+
+            if [ -n "$CHANGED_FILES" ] && echo "$CHANGED_FILES" | grep -qE "$PATTERN"; then
+              RESULTS["$CURRENT_KEY"]="true"
+            fi
+          fi
+        done <<< "$INPUT_FILTERS"
+
+        # Write outputs
+        JSON="{"
+        FIRST=true
+        for key in "${!RESULTS[@]}"; do
+          echo "${key}=${RESULTS[$key]}" >> "$GITHUB_OUTPUT"
+          if [ "$FIRST" = true ]; then
+            FIRST=false
+          else
+            JSON="$JSON,"
+          fi
+          JSON="$JSON\"$key\":\"${RESULTS[$key]}\""
+        done
+        JSON="$JSON}"
+
+        echo "result=$JSON" >> "$GITHUB_OUTPUT"
+        echo "Filter results: $JSON"
