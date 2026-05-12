@@ -220,6 +220,7 @@ packages:
       INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
       INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
       SWIFT_EMIT_LOC_STRINGS: YES
+      CLANG_ENABLE_EXPLICIT_MODULES: NO
   {name}Tests:
     type: bundle.unit-test
     platform: iOS
