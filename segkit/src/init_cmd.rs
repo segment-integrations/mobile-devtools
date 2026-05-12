@@ -97,6 +97,19 @@ fn resolve_plugins(requested: &[String]) -> Result<Vec<&'static Plugin>, String>
     Ok(resolved)
 }
 
+/// Check if a name is a valid Swift identifier (ASCII letters, digits, underscores; not starting with a digit).
+fn is_valid_swift_identifier(name: &str) -> bool {
+    if name.is_empty() {
+        return false;
+    }
+    let mut chars = name.chars();
+    match chars.next() {
+        Some(c) if c.is_ascii_alphabetic() || c == '_' => {}
+        _ => return false,
+    }
+    chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
 fn ensure_xcodegen() -> bool {
     if which::which("xcodegen").is_ok() {
         return true;
@@ -244,13 +257,13 @@ fn generate_content_view(name: &str, plugins: &[&Plugin]) -> String {
                             .font(.subheadline)
                     }}
                 }}
-                .onChange(of: {key}Enabled) {{ _, newValue in
+                .onChange(of: {key}Enabled, perform: {{ newValue in
                     if newValue {{
                         print("{display} destination enabled")
                     }} else {{
                         print("{display} destination disabled")
                     }}
-                }}
+                }})
 "#,
             key = p.key,
             display = capitalize(p.key),
@@ -545,6 +558,16 @@ pub fn run(
     }
 
     let name = name.unwrap_or_else(|| prompt("Project name", "SegmentDemo"));
+
+    // Project name must be a valid Swift identifier (letters, digits, underscores)
+    if !is_valid_swift_identifier(&name) {
+        err(&format!(
+            "Project name '{name}' is not a valid Swift identifier. \
+             Use only letters, digits, and underscores (e.g. SegmentDemo, my_app)."
+        ));
+        return ExitCode::FAILURE;
+    }
+
     let org = org.unwrap_or_else(|| prompt("Organization identifier", "com.example"));
     let write_key = write_key.unwrap_or_else(|| prompt("Segment write key", "demo_write_key_not_real"));
 
