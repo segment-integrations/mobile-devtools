@@ -2,6 +2,7 @@ use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
 
+mod config_cmd;
 mod delegate;
 mod doctor;
 mod init_cmd;
@@ -74,6 +75,32 @@ enum Commands {
     },
     /// Update segkit to the latest version from main
     Update,
+    /// View or modify project configuration (write key, plugins)
+    Config {
+        #[command(subcommand)]
+        action: ConfigAction,
+    },
+}
+
+#[derive(Subcommand)]
+enum ConfigAction {
+    /// Show current configuration
+    Show,
+    /// Update configuration values
+    Set {
+        /// Set the Segment write key
+        #[arg(long)]
+        write_key: Option<String>,
+        /// Replace the enabled plugins list (comma-separated)
+        #[arg(long, value_delimiter = ',')]
+        plugins: Option<Vec<String>>,
+        /// Add plugins to the enabled list (comma-separated)
+        #[arg(long, value_delimiter = ',')]
+        add_plugins: Vec<String>,
+        /// Remove plugins from the enabled list (comma-separated)
+        #[arg(long, value_delimiter = ',')]
+        remove_plugins: Vec<String>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -90,6 +117,12 @@ fn main() -> ExitCode {
             init_cmd::run(sdk, name, org, write_key, plugins)
         }
         Some(Commands::Update) => update::run(),
+        Some(Commands::Config { action }) => match action {
+            ConfigAction::Show => config_cmd::run_show(),
+            ConfigAction::Set { write_key, plugins, add_plugins, remove_plugins } => {
+                config_cmd::run_set(write_key, plugins, add_plugins, remove_plugins)
+            }
+        },
         None => {
             println!("segkit {}", env!("CARGO_PKG_VERSION"));
             ExitCode::SUCCESS
