@@ -90,6 +90,21 @@ pub const PLUGIN_REGISTRY: &[Plugin] = &[
     },
 ];
 
+/// Validate that all plugin names are known. Returns an error message for the first unknown name.
+pub fn validate_plugin_names(names: &[String]) -> Result<(), String> {
+    for name in names {
+        let lower = name.to_lowercase();
+        if !PLUGIN_REGISTRY.iter().any(|p| p.key == lower) {
+            let available: Vec<_> = PLUGIN_REGISTRY.iter().map(|p| p.key).collect();
+            return Err(format!(
+                "Unknown plugin '{name}'. Available: {}",
+                available.join(", ")
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn resolve_plugins(requested: &[String]) -> Result<Vec<&'static Plugin>, String> {
     let mut resolved = Vec::new();
     for name in requested {

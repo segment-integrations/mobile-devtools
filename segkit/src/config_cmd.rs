@@ -1,104 +1,11 @@
 use std::collections::BTreeSet;
 use std::fs;
-use std::path::PathBuf;
 use std::process::ExitCode;
 
-use crate::init_cmd::PLUGIN_REGISTRY;
+use crate::init_cmd::{validate_plugin_names, PLUGIN_REGISTRY};
 use crate::util::log::{err, info};
-
-/// Line-preserving xcconfig parser.
-/// Stores raw lines and provides get/set that edit in-place.
-struct XCConfig {
-    lines: Vec<String>,
-}
-
-impl XCConfig {
-    fn parse(content: &str) -> Self {
-        Self {
-            lines: content.lines().map(|l| l.to_string()).collect(),
-        }
-    }
-
-    fn get(&self, key: &str) -> Option<String> {
-        for line in &self.lines {
-            let trimmed = line.trim();
-            if trimmed.starts_with("//") || trimmed.is_empty() {
-                continue;
-            }
-            if let Some((k, v)) = trimmed.split_once('=') {
-                if k.trim() == key {
-                    return Some(v.trim().to_string());
-                }
-            }
-        }
-        None
-    }
-
-    fn set(&mut self, key: &str, value: &str) {
-        for line in &mut self.lines {
-            let trimmed = line.trim();
-            if trimmed.starts_with("//") || trimmed.is_empty() {
-                continue;
-            }
-            if let Some((k, _)) = trimmed.split_once('=') {
-                if k.trim() == key {
-                    *line = format!("{} = {}", key, value);
-                    return;
-                }
-            }
-        }
-        // Key not found — append it
-        self.lines.push(format!("{} = {}", key, value));
-    }
-
-    fn to_string(&self) -> String {
-        let mut out = self.lines.join("\n");
-        if !out.ends_with('\n') {
-            out.push('\n');
-        }
-        out
-    }
-}
-
-/// Scan current directory for a SegmentConfig.xcconfig file.
-fn find_config_file() -> Option<PathBuf> {
-    let cwd = std::env::current_dir().ok()?;
-
-    // Check immediate subdirectories (the app source dir pattern: <Name>/<Name>/SegmentConfig.xcconfig or <Name>/SegmentConfig.xcconfig)
-    let entries = fs::read_dir(&cwd).ok()?;
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            let candidate = path.join("SegmentConfig.xcconfig");
-            if candidate.exists() {
-                return Some(candidate);
-            }
-        }
-    }
-
-    // Also check cwd itself
-    let candidate = cwd.join("SegmentConfig.xcconfig");
-    if candidate.exists() {
-        return Some(candidate);
-    }
-
-    None
-}
-
-fn validate_plugin_names(names: &[String]) -> Result<(), String> {
-    let known: BTreeSet<&str> = PLUGIN_REGISTRY.iter().map(|p| p.key).collect();
-    for name in names {
-        let lower = name.to_lowercase();
-        if !known.contains(lower.as_str()) {
-            return Err(format!(
-                "Unknown plugin '{}'. Available: {}",
-                name,
-                known.into_iter().collect::<Vec<_>>().join(", ")
-            ));
-        }
-    }
-    Ok(())
-}
+use crate::util::project::find_segment_config;
+use crate::util::xcconfig::XCConfig;
 
 fn parse_plugin_csv(raw: &str) -> BTreeSet<String> {
     if raw.is_empty() {
@@ -111,7 +18,7 @@ fn parse_plugin_csv(raw: &str) -> BTreeSet<String> {
 }
 
 pub fn run_show() -> ExitCode {
-    let config_path = match find_config_file() {
+    let config_path = match find_segment_config() {
         Some(p) => p,
         None => {
             err("No SegmentConfig.xcconfig found. Are you in a segkit project directory?");
@@ -138,10 +45,9 @@ pub fn run_show() -> ExitCode {
     eprintln!("  Write Key: {}", if write_key.is_empty() { "(not set)" } else { &write_key });
     eprintln!();
     eprintln!("  Plugins:");
-    let known: Vec<&str> = PLUGIN_REGISTRY.iter().map(|p| p.key).collect();
-    for key in &known {
-        let marker = if enabled.contains(*key) { "+" } else { "-" };
-        eprintln!("    {marker} {key}");
+    for p in PLUGIN_REGISTRY {
+        let marker = if enabled.contains(p.key) { "+" } else { "-" };
+        eprintln!("    {marker} {}", p.key);
     }
 
     ExitCode::SUCCESS
@@ -153,7 +59,7 @@ pub fn run_set(
     add_plugins: Vec<String>,
     remove_plugins: Vec<String>,
 ) -> ExitCode {
-    let config_path = match find_config_file() {
+    let config_path = match find_segment_config() {
         Some(p) => p,
         None => {
             err("No SegmentConfig.xcconfig found. Are you in a segkit project directory?");
@@ -174,7 +80,7 @@ pub fn run_set(
     // Set write key if provided
     if let Some(key) = &write_key {
         config.set("SEGMENT_WRITE_KEY", key);
-        info(&format!("Write key updated"));
+        info("Write key updated");
     }
 
     // Handle plugin mutations
