@@ -82,10 +82,10 @@ pub const PLUGIN_REGISTRY: &[Plugin] = &[
     Plugin {
         key: "survicate",
         display_name: "Survicate",
-        package_name: "SegmentSurvicate",
+        package_name: "SurvicateDestination",
         repo_url: "https://github.com/Survicate/analytics-swift-survicate",
         min_version: "3.0.2",
-        import_name: "SegmentSurvicate",
+        import_name: "SurvicateDestination",
         swift_init: "SurvicateDestination()",
     },
 ];
@@ -220,6 +220,7 @@ packages:
       INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
       INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
       SWIFT_EMIT_LOC_STRINGS: YES
+      CLANG_ENABLE_EXPLICIT_MODULES: NO
   {name}Tests:
     type: bundle.unit-test
     platform: iOS
@@ -271,7 +272,7 @@ fn generate_content_view(name: &str) -> String {
     let mut plugin_entries = String::new();
     for p in PLUGIN_REGISTRY {
         plugin_entries.push_str(&format!(
-            "            (\"{key}\", \"{display}\", {{ {init} as (any DestinationPlugin) }}),\n",
+            "            (\"{key}\", \"{display}\", {{ {init} as (any Plugin) }}),\n",
             key = p.key,
             display = p.display_name,
             init = p.swift_init,
@@ -328,7 +329,7 @@ struct ContentView: View {{
         analytics.add(plugin: IDFAPlugin())
 
         // Dynamically register enabled destination plugins
-        let availablePlugins: [(key: String, name: String, make: () -> any DestinationPlugin)] = [
+        let availablePlugins: [(key: String, name: String, make: () -> any Plugin)] = [
 {plugin_entries}        ]
         for p in availablePlugins where Config.enabledPluginKeys.contains(p.key) {{
             analytics.add(plugin: p.make())
@@ -738,10 +739,10 @@ const DEVBOX_JSON: &str = r#"{
   "shell": {
     "scripts": {
       "build": [
-        "ios.sh xcodebuild -project __NAME__.xcodeproj -scheme __NAME__ -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData build"
+        "ios.sh xcodebuild -project __NAME__.xcodeproj -scheme __NAME__ -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData CLANG_ENABLE_EXPLICIT_MODULES=NO build"
       ],
       "build:release": [
-        "ios.sh xcodebuild -project __NAME__.xcodeproj -scheme __NAME__ -configuration Release -derivedDataPath DerivedData build"
+        "ios.sh xcodebuild -project __NAME__.xcodeproj -scheme __NAME__ -configuration Release -derivedDataPath DerivedData CLANG_ENABLE_EXPLICIT_MODULES=NO build"
       ],
       "build:clean": [
         "rm -rf DerivedData"
@@ -750,7 +751,7 @@ const DEVBOX_JSON: &str = r#"{
         "ios.sh run ${1:-}"
       ],
       "test": [
-        "ios.sh xcodebuild -project __NAME__.xcodeproj -scheme __NAME__ -destination 'platform=iOS Simulator,name=iPhone 17' test"
+        "ios.sh xcodebuild -project __NAME__.xcodeproj -scheme __NAME__ -destination 'platform=iOS Simulator,name=iPhone 17' CLANG_ENABLE_EXPLICIT_MODULES=NO test"
       ]
     }
   }
