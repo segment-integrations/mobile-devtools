@@ -54,18 +54,21 @@ enum Commands {
     },
     /// Scaffold a new project from a template
     Init {
-        /// SDK template to use
+        /// SDK template to use (swift)
         #[arg(long)]
-        sdk: String,
+        sdk: Option<String>,
         /// Project name
-        #[arg(long, default_value = "SegmentDemo")]
-        name: String,
+        #[arg(long)]
+        name: Option<String>,
         /// Organization identifier prefix (bundle ID = org.name)
-        #[arg(long, default_value = "com.example")]
-        org: String,
+        #[arg(long)]
+        org: Option<String>,
         /// Segment write key
-        #[arg(long, default_value = "demo_write_key_not_real")]
-        write_key: String,
+        #[arg(long)]
+        write_key: Option<String>,
+        /// Segment SDK destination plugins to include (e.g. amplitude, firebase, mixpanel, braze, appsflyer, facebook, survicate)
+        #[arg(long, value_delimiter = ',')]
+        plugins: Vec<String>,
     },
 }
 
@@ -79,8 +82,8 @@ fn main() -> ExitCode {
         Some(Commands::Metro { args }) => delegate::run("metro.sh", &args),
         Some(Commands::Doctor { fix }) => doctor::run(fix),
         Some(Commands::Uninstall { all, keep }) => uninstall::run(all, &keep),
-        Some(Commands::Init { sdk, name, org, write_key }) => {
-            init_cmd::run(&sdk, &name, &org, &write_key)
+        Some(Commands::Init { sdk, name, org, write_key, plugins }) => {
+            init_cmd::run(sdk, name, org, write_key, plugins)
         }
         None => {
             println!("segkit {}", env!("CARGO_PKG_VERSION"));

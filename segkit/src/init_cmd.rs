@@ -1,6 +1,9 @@
 use std::fs;
+use std::io::{self, BufRead, IsTerminal, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitCode};
+
+use crate::doctor;
 
 fn info(msg: &str) {
     eprintln!("\x1b[1;34m==> {}\x1b[0m", msg);
@@ -8,6 +11,90 @@ fn info(msg: &str) {
 
 fn err(msg: &str) {
     eprintln!("\x1b[1;31m==> {}\x1b[0m", msg);
+}
+
+struct Plugin {
+    /// CLI name (e.g. "amplitude")
+    key: &'static str,
+    /// SPM package name used in project.yml
+    package_name: &'static str,
+    /// GitHub repo URL
+    repo_url: &'static str,
+    /// Minimum version for SPM
+    min_version: &'static str,
+    /// Swift import name
+    import_name: &'static str,
+}
+
+const PLUGIN_REGISTRY: &[Plugin] = &[
+    Plugin {
+        key: "amplitude",
+        package_name: "SegmentAmplitude",
+        repo_url: "https://github.com/segment-integrations/analytics-swift-amplitude",
+        min_version: "1.5.0",
+        import_name: "SegmentAmplitude",
+    },
+    Plugin {
+        key: "appsflyer",
+        package_name: "SegmentAppsFlyer",
+        repo_url: "https://github.com/segment-integrations/analytics-swift-appsflyer",
+        min_version: "1.3.0",
+        import_name: "SegmentAppsFlyer",
+    },
+    Plugin {
+        key: "braze",
+        package_name: "SegmentBraze",
+        repo_url: "https://github.com/segment-integrations/analytics-swift-braze",
+        min_version: "1.3.0",
+        import_name: "SegmentBraze",
+    },
+    Plugin {
+        key: "facebook",
+        package_name: "SegmentFacebook",
+        repo_url: "https://github.com/segment-integrations/analytics-swift-facebook-app-events",
+        min_version: "1.3.0",
+        import_name: "SegmentFacebook",
+    },
+    Plugin {
+        key: "firebase",
+        package_name: "SegmentFirebase",
+        repo_url: "https://github.com/segment-integrations/analytics-swift-firebase",
+        min_version: "1.4.0",
+        import_name: "SegmentFirebase",
+    },
+    Plugin {
+        key: "mixpanel",
+        package_name: "SegmentMixpanel",
+        repo_url: "https://github.com/segment-integrations/analytics-swift-mixpanel",
+        min_version: "1.4.0",
+        import_name: "SegmentMixpanel",
+    },
+    Plugin {
+        key: "survicate",
+        package_name: "SegmentSurvicate",
+        repo_url: "https://github.com/Survicate/analytics-swift-survicate",
+        min_version: "1.1.0",
+        import_name: "SegmentSurvicate",
+    },
+];
+
+fn resolve_plugins(requested: &[String]) -> Result<Vec<&'static Plugin>, String> {
+    let mut resolved = Vec::new();
+    for name in requested {
+        let lower = name.to_lowercase();
+        match PLUGIN_REGISTRY.iter().find(|p| p.key == lower) {
+            Some(p) => resolved.push(p),
+            None => {
+                let available: Vec<_> = PLUGIN_REGISTRY.iter().map(|p| p.key).collect();
+                return Err(format!(
+                    "Unknown plugin '{name}'. Available: {}",
+                    available.join(", ")
+                ));
+            }
+        }
+    }
+    resolved.dedup_by_key(|p| p.key);
+    Ok(resolved)
 }
 
 fn ensure_xcodegen() -> bool {
@@ -51,14 +138,438 @@ fn apply(template: &str, name: &str, org: &str, write_key: &str, bundle_id: &str
         .replace("__BUNDLE_ID__", bundle_id)
 }
 
-pub fn run(sdk: &str, name: &str, org: &str, write_key: &str) -> ExitCode {
+/// Generate the packages section of project.yml for selected plugins.
+fn generate_packages_yaml(plugins: &[&Plugin]) -> String {
+    let mut yaml = String::new();
+    for p in plugins {
+        yaml.push_str(&format!(
+            "  {}:\n    url: {}\n    from: {}\n",
+            p.package_name, p.repo_url, p.min_version
+        ));
+    }
+    yaml
+}
+
+/// Generate the dependencies section entries for selected plugins.
+fn generate_deps_yaml(plugins: &[&Plugin]) -> String {
+    let mut yaml = String::new();
+    for p in plugins {
+        yaml.push_str(&format!("      - package: {}\n", p.package_name));
+    }
+    yaml
+}
+
+/// Generate the project.yml with dynamic plugin support.
+fn generate_project_yml(name: &str, org: &str, plugins: &[&Plugin]) -> String {
+    let mut packages_section = String::new();
+    packages_section.push_str("  Segment:\n    url: https://github.com/segmentio/analytics-swift\n    from: 1.9.3\n");
+    packages_section.push_str(&generate_packages_yaml(plugins));
+
+    let mut deps_section = String::from("      - package: Segment\n");
+    deps_section.push_str(&generate_deps_yaml(plugins));
+
+    format!(
+        r#"name: {name}
+options:
+  bundleIdPrefix: {org}
+  deploymentTarget:
+    iOS: "16.0"
+  generateEmptyDirectories: true
+packages:
+{packages}targets:
+  {name}:
+    type: application
+    platform: iOS
+    sources: [{name}]
+    dependencies:
+{deps}    settings:
+      GENERATE_INFOPLIST_FILE: YES
+      INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+      INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+      INFOPLIST_KEY_UILaunchScreen_Generation: YES
+      INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+      INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+      SWIFT_EMIT_LOC_STRINGS: YES
+  {name}Tests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [{name}Tests]
+    dependencies:
+      - target: {name}
+    settings:
+      GENERATE_INFOPLIST_FILE: YES
+  {name}UITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [{name}UITests]
+    dependencies:
+      - target: {name}
+    settings:
+      GENERATE_INFOPLIST_FILE: YES
+"#,
+        name = name,
+        org = org,
+        packages = packages_section,
+        deps = deps_section,
+    )
+}
+
+/// Generate ContentView.swift with dynamic plugin imports and toggles.
+fn generate_content_view(name: &str, plugins: &[&Plugin]) -> String {
+    // Build import lines
+    let mut imports = String::from("import Segment\n");
+    for p in plugins {
+        imports.push_str(&format!("import {}\n", p.import_name));
+    }
+
+    // Build toggle state vars
+    let mut toggle_states = String::new();
+    for p in plugins {
+        toggle_states.push_str(&format!(
+            "    @State private var {key}Enabled = false\n",
+            key = p.key
+        ));
+    }
+
+    // Build toggle UI
+    let mut toggle_ui = String::new();
+    for p in plugins {
+        toggle_ui.push_str(&format!(
+            r#"
+                Toggle(isOn: ${key}Enabled) {{
+                    HStack {{
+                        Image(systemName: {key}Enabled ? "wave.3.right.circle.fill" : "wave.3.right.circle")
+                            .foregroundStyle({key}Enabled ? .blue : .gray)
+                        Text("{display} Destination")
+                            .font(.subheadline)
+                    }}
+                }}
+                .onChange(of: {key}Enabled) {{ _, newValue in
+                    if newValue {{
+                        print("{display} destination enabled")
+                    }} else {{
+                        print("{display} destination disabled")
+                    }}
+                }}
+"#,
+            key = p.key,
+            display = capitalize(p.key),
+        ));
+    }
+
+    let toggle_section = if plugins.is_empty() {
+        String::new()
+    } else {
+        format!(
+            r#"
+            VStack(spacing: 12) {{
+                Divider()
+{toggles}
+            }}
+            .padding(.horizontal, 32)
+"#,
+            toggles = toggle_ui
+        )
+    };
+
+    format!(
+        r#"//
+//  ContentView.swift
+//  {name}
+//
+
+import SwiftUI
+{imports}
+struct ContentView: View {{
+    @State private var eventCount = 0
+    @State private var lastEventTime: Date?
+{toggle_states}
+    let analytics: Analytics
+
+    init() {{
+        var configuration = Configuration(writeKey: Config.segmentWriteKey)
+
+        if Config.isUsingDemoKey {{
+            configuration = configuration
+                .flushAt(1000)
+                .flushInterval(0)
+        }} else {{
+            configuration = configuration
+                .flushInterval(10)
+        }}
+
+        self.analytics = Analytics(configuration: configuration)
+        analytics.add(plugin: ConsoleLoggerPlugin())
+        analytics.add(plugin: IDFAPlugin())
+
+        print("Segment Analytics initialized")
+        print("  Write Key: \(Config.segmentWriteKey)")
+        print("  Mode: \(Config.isUsingDemoKey ? "Demo (events queued locally)" : "Live (sending to Segment)")")
+    }}
+
+    var body: some View {{
+        VStack(spacing: 24) {{
+            VStack(spacing: 8) {{
+                Image(systemName: "chart.line.uptrend.xyaxis")
+                    .font(.system(size: 60))
+                    .foregroundStyle(.blue)
+
+                Text("Segment iOS Demo")
+                    .font(.title)
+                    .fontWeight(.bold)
+
+                Text("Analytics Swift SDK")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }}
+            .padding(.top, 40)
+
+            Spacer()
+
+            VStack(spacing: 4) {{
+                Text("\(eventCount)")
+                    .font(.system(size: 48, weight: .bold))
+                    .foregroundStyle(.blue)
+
+                Text("Events Tracked")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                if let lastTime = lastEventTime {{
+                    Text("Last: \(lastTime, formatter: dateFormatter)")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }}
+            }}
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.blue.opacity(0.1))
+            )
+
+            Spacer()
+
+            VStack(spacing: 16) {{
+                Button(action: trackEvent) {{
+                    HStack {{
+                        Image(systemName: "chart.bar.fill")
+                        Text("Track Event")
+                    }}
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(.blue)
+                    .foregroundStyle(.white)
+                    .cornerRadius(12)
+                }}
+
+                Button(action: identifyUser) {{
+                    HStack {{
+                        Image(systemName: "person.fill")
+                        Text("Identify User")
+                    }}
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(.green)
+                    .foregroundStyle(.white)
+                    .cornerRadius(12)
+                }}
+
+                Button(action: trackScreen) {{
+                    HStack {{
+                        Image(systemName: "iphone")
+                        Text("Track Screen")
+                    }}
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(.purple)
+                    .foregroundStyle(.white)
+                    .cornerRadius(12)
+                }}
+            }}
+            .padding(.horizontal, 32)
+{toggle_section}
+            Spacer()
+        }}
+        .padding()
+    }}
+
+    private func trackEvent() {{
+        eventCount += 1
+        lastEventTime = Date()
+
+        analytics.track(name: "Button Pressed", properties: [
+            "button": "Track Event",
+            "count": eventCount,
+            "timestamp": ISO8601DateFormatter().string(from: Date())
+        ])
+    }}
+
+    private func identifyUser() {{
+        eventCount += 1
+        lastEventTime = Date()
+
+        analytics.identify(userId: "demo-user-\(UUID().uuidString.prefix(8))", traits: [
+            "name": "Demo User",
+            "email": "demo@example.com",
+            "plan": "free",
+            "event_count": eventCount
+        ])
+    }}
+
+    private func trackScreen() {{
+        eventCount += 1
+        lastEventTime = Date()
+
+        analytics.screen(title: "Demo Screen", properties: [
+            "screen_name": "ContentView",
+            "view_count": eventCount
+        ])
+    }}
+
+    private var dateFormatter: DateFormatter {{
+        let formatter = DateFormatter()
+        formatter.timeStyle = .medium
+        return formatter
+    }}
+}}
+
+#Preview {{
+    ContentView()
+}}
+"#,
+        name = name,
+        imports = imports,
+        toggle_states = toggle_states,
+        toggle_section = toggle_section,
+    )
+}
+
+fn capitalize(s: &str) -> String {
+    let mut c = s.chars();
+    match c.next() {
+        None => String::new(),
+        Some(f) => f.to_uppercase().to_string() + c.as_str(),
+    }
+}
+
+/// Prompt the user for input with a default value. Returns the default in non-interactive mode.
+fn prompt(label: &str, default: &str) -> String {
+    if !io::stdin().is_terminal() {
+        return default.to_string();
+    }
+    if default.is_empty() {
+        eprint!("{label}: ");
+    } else {
+        eprint!("{label} [{default}]: ");
+    }
+    io::stderr().flush().ok();
+
+    let mut line = String::new();
+    if io::stdin().lock().read_line(&mut line).is_err() {
+        return default.to_string();
+    }
+    let trimmed = line.trim();
+    if trimmed.is_empty() { default.to_string() } else { trimmed.to_string() }
+}
+
+/// Prompt user to select plugins interactively (toggle with numbers, Enter to confirm).
+fn prompt_plugins(already_selected: &[String]) -> Vec<String> {
+    if !io::stdin().is_terminal() {
+        return already_selected.to_vec();
+    }
+
+    let mut selected: Vec<bool> = PLUGIN_REGISTRY
+        .iter()
+        .map(|p| already_selected.iter().any(|s| s.to_lowercase() == p.key))
+        .collect();
+
+    loop {
+        eprintln!();
+        eprintln!("Select destination plugins (enter numbers to toggle, Enter to confirm):");
+        for (i, plugin) in PLUGIN_REGISTRY.iter().enumerate() {
+            let marker = if selected[i] { "[x]" } else { "[ ]" };
+            eprintln!("  {}) {} {}", i + 1, marker, plugin.key);
+        }
+        eprint!("> ");
+        io::stderr().flush().ok();
+
+        let mut line = String::new();
+        if io::stdin().lock().read_line(&mut line).is_err() {
+            break;
+        }
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            break;
+        }
+        for token in trimmed.split_whitespace() {
+            if let Ok(n) = token.parse::<usize>() {
+                if n >= 1 && n <= PLUGIN_REGISTRY.len() {
+                    selected[n - 1] = !selected[n - 1];
+                }
+            }
+        }
+    }
+
+    PLUGIN_REGISTRY
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| selected[*i])
+        .map(|(_, p)| p.key.to_string())
+        .collect()
+}
+
+pub fn run(
+    sdk: Option<String>,
+    name: Option<String>,
+    org: Option<String>,
+    write_key: Option<String>,
+    plugin_names: Vec<String>,
+) -> ExitCode {
+    let interactive = io::stdin().is_terminal();
+
+    // If any required field is missing and we're interactive, run the wizard
+    let needs_wizard = interactive && sdk.is_none();
+
+    let sdk = sdk.unwrap_or_else(|| {
+        if interactive {
+            prompt("SDK template (swift)", "swift")
+        } else {
+            err("--sdk is required in non-interactive mode");
+            std::process::exit(1);
+        }
+    });
+
     if sdk != "swift" {
         err(&format!("Unknown SDK: {sdk}. Only 'swift' is supported."));
         return ExitCode::FAILURE;
     }
 
+    let name = name.unwrap_or_else(|| prompt("Project name", "SegmentDemo"));
+    let org = org.unwrap_or_else(|| prompt("Organization identifier", "com.example"));
+    let write_key = write_key.unwrap_or_else(|| prompt("Segment write key", "demo_write_key_not_real"));
+
+    let plugin_names = if needs_wizard && plugin_names.is_empty() {
+        prompt_plugins(&plugin_names)
+    } else {
+        plugin_names
+    };
+
+    // Resolve requested plugins
+    let plugins = match resolve_plugins(&plugin_names) {
+        Ok(p) => p,
+        Err(e) => {
+            err(&e);
+            return ExitCode::FAILURE;
+        }
+    };
+
+    if !plugins.is_empty() {
+        let names: Vec<_> = plugins.iter().map(|p| p.key).collect();
+        info(&format!("Plugins: {}", names.join(", ")));
+    }
+
     let bundle_id = format!("{org}.{name}");
-    let out = PathBuf::from(name);
+    let out = PathBuf::from(&name);
 
     if out.exists() {
         err(&format!("Directory '{}' already exists.", out.display()));
@@ -74,21 +585,21 @@ pub fn run(sdk: &str, name: &str, org: &str, write_key: &str) -> ExitCode {
         err(&format!("Failed to create directory: {e}"));
     });
 
-    // project.yml
-    write_file(&out, "project.yml", &apply(PROJECT_YML, name, org, write_key, &bundle_id));
+    // project.yml (dynamically generated with plugins)
+    write_file(&out, "project.yml", &generate_project_yml(&name, &org, &plugins));
 
     // devbox.json
-    write_file(&out, "devbox.json", &apply(DEVBOX_JSON, name, org, write_key, &bundle_id));
+    write_file(&out, "devbox.json", &apply(DEVBOX_JSON, &name, &org, &write_key, &bundle_id));
 
     // Device definitions
     write_file(&out, "devbox.d/ios/devices/max.json", DEVICE_MAX_JSON);
     write_file(&out, "devbox.d/ios/devices/min.json", DEVICE_MIN_JSON);
 
     // Swift source files
-    let src = name;
-    write_file(&out, &format!("{src}/Config.swift"), &apply(CONFIG_SWIFT, name, org, write_key, &bundle_id));
-    write_file(&out, &format!("{src}/{name}App.swift"), &apply(APP_SWIFT, name, org, write_key, &bundle_id));
-    write_file(&out, &format!("{src}/ContentView.swift"), &apply(CONTENT_VIEW_SWIFT, name, org, write_key, &bundle_id));
+    let src = &name;
+    write_file(&out, &format!("{src}/Config.swift"), &apply(CONFIG_SWIFT, &name, &org, &write_key, &bundle_id));
+    write_file(&out, &format!("{src}/{name}App.swift"), &apply(APP_SWIFT, &name, &org, &write_key, &bundle_id));
+    write_file(&out, &format!("{src}/ContentView.swift"), &generate_content_view(&name, &plugins));
     write_file(&out, &format!("{src}/ConsoleLoggerPlugin.swift"), CONSOLE_LOGGER_SWIFT);
     write_file(&out, &format!("{src}/IDFAPlugin.swift"), IDFA_PLUGIN_SWIFT);
 
@@ -98,9 +609,9 @@ pub fn run(sdk: &str, name: &str, org: &str, write_key: &str) -> ExitCode {
     write_file(&out, &format!("{src}/Assets.xcassets/AppIcon.appiconset/Contents.json"), APP_ICON_CONTENTS);
 
     // Test files
-    write_file(&out, &format!("{name}Tests/{name}Tests.swift"), &apply(TESTS_SWIFT, name, org, write_key, &bundle_id));
-    write_file(&out, &format!("{name}UITests/{name}UITests.swift"), &apply(UI_TESTS_SWIFT, name, org, write_key, &bundle_id));
-    write_file(&out, &format!("{name}UITests/{name}UITestsLaunchTests.swift"), &apply(UI_TESTS_LAUNCH_SWIFT, name, org, write_key, &bundle_id));
+    write_file(&out, &format!("{name}Tests/{name}Tests.swift"), &apply(TESTS_SWIFT, &name, &org, &write_key, &bundle_id));
+    write_file(&out, &format!("{name}UITests/{name}UITests.swift"), &apply(UI_TESTS_SWIFT, &name, &org, &write_key, &bundle_id));
+    write_file(&out, &format!("{name}UITests/{name}UITestsLaunchTests.swift"), &apply(UI_TESTS_LAUNCH_SWIFT, &name, &org, &write_key, &bundle_id));
 
     // .gitignore
     write_file(&out, ".gitignore", GITIGNORE);
@@ -130,6 +641,13 @@ pub fn run(sdk: &str, name: &str, org: &str, write_key: &str) -> ExitCode {
         }
     }
 
+    // Run doctor --fix to ensure devbox/homebrew/etc. are available
+    info("Running doctor --fix to ensure dependencies are installed...");
+    let doctor_result = doctor::run(true);
+    if doctor_result != ExitCode::SUCCESS {
+        err("doctor --fix reported issues; the project was still created.");
+    }
+
     info("Done!");
     eprintln!();
     eprintln!("  cd {name}");
@@ -145,52 +663,7 @@ pub fn run(sdk: &str, name: &str, org: &str, write_key: &str) -> ExitCode {
 // Templates
 // ============================================================================
 
-const PROJECT_YML: &str = r#"name: __NAME__
-options:
-  bundleIdPrefix: __ORG__
-  deploymentTarget:
-    iOS: "16.0"
-  generateEmptyDirectories: true
-packages:
-  Segment:
-    url: https://github.com/segmentio/analytics-swift
-    from: 1.9.3
-  SegmentAmplitude:
-    url: https://github.com/segment-integrations/analytics-swift-amplitude
-    from: 1.5.0
-targets:
-  __NAME__:
-    type: application
-    platform: iOS
-    sources: [__NAME__]
-    dependencies:
-      - package: Segment
-      - package: SegmentAmplitude
-    settings:
-      GENERATE_INFOPLIST_FILE: YES
-      INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
-      INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
-      INFOPLIST_KEY_UILaunchScreen_Generation: YES
-      INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
-      INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
-      SWIFT_EMIT_LOC_STRINGS: YES
-  __NAME__Tests:
-    type: bundle.unit-test
-    platform: iOS
-    sources: [__NAME__Tests]
-    dependencies:
-      - target: __NAME__
-    settings:
-      GENERATE_INFOPLIST_FILE: YES
-  __NAME__UITests:
-    type: bundle.ui-testing
-    platform: iOS
-    sources: [__NAME__UITests]
-    dependencies:
-      - target: __NAME__
-    settings:
-      GENERATE_INFOPLIST_FILE: YES
-"#;
+// project.yml is now generated dynamically by generate_project_yml()
 
 const DEVBOX_JSON: &str = r#"{
   "include": ["github:segment-integrations/mobile-devtools?dir=plugins/ios&ref=main"],
@@ -272,200 +745,7 @@ struct __NAME__App: App {
 }
 "#;
 
-const CONTENT_VIEW_SWIFT: &str = r#"//
-//  ContentView.swift
-//  __NAME__
-//
-
-import SwiftUI
-import Segment
-import SegmentAmplitude
-
-struct ContentView: View {
-    @State private var eventCount = 0
-    @State private var lastEventTime: Date?
-    @State private var amplitudeEnabled = false
-
-    let analytics: Analytics
-    private let amplitudePlugin = AmplitudeSession()
-
-    init() {
-        var configuration = Configuration(writeKey: Config.segmentWriteKey)
-
-        if Config.isUsingDemoKey {
-            configuration = configuration
-                .flushAt(1000)
-                .flushInterval(0)
-        } else {
-            configuration = configuration
-                .flushInterval(10)
-        }
-
-        self.analytics = Analytics(configuration: configuration)
-        analytics.add(plugin: ConsoleLoggerPlugin())
-        analytics.add(plugin: IDFAPlugin())
-
-        print("Segment Analytics initialized")
-        print("  Write Key: \(Config.segmentWriteKey)")
-        print("  Mode: \(Config.isUsingDemoKey ? "Demo (events queued locally)" : "Live (sending to Segment)")")
-    }
-
-    var body: some View {
-        VStack(spacing: 24) {
-            VStack(spacing: 8) {
-                Image(systemName: "chart.line.uptrend.xyaxis")
-                    .font(.system(size: 60))
-                    .foregroundStyle(.blue)
-
-                Text("Segment iOS Demo")
-                    .font(.title)
-                    .fontWeight(.bold)
-
-                Text("Analytics Swift SDK")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.top, 40)
-
-            Spacer()
-
-            VStack(spacing: 4) {
-                Text("\(eventCount)")
-                    .font(.system(size: 48, weight: .bold))
-                    .foregroundStyle(.blue)
-
-                Text("Events Tracked")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-
-                if let lastTime = lastEventTime {
-                    Text("Last: \(lastTime, formatter: dateFormatter)")
-                        .font(.caption2)
-                        .foregroundStyle(.tertiary)
-                }
-            }
-            .padding()
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(.blue.opacity(0.1))
-            )
-
-            Spacer()
-
-            VStack(spacing: 16) {
-                Button(action: trackEvent) {
-                    HStack {
-                        Image(systemName: "chart.bar.fill")
-                        Text("Track Event")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(.blue)
-                    .foregroundStyle(.white)
-                    .cornerRadius(12)
-                }
-
-                Button(action: identifyUser) {
-                    HStack {
-                        Image(systemName: "person.fill")
-                        Text("Identify User")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(.green)
-                    .foregroundStyle(.white)
-                    .cornerRadius(12)
-                }
-
-                Button(action: trackScreen) {
-                    HStack {
-                        Image(systemName: "iphone")
-                        Text("Track Screen")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(.purple)
-                    .foregroundStyle(.white)
-                    .cornerRadius(12)
-                }
-            }
-            .padding(.horizontal, 32)
-
-            VStack(spacing: 12) {
-                Divider()
-
-                Toggle(isOn: $amplitudeEnabled) {
-                    HStack {
-                        Image(systemName: amplitudeEnabled ? "wave.3.right.circle.fill" : "wave.3.right.circle")
-                            .foregroundStyle(amplitudeEnabled ? .blue : .gray)
-                        Text("Amplitude Destination")
-                            .font(.subheadline)
-                    }
-                }
-                .onChange(of: amplitudeEnabled) { _, newValue in
-                    toggleAmplitude(enabled: newValue)
-                }
-                .padding(.horizontal, 32)
-            }
-
-            Spacer()
-        }
-        .padding()
-    }
-
-    private func trackEvent() {
-        eventCount += 1
-        lastEventTime = Date()
-
-        analytics.track(name: "Button Pressed", properties: [
-            "button": "Track Event",
-            "count": eventCount,
-            "timestamp": ISO8601DateFormatter().string(from: Date())
-        ])
-    }
-
-    private func identifyUser() {
-        eventCount += 1
-        lastEventTime = Date()
-
-        analytics.identify(userId: "demo-user-\(UUID().uuidString.prefix(8))", traits: [
-            "name": "Demo User",
-            "email": "demo@example.com",
-            "plan": "free",
-            "event_count": eventCount
-        ])
-    }
-
-    private func trackScreen() {
-        eventCount += 1
-        lastEventTime = Date()
-
-        analytics.screen(title: "Demo Screen", properties: [
-            "screen_name": "ContentView",
-            "view_count": eventCount
-        ])
-    }
-
-    private func toggleAmplitude(enabled: Bool) {
-        if enabled {
-            analytics.add(plugin: amplitudePlugin)
-            print("Amplitude destination enabled")
-        } else {
-            print("Amplitude destination disabled")
-        }
-    }
-
-    private var dateFormatter: DateFormatter {
-        let formatter = DateFormatter()
-        formatter.timeStyle = .medium
-        return formatter
-    }
-}
-
-#Preview {
-    ContentView()
-}
-"#;
+// ContentView.swift is now generated dynamically by generate_content_view()
 
 const CONSOLE_LOGGER_SWIFT: &str = r#"//
 //  ConsoleLoggerPlugin.swift
