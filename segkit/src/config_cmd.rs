@@ -4,7 +4,7 @@ use std::process::ExitCode;
 
 use crate::init_cmd::{validate_plugin_names, PLUGIN_REGISTRY};
 use crate::util::log::{err, info};
-use crate::util::project::find_segment_config;
+use crate::util::project::find_file;
 use crate::util::xcconfig::XCConfig;
 
 fn parse_plugin_csv(raw: &str) -> BTreeSet<String> {
@@ -18,7 +18,7 @@ fn parse_plugin_csv(raw: &str) -> BTreeSet<String> {
 }
 
 pub fn run_show() -> ExitCode {
-    let config_path = match find_segment_config() {
+    let config_path = match find_file("SegmentConfig.xcconfig") {
         Some(p) => p,
         None => {
             err("No SegmentConfig.xcconfig found. Are you in a segkit project directory?");
@@ -59,7 +59,7 @@ pub fn run_set(
     add_plugins: Vec<String>,
     remove_plugins: Vec<String>,
 ) -> ExitCode {
-    let config_path = match find_segment_config() {
+    let config_path = match find_file("SegmentConfig.xcconfig") {
         Some(p) => p,
         None => {
             err("No SegmentConfig.xcconfig found. Are you in a segkit project directory?");
