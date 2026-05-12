@@ -104,13 +104,23 @@ resolve_flake_sdk_root() {
   # Build the SDK to ensure it's in the Nix store
   # Use --impure to allow flake to read ANDROID_CONFIG_DIR for android.lock location
   # Capture stderr so failures are visible instead of silently swallowed
+  # In interactive shells, also stream progress to the terminal so users see activity
   [ -n "${ANDROID_DEBUG_SETUP:-}" ] && echo "[CORE-$$] Building SDK: path:${root}#${output}" >&2
   _nix_stderr=""
   _nix_stderr_file="$(mktemp "${TMPDIR:-/tmp}/android-nix-build-XXXXXX.stderr")"
-  sdk_out=$(
-    nix --extra-experimental-features 'nix-command flakes' \
-      build "path:${root}#${output}" --no-link --print-out-paths --impure 2>"$_nix_stderr_file"
-  ) || true
+  if [ -z "${CI:-}" ] && [ -t 2 ]; then
+    # Interactive terminal: stream nix build progress to stderr in real time
+    sdk_out=$(
+      nix --extra-experimental-features 'nix-command flakes' \
+        build "path:${root}#${output}" --no-link --print-out-paths --impure 2> >(tee "$_nix_stderr_file" >&2)
+    ) || true
+  else
+    # CI or non-interactive: capture stderr silently
+    sdk_out=$(
+      nix --extra-experimental-features 'nix-command flakes' \
+        build "path:${root}#${output}" --no-link --print-out-paths --impure 2>"$_nix_stderr_file"
+    ) || true
+  fi
   _nix_stderr=""
   if [ -f "$_nix_stderr_file" ]; then
     _nix_stderr=$(cat "$_nix_stderr_file" 2>/dev/null || true)

@@ -38,9 +38,18 @@ fi
 pick_runtime() {
   preferred="$1"
   json="$(xcrun simctl list runtimes -j)"
-  choice="$(echo "$json" | jq -r --arg v "$preferred" '.runtimes[] | select(.isAvailable and (.name|startswith("iOS \($v)"))) | "\(.identifier)|\(.name)"' | head -n1)"
+  # Filter: must be available, must start with "iOS <preferred>", must not be
+  # in a transitional state (e.g. "Finding content..." placeholders from Xcode)
+  choice="$(echo "$json" | jq -r --arg v "$preferred" '
+    .runtimes[] |
+    select(.isAvailable and (.name|startswith("iOS \($v)")) and (.name|test("Finding content";"i")|not)) |
+    "\(.identifier)|\(.name)"' | head -n1)"
   if [ -z "$choice" ] || [ "$choice" = "null" ]; then
-    choice="$(echo "$json" | jq -r '.runtimes[] | select(.isAvailable and (.name|startswith("iOS "))) | "\(.version)|\(.identifier)|\(.name)"' | sort -Vr | head -n1 | cut -d"|" -f2-)"
+    # Fallback: pick the latest available iOS runtime
+    choice="$(echo "$json" | jq -r '
+      .runtimes[] |
+      select(.isAvailable and (.name|startswith("iOS ")) and (.name|test("Finding content";"i")|not)) |
+      "\(.version)|\(.identifier)|\(.name)"' | sort -Vr | head -n1 | cut -d"|" -f2-)"
   fi
   if [ -n "$choice" ] && [ "$choice" != "null" ]; then
     printf '%s\n' "$choice"
@@ -55,7 +64,10 @@ pick_runtime() {
 pick_runtime_strict() {
   preferred="$1"
   json="$(xcrun simctl list runtimes -j)"
-  choice="$(echo "$json" | jq -r --arg v "$preferred" '.runtimes[] | select(.isAvailable and (.name|startswith("iOS \($v)"))) | "\(.identifier)|\(.name)"' | head -n1)"
+  choice="$(echo "$json" | jq -r --arg v "$preferred" '
+    .runtimes[] |
+    select(.isAvailable and (.name|startswith("iOS \($v)")) and (.name|test("Finding content";"i")|not)) |
+    "\(.identifier)|\(.name)"' | head -n1)"
   if [ -n "$choice" ] && [ "$choice" != "null" ]; then
     printf '%s\n' "$choice"
     return 0
@@ -191,6 +203,49 @@ ensure_device() {
     fi
     echo "Existing ${display_name} (${existing_udid}) is missing its data directory. Deleting stale simulator..."
     xcrun simctl delete "$existing_udid" || true
+  fi
+
+  echo "Creating ${display_name}..."
+  xcrun simctl create "$display_name" "$device_type" "$runtime_id"
+  echo "Created ${display_name}"
+}
+
+# Ensure device exists using an already-resolved runtime
+# This avoids redundant runtime resolution and failed download attempts
+# Args: base_name, runtime_id, runtime_name
+# Returns: 0 on success
+ensure_device_with_runtime() {
+  base_name="$1"
+  runtime_id="$2"
+  runtime_name="$3"
+
+  display_name="${base_name} (${runtime_name})"
+
+  existing_udid="$(existing_device_udid_any_runtime "$display_name")"
+  if [ -n "$existing_udid" ]; then
+    if device_data_dir_exists "$existing_udid"; then
+      echo "Found existing ${display_name}: ${existing_udid}"
+      return 0
+    fi
+    echo "Existing ${display_name} (${existing_udid}) is missing its data directory. Deleting stale simulator..."
+    xcrun simctl delete "$existing_udid" || true
+  fi
+
+  # Also check for base name without runtime suffix
+  existing_udid="$(existing_device_udid_any_runtime "$base_name")"
+  if [ -n "$existing_udid" ]; then
+    if device_data_dir_exists "$existing_udid"; then
+      echo "Found existing ${base_name}: ${existing_udid}"
+      return 0
+    fi
+    echo "Existing ${base_name} (${existing_udid}) is missing its data directory. Deleting stale simulator..."
+    xcrun simctl delete "$existing_udid" || true
+  fi
+
+  device_type="$(devicetype_id_for_name "$base_name" || true)"
+  if [ -z "$device_type" ]; then
+    echo "Device type '${base_name}' is unavailable in this Xcode install. Skipping ${display_name}." >&2
+    return 0
   fi
 
   echo "Creating ${display_name}..."
