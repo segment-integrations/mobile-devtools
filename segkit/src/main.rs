@@ -7,6 +7,7 @@ mod doctor;
 mod init_cmd;
 mod state;
 mod uninstall;
+mod update;
 
 #[derive(Parser)]
 #[command(name = "segkit", version, about = "Segment SDK developer toolkit")]
@@ -70,6 +71,8 @@ enum Commands {
         #[arg(long, value_delimiter = ',')]
         plugins: Vec<String>,
     },
+    /// Update segkit to the latest version from main
+    Update,
 }
 
 fn main() -> ExitCode {
@@ -85,6 +88,7 @@ fn main() -> ExitCode {
         Some(Commands::Init { sdk, name, org, write_key, plugins }) => {
             init_cmd::run(sdk, name, org, write_key, plugins)
         }
+        Some(Commands::Update) => update::run(),
         None => {
             println!("segkit {}", env!("CARGO_PKG_VERSION"));
             ExitCode::SUCCESS
