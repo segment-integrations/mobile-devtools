@@ -84,7 +84,7 @@ pub const PLUGIN_REGISTRY: &[Plugin] = &[
         display_name: "Survicate",
         package_name: "SegmentSurvicate",
         repo_url: "https://github.com/Survicate/analytics-swift-survicate",
-        min_version: "1.1.0",
+        min_version: "3.0.2",
         import_name: "SegmentSurvicate",
         swift_init: "SurvicateDestination()",
     },
