@@ -1,46 +1,20 @@
-# Mobile Devtools & Plugins for Devbox
+# Mobile Devtools
 
-Reproducible, project-local development environments for Android, iOS, and React Native for [Devbox](https://www.jetify.com/devbox).
+Reproducible, project-local development environments for Android, iOS, and React Native.
 
 ## Quick Start
 
-```bash
-# Install devbox (if you haven't already)
-curl -fsSL https://get.jetify.com/devbox | bash
+```sh
+# Install segkit (installs Nix if needed)
+curl -fsSL https://raw.githubusercontent.com/segment-integrations/mobile-devtools/main/segkit/install.sh | sh
 
-# Initialize devbox in your project
-devbox init
+# Check your environment
+segkit doctor --fix
 ```
 
-Replace the contents of your `devbox.json` with the Android plugin:
+That's it. `segkit` manages Nix, Devbox, and platform dependencies for you.
 
-```json
-{
-  "include": ["github:segment-integrations/devbox-plugins?dir=plugins/android"],
-  "packages": {
-    "jdk17": "latest",
-    "gradle": "latest"
-  },
-  "env": {
-    "ANDROID_APP_APK": "app/build/outputs/apk/debug/app-debug.apk"
-  }
-}
-```
-
-> **Note:** Plugins are added via `include` in `devbox.json`, not with `devbox add`. The plugin provides the Android SDK, emulator, and device management tools. You add your own build tooling (JDK, Gradle) as packages.
-
-```bash
-# Enter development environment (downloads SDK on first run)
-devbox shell
-
-# List available devices
-devbox run android.sh devices list
-
-# Start the default emulator
-devbox run start:emu
-```
-
-**New to devbox-plugins?** Check out the [Quick Start Guide](wiki/guides/quick-start.md) for a complete walkthrough including how to set up build and deploy scripts.
+**New to mobile-devtools?** Check out the [Quick Start Guide](wiki/guides/quick-start.md) for a complete walkthrough.
 
 ## Features
 
@@ -146,14 +120,26 @@ devbox run doctor               # Check environment health
 devbox run verify:setup         # Quick verification
 ```
 
+## Uninstall
+
+```sh
+# Remove segkit and Nix (if installed by segkit)
+segkit uninstall
+
+# Also remove dependencies installed by 'segkit doctor --fix'
+segkit uninstall --all
+
+# Keep specific packages
+segkit uninstall --all --keep homebrew
+```
+
 ## Requirements
 
-- **[Devbox](https://www.jetify.com/devbox)** - Install with `curl -fsSL https://get.jetify.com/devbox | bash`
 - **macOS** - Required for iOS plugin (Xcode required)
 - **Linux** - Supported for Android and React Native (Android only)
 
 ## Support
 
 - **Questions?** Check [Troubleshooting](wiki/guides/troubleshooting.md)
-- **Found a bug?** [Open an issue](https://github.com/segment-integrations/devbox-plugins/issues)
+- **Found a bug?** [Open an issue](https://github.com/segment-integrations/mobile-devtools/issues)
 - **Want to contribute?** Read the [Contributing Guide](wiki/project/CONTRIBUTING.md)
