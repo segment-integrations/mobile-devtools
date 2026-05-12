@@ -39,14 +39,14 @@ const PLUGIN_REGISTRY: &[Plugin] = &[
         key: "braze",
         package_name: "SegmentBraze",
         repo_url: "https://github.com/segment-integrations/analytics-swift-braze",
-        min_version: "1.3.0",
+        min_version: "2.2.0",
         import_name: "SegmentBraze",
     },
     Plugin {
         key: "facebook",
         package_name: "SegmentFacebook",
         repo_url: "https://github.com/segment-integrations/analytics-swift-facebook-app-events",
-        min_version: "1.3.0",
+        min_version: "1.1.3",
         import_name: "SegmentFacebook",
     },
     Plugin {
@@ -60,7 +60,7 @@ const PLUGIN_REGISTRY: &[Plugin] = &[
         key: "mixpanel",
         package_name: "SegmentMixpanel",
         repo_url: "https://github.com/segment-integrations/analytics-swift-mixpanel",
-        min_version: "1.4.0",
+        min_version: "1.1.3",
         import_name: "SegmentMixpanel",
     },
     Plugin {
