@@ -8,6 +8,7 @@ mod init_cmd;
 mod state;
 mod uninstall;
 mod update;
+mod util;
 
 #[derive(Parser)]
 #[command(name = "segkit", version, about = "Segment SDK developer toolkit")]

@@ -1,17 +1,11 @@
 use std::fs;
 use std::io::{self, BufRead, IsTerminal, Write};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::{Command, ExitCode};
 
 use crate::doctor;
-
-fn info(msg: &str) {
-    eprintln!("\x1b[1;34m==> {}\x1b[0m", msg);
-}
-
-fn err(msg: &str) {
-    eprintln!("\x1b[1;31m==> {}\x1b[0m", msg);
-}
+use crate::util::fs::write_file;
+use crate::util::log::{err, info};
 
 struct Plugin {
     /// CLI name (e.g. "amplitude")
@@ -131,16 +125,6 @@ fn ensure_xcodegen() -> bool {
             false
         }
     }
-}
-
-fn write_file(base: &Path, rel_path: &str, content: &str) {
-    let path = base.join(rel_path);
-    if let Some(parent) = path.parent() {
-        let _ = fs::create_dir_all(parent);
-    }
-    fs::write(&path, content).unwrap_or_else(|e| {
-        err(&format!("Failed to write {}: {e}", path.display()));
-    });
 }
 
 fn apply(template: &str, name: &str, org: &str, write_key: &str, bundle_id: &str) -> String {

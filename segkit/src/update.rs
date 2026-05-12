@@ -1,14 +1,8 @@
 use std::process::{Command, ExitCode};
 
+use crate::util::log::{err, info};
+
 const FLAKE_REF: &str = "github:segment-integrations/mobile-devtools?dir=segkit#segkit";
-
-fn info(msg: &str) {
-    eprintln!("\x1b[1;34m==> {}\x1b[0m", msg);
-}
-
-fn err(msg: &str) {
-    eprintln!("\x1b[1;31m==> {}\x1b[0m", msg);
-}
 
 pub fn run() -> ExitCode {
     info("Updating segkit to latest main...");
