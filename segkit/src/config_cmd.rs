@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 use std::fs;
+use std::path::PathBuf;
 use std::process::ExitCode;
 
 use crate::init_cmd::{validate_plugin_names, PLUGIN_REGISTRY};
@@ -17,28 +18,62 @@ fn parse_plugin_csv(raw: &str) -> BTreeSet<String> {
         .collect()
 }
 
+/// Locate and parse SegmentConfig.xcconfig from the project directory.
+fn load_config() -> Result<(PathBuf, XCConfig), ExitCode> {
+    let path = find_file("SegmentConfig.xcconfig").ok_or_else(|| {
+        err("No SegmentConfig.xcconfig found. Are you in a segkit project directory?");
+        ExitCode::FAILURE
+    })?;
+
+    let content = fs::read_to_string(&path).map_err(|e| {
+        err(&format!("Failed to read {}: {}", path.display(), e));
+        ExitCode::FAILURE
+    })?;
+
+    Ok((path, XCConfig::parse(&content)))
+}
+
+/// Validate and apply plugin list mutations (replace, add, remove).
+/// Returns the updated CSV string.
+fn apply_plugin_changes(
+    config: &XCConfig,
+    plugins: &Option<Vec<String>>,
+    add_plugins: &[String],
+    remove_plugins: &[String],
+) -> Result<String, String> {
+    // Validate all provided plugin names
+    if let Some(list) = plugins {
+        validate_plugin_names(list)?;
+    }
+    validate_plugin_names(add_plugins)?;
+    validate_plugin_names(remove_plugins)?;
+
+    // Start from --plugins (replace) or current value
+    let mut current = if let Some(list) = plugins {
+        list.iter().map(|s| s.to_lowercase()).collect::<BTreeSet<String>>()
+    } else {
+        let raw = config.get("ENABLED_PLUGINS").unwrap_or_default();
+        parse_plugin_csv(&raw)
+    };
+
+    for p in add_plugins {
+        current.insert(p.to_lowercase());
+    }
+    for p in remove_plugins {
+        current.remove(&p.to_lowercase());
+    }
+
+    Ok(current.into_iter().collect::<Vec<_>>().join(","))
+}
+
 pub fn run_show() -> ExitCode {
-    let config_path = match find_file("SegmentConfig.xcconfig") {
-        Some(p) => p,
-        None => {
-            err("No SegmentConfig.xcconfig found. Are you in a segkit project directory?");
-            return ExitCode::FAILURE;
-        }
+    let (config_path, config) = match load_config() {
+        Ok(v) => v,
+        Err(code) => return code,
     };
-
-    let content = match fs::read_to_string(&config_path) {
-        Ok(c) => c,
-        Err(e) => {
-            err(&format!("Failed to read {}: {}", config_path.display(), e));
-            return ExitCode::FAILURE;
-        }
-    };
-
-    let config = XCConfig::parse(&content);
 
     let write_key = config.get("SEGMENT_WRITE_KEY").unwrap_or_default();
-    let plugins_raw = config.get("ENABLED_PLUGINS").unwrap_or_default();
-    let enabled = parse_plugin_csv(&plugins_raw);
+    let enabled = parse_plugin_csv(&config.get("ENABLED_PLUGINS").unwrap_or_default());
 
     eprintln!("Config: {}", config_path.display());
     eprintln!();
@@ -59,74 +94,28 @@ pub fn run_set(
     add_plugins: Vec<String>,
     remove_plugins: Vec<String>,
 ) -> ExitCode {
-    let config_path = match find_file("SegmentConfig.xcconfig") {
-        Some(p) => p,
-        None => {
-            err("No SegmentConfig.xcconfig found. Are you in a segkit project directory?");
-            return ExitCode::FAILURE;
-        }
+    let (config_path, mut config) = match load_config() {
+        Ok(v) => v,
+        Err(code) => return code,
     };
 
-    let content = match fs::read_to_string(&config_path) {
-        Ok(c) => c,
-        Err(e) => {
-            err(&format!("Failed to read {}: {}", config_path.display(), e));
-            return ExitCode::FAILURE;
-        }
-    };
-
-    let mut config = XCConfig::parse(&content);
-
-    // Set write key if provided
     if let Some(key) = &write_key {
         config.set("SEGMENT_WRITE_KEY", key);
         info("Write key updated");
     }
 
-    // Handle plugin mutations
-    let has_plugin_change = plugins.is_some() || !add_plugins.is_empty() || !remove_plugins.is_empty();
-
-    if has_plugin_change {
-        // Validate all plugin names
-        if let Some(ref list) = plugins {
-            if let Err(e) = validate_plugin_names(list) {
+    if plugins.is_some() || !add_plugins.is_empty() || !remove_plugins.is_empty() {
+        let csv = match apply_plugin_changes(&config, &plugins, &add_plugins, &remove_plugins) {
+            Ok(csv) => csv,
+            Err(e) => {
                 err(&e);
                 return ExitCode::FAILURE;
             }
-        }
-        if let Err(e) = validate_plugin_names(&add_plugins) {
-            err(&e);
-            return ExitCode::FAILURE;
-        }
-        if let Err(e) = validate_plugin_names(&remove_plugins) {
-            err(&e);
-            return ExitCode::FAILURE;
-        }
-
-        let mut current = if let Some(ref list) = plugins {
-            // --plugins replaces the entire list
-            list.iter().map(|s| s.to_lowercase()).collect::<BTreeSet<String>>()
-        } else {
-            let raw = config.get("ENABLED_PLUGINS").unwrap_or_default();
-            parse_plugin_csv(&raw)
         };
-
-        // --add-plugins appends
-        for p in &add_plugins {
-            current.insert(p.to_lowercase());
-        }
-
-        // --remove-plugins removes
-        for p in &remove_plugins {
-            current.remove(&p.to_lowercase());
-        }
-
-        let csv = current.into_iter().collect::<Vec<_>>().join(",");
         config.set("ENABLED_PLUGINS", &csv);
         info(&format!("Enabled plugins: {}", if csv.is_empty() { "(none)" } else { &csv }));
     }
 
-    // Write back
     if let Err(e) = fs::write(&config_path, config.to_string()) {
         err(&format!("Failed to write {}: {}", config_path.display(), e));
         return ExitCode::FAILURE;
