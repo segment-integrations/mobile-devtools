@@ -32,6 +32,8 @@ touch "$STATE_DIR/installed-segkit"
 
 info "Done!"
 echo ""
+echo "  You may need to restart your shell for PATH changes to take effect."
+echo ""
 echo "  Next steps:"
 echo "    segkit doctor --fix   Install project dependencies"
 echo "    segkit --help         See all commands"

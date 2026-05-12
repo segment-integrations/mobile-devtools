@@ -318,6 +318,7 @@ pub fn run(fix: bool) -> ExitCode {
             "\nInstalled missing dependencies: {}.",
             fixed_names.join(", ")
         );
+        eprintln!("You may need to restart your shell for PATH changes to take effect.");
         return ExitCode::SUCCESS;
     }
 
