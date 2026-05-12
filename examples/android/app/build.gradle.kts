@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
 }
 
+val minSdkApi = (System.getenv("ANDROID_MIN_SDK") ?: "24").toInt()
 val compileSdkApi = (System.getenv("ANDROID_COMPILE_SDK")
     ?: System.getenv("ANDROID_MAX_API")
     ?: "36").toInt()
@@ -17,7 +18,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.devbox"
-        minSdk = 21
+        minSdk = minSdkApi
         targetSdk = targetSdkApi
         versionCode = 1
         versionName = "1.0"
