@@ -4,6 +4,8 @@ use clap::{Parser, Subcommand};
 
 mod delegate;
 mod doctor;
+mod state;
+mod uninstall;
 
 #[derive(Parser)]
 #[command(name = "segkit", version, about = "Segment SDK developer toolkit")]
@@ -40,6 +42,15 @@ enum Commands {
         #[arg(long)]
         fix: bool,
     },
+    /// Remove segkit and any dependencies installed by segkit
+    Uninstall {
+        /// Also remove dependencies installed by 'segkit doctor --fix'
+        #[arg(long)]
+        all: bool,
+        /// Keep specific packages when using --all (e.g. --keep homebrew --keep devbox)
+        #[arg(long, value_name = "PACKAGE")]
+        keep: Vec<String>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -51,6 +62,7 @@ fn main() -> ExitCode {
         Some(Commands::Rn { args }) => delegate::run("rn.sh", &args),
         Some(Commands::Metro { args }) => delegate::run("metro.sh", &args),
         Some(Commands::Doctor { fix }) => doctor::run(fix),
+        Some(Commands::Uninstall { all, keep }) => uninstall::run(all, &keep),
         None => {
             println!("segkit {}", env!("CARGO_PKG_VERSION"));
             ExitCode::SUCCESS

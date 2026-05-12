@@ -1,5 +1,7 @@
 use std::process::{Command, ExitCode};
 
+use crate::state;
+
 const DEVBOX_INSTALL_URL: &str = "https://get.jetify.com/devbox";
 const HOMEBREW_INSTALL_URL: &str =
     "https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh";
@@ -154,10 +156,13 @@ fn check_devbox(fix: bool) -> CheckResult {
     }
     eprintln!("segkit: installing devbox...");
     match install_devbox() {
-        Ok(()) => CheckResult {
-            name,
-            status: CheckStatus::Fixed,
-        },
+        Ok(()) => {
+            state::set_breadcrumb("installed-devbox");
+            CheckResult {
+                name,
+                status: CheckStatus::Fixed,
+            }
+        }
         Err(e) => CheckResult {
             name,
             status: CheckStatus::Failed(e),
@@ -189,10 +194,13 @@ fn check_homebrew(fix: bool) -> CheckResult {
     }
     eprintln!("segkit: installing homebrew...");
     match install_homebrew() {
-        Ok(()) => CheckResult {
-            name,
-            status: CheckStatus::Fixed,
-        },
+        Ok(()) => {
+            state::set_breadcrumb("installed-homebrew");
+            CheckResult {
+                name,
+                status: CheckStatus::Fixed,
+            }
+        }
         Err(e) => CheckResult {
             name,
             status: CheckStatus::Failed(e),
@@ -232,6 +240,7 @@ fn check_applesimutils(fix: bool) -> CheckResult {
     match install_applesimutils() {
         Ok(()) => {
             ensure_homebrew_in_path();
+            state::set_breadcrumb("installed-applesimutils");
             CheckResult {
                 name,
                 status: CheckStatus::Fixed,
