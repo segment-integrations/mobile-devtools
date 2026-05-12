@@ -125,9 +125,10 @@ ios_start() {
     echo "No available iOS simulator runtime found. Install one in Xcode (Settings > Platforms) and retry." >&2
     return 1
   fi
+  runtime_id="$(printf '%s' "$choice" | cut -d'|' -f1)"
   runtime_name="$(printf '%s' "$choice" | cut -d'|' -f2)"
 
-  ensure_device "$device_base" "$preferred_runtime"
+  ensure_device_with_runtime "$device_base" "$runtime_id" "$runtime_name"
   display_name="${device_base} (${runtime_name})"
   udid="$(xcrun simctl list devices -j | jq -r --arg name "$display_name" '.devices[]?[]? | select(.name == $name) | .udid' | head -n1)"
   if [ -z "$udid" ]; then

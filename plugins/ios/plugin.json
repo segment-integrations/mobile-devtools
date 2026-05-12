@@ -11,7 +11,7 @@
     "IOS_DEFAULT_RUNTIME": "",
     "IOS_DEVELOPER_DIR": "",
     "IOS_DOWNLOAD_RUNTIME": "1",
-    "IOS_XCODE_VERSION": "26.2",
+    "IOS_XCODE_VERSION": "26.5",
     "IOS_APP_ARTIFACT": "",
     "IOS_APP_SCHEME": "",
     "IOS_APP_PROJECT": "",
@@ -34,10 +34,7 @@
     "process-compose": "latest",
     "cocoapods": {
       "version": "latest",
-      "platforms": [
-        "x86_64-darwin",
-        "aarch64-darwin"
-      ]
+      "platforms": ["x86_64-darwin", "aarch64-darwin"]
     }
   },
   "create_files": {
@@ -67,24 +64,12 @@
       ". {{ .Virtenv }}/scripts/init/setup.sh"
     ],
     "scripts": {
-      "setup": [
-        "bash {{ .Virtenv }}/scripts/user/setup.sh"
-      ],
-      "ios:devices:eval": [
-        "segkit ios devices eval"
-      ],
-      "start:ios": [
-        "segkit ios run \"${1:-}\""
-      ],
-      "start:sim": [
-        "segkit ios simulator start \"${1:-}\""
-      ],
-      "stop:sim": [
-        "segkit ios simulator stop"
-      ],
-      "doctor": [
-        "bash {{ .Virtenv }}/scripts/user/doctor.sh"
-      ],
+      "setup": ["bash {{ .Virtenv }}/scripts/user/setup.sh"],
+      "ios:devices:eval": ["segkit ios devices eval"],
+      "start:ios": ["segkit ios run \"${1:-}\""],
+      "start:sim": ["segkit ios simulator start \"${1:-}\""],
+      "stop:sim": ["segkit ios simulator stop"],
+      "doctor": ["bash {{ .Virtenv }}/scripts/user/doctor.sh"],
       "verify:setup": [
         "xcrun --show-sdk-path >/dev/null 2>&1 && xcrun simctl list devices >/dev/null 2>&1 && echo '✓ iOS environment OK' || (echo '✗ iOS environment check failed. Run: devbox run doctor' && exit 1)"
       ]
