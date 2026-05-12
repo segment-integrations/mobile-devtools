@@ -4,6 +4,7 @@ use clap::{Parser, Subcommand};
 
 mod delegate;
 mod doctor;
+mod init_cmd;
 mod state;
 mod uninstall;
 
@@ -51,6 +52,21 @@ enum Commands {
         #[arg(long, value_name = "PACKAGE")]
         keep: Vec<String>,
     },
+    /// Scaffold a new project from a template
+    Init {
+        /// SDK template to use
+        #[arg(long)]
+        sdk: String,
+        /// Project name
+        #[arg(long, default_value = "SegmentDemo")]
+        name: String,
+        /// Organization identifier prefix (bundle ID = org.name)
+        #[arg(long, default_value = "com.example")]
+        org: String,
+        /// Segment write key
+        #[arg(long, default_value = "demo_write_key_not_real")]
+        write_key: String,
+    },
 }
 
 fn main() -> ExitCode {
@@ -63,6 +79,9 @@ fn main() -> ExitCode {
         Some(Commands::Metro { args }) => delegate::run("metro.sh", &args),
         Some(Commands::Doctor { fix }) => doctor::run(fix),
         Some(Commands::Uninstall { all, keep }) => uninstall::run(all, &keep),
+        Some(Commands::Init { sdk, name, org, write_key }) => {
+            init_cmd::run(&sdk, &name, &org, &write_key)
+        }
         None => {
             println!("segkit {}", env!("CARGO_PKG_VERSION"));
             ExitCode::SUCCESS
