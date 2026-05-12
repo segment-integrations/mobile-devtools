@@ -7,70 +7,103 @@ use crate::doctor;
 use crate::util::fs::write_file;
 use crate::util::log::{err, info};
 
-struct Plugin {
+pub struct Plugin {
     /// CLI name (e.g. "amplitude")
-    key: &'static str,
+    pub key: &'static str,
+    /// Human-readable display name
+    pub display_name: &'static str,
     /// SPM package name used in project.yml
-    package_name: &'static str,
+    pub package_name: &'static str,
     /// GitHub repo URL
-    repo_url: &'static str,
+    pub repo_url: &'static str,
     /// Minimum version for SPM
-    min_version: &'static str,
+    pub min_version: &'static str,
     /// Swift import name
-    import_name: &'static str,
+    pub import_name: &'static str,
+    /// Swift class instantiation expression (e.g. "AmplitudeSession()")
+    pub swift_init: &'static str,
 }
 
-const PLUGIN_REGISTRY: &[Plugin] = &[
+pub const PLUGIN_REGISTRY: &[Plugin] = &[
     Plugin {
         key: "amplitude",
+        display_name: "Amplitude",
         package_name: "SegmentAmplitude",
         repo_url: "https://github.com/segment-integrations/analytics-swift-amplitude",
         min_version: "1.5.0",
         import_name: "SegmentAmplitude",
+        swift_init: "AmplitudeSession()",
     },
     Plugin {
         key: "appsflyer",
+        display_name: "AppsFlyer",
         package_name: "SegmentAppsFlyer",
         repo_url: "https://github.com/segment-integrations/analytics-swift-appsflyer",
         min_version: "1.3.0",
         import_name: "SegmentAppsFlyer",
+        swift_init: "AppsFlyerDestination()",
     },
     Plugin {
         key: "braze",
+        display_name: "Braze",
         package_name: "SegmentBraze",
         repo_url: "https://github.com/segment-integrations/analytics-swift-braze",
         min_version: "2.2.0",
         import_name: "SegmentBraze",
+        swift_init: "BrazeDestination()",
     },
     Plugin {
         key: "facebook",
+        display_name: "Facebook",
         package_name: "SegmentFacebook",
         repo_url: "https://github.com/segment-integrations/analytics-swift-facebook-app-events",
         min_version: "1.1.3",
         import_name: "SegmentFacebook",
+        swift_init: "FacebookAppEventsDestination()",
     },
     Plugin {
         key: "firebase",
+        display_name: "Firebase",
         package_name: "SegmentFirebase",
         repo_url: "https://github.com/segment-integrations/analytics-swift-firebase",
         min_version: "1.4.0",
         import_name: "SegmentFirebase",
+        swift_init: "FirebaseDestination()",
     },
     Plugin {
         key: "mixpanel",
+        display_name: "Mixpanel",
         package_name: "SegmentMixpanel",
         repo_url: "https://github.com/segment-integrations/analytics-swift-mixpanel",
         min_version: "1.1.3",
         import_name: "SegmentMixpanel",
+        swift_init: "MixpanelDestination()",
     },
     Plugin {
         key: "survicate",
+        display_name: "Survicate",
         package_name: "SegmentSurvicate",
         repo_url: "https://github.com/Survicate/analytics-swift-survicate",
         min_version: "1.1.0",
         import_name: "SegmentSurvicate",
+        swift_init: "SurvicateDestination()",
     },
 ];
+
+/// Validate that all plugin names are known. Returns an error message for the first unknown name.
+pub fn validate_plugin_names(names: &[String]) -> Result<(), String> {
+    for name in names {
+        let lower = name.to_lowercase();
+        if !PLUGIN_REGISTRY.iter().any(|p| p.key == lower) {
+            let available: Vec<_> = PLUGIN_REGISTRY.iter().map(|p| p.key).collect();
+            return Err(format!(
+                "Unknown plugin '{name}'. Available: {}",
+                available.join(", ")
+            ));
+        }
+    }
+    Ok(())
+}
 
 fn resolve_plugins(requested: &[String]) -> Result<Vec<&'static Plugin>, String> {
     let mut resolved = Vec::new();
@@ -211,63 +244,49 @@ packages:
     )
 }
 
-/// Generate ContentView.swift with dynamic plugin imports and toggles.
-fn generate_content_view(name: &str, plugins: &[&Plugin]) -> String {
-    // Build import lines
+/// Generate the SegmentConfig.xcconfig file content.
+pub fn generate_xcconfig(write_key: &str, enabled_plugins: &[String]) -> String {
+    let plugins_csv = enabled_plugins.join(",");
+    format!(
+        r#"// Segment SDK Configuration
+// Managed by segkit - manual edits are fine
+
+SEGMENT_WRITE_KEY = {write_key}
+ENABLED_PLUGINS = {plugins_csv}
+"#,
+        write_key = write_key,
+        plugins_csv = plugins_csv,
+    )
+}
+
+/// Generate ContentView.swift with all plugin imports and dynamic registration.
+fn generate_content_view(name: &str) -> String {
+    // All 7 plugin imports — always present
     let mut imports = String::from("import Segment\n");
-    for p in plugins {
+    for p in PLUGIN_REGISTRY {
         imports.push_str(&format!("import {}\n", p.import_name));
     }
 
-    // Build toggle state vars
-    let mut toggle_states = String::new();
-    for p in plugins {
-        toggle_states.push_str(&format!(
-            "    @State private var {key}Enabled = false\n",
-            key = p.key
-        ));
-    }
-
-    // Build toggle UI
-    let mut toggle_ui = String::new();
-    for p in plugins {
-        toggle_ui.push_str(&format!(
-            r#"
-                Toggle(isOn: ${key}Enabled) {{
-                    HStack {{
-                        Image(systemName: {key}Enabled ? "wave.3.right.circle.fill" : "wave.3.right.circle")
-                            .foregroundStyle({key}Enabled ? .blue : .gray)
-                        Text("{display} Destination")
-                            .font(.subheadline)
-                    }}
-                }}
-                .onChange(of: {key}Enabled, perform: {{ newValue in
-                    if newValue {{
-                        print("{display} destination enabled")
-                    }} else {{
-                        print("{display} destination disabled")
-                    }}
-                }})
-"#,
+    // Build the availablePlugins array entries
+    let mut plugin_entries = String::new();
+    for p in PLUGIN_REGISTRY {
+        plugin_entries.push_str(&format!(
+            "            (\"{key}\", \"{display}\", {{ {init} as (any DestinationPlugin) }}),\n",
             key = p.key,
-            display = capitalize(p.key),
+            display = p.display_name,
+            init = p.swift_init,
         ));
     }
 
-    let toggle_section = if plugins.is_empty() {
-        String::new()
-    } else {
-        format!(
-            r#"
-            VStack(spacing: 12) {{
-                Divider()
-{toggles}
-            }}
-            .padding(.horizontal, 32)
-"#,
-            toggles = toggle_ui
-        )
-    };
+    // Build the allPlugins struct data
+    let mut all_plugins_data = String::new();
+    for p in PLUGIN_REGISTRY {
+        all_plugins_data.push_str(&format!(
+            "        PluginInfo(key: \"{key}\", name: \"{display}\"),\n",
+            key = p.key,
+            display = p.display_name,
+        ));
+    }
 
     format!(
         r#"//
@@ -277,11 +296,20 @@ fn generate_content_view(name: &str, plugins: &[&Plugin]) -> String {
 
 import SwiftUI
 {imports}
+struct PluginInfo: Identifiable {{
+    let key: String
+    let name: String
+    var id: String {{ key }}
+}}
+
 struct ContentView: View {{
     @State private var eventCount = 0
     @State private var lastEventTime: Date?
-{toggle_states}
+
     let analytics: Analytics
+
+    private let allPlugins: [PluginInfo] = [
+{all_plugins_data}    ]
 
     init() {{
         var configuration = Configuration(writeKey: Config.segmentWriteKey)
@@ -299,9 +327,18 @@ struct ContentView: View {{
         analytics.add(plugin: ConsoleLoggerPlugin())
         analytics.add(plugin: IDFAPlugin())
 
+        // Dynamically register enabled destination plugins
+        let availablePlugins: [(key: String, name: String, make: () -> any DestinationPlugin)] = [
+{plugin_entries}        ]
+        for p in availablePlugins where Config.enabledPluginKeys.contains(p.key) {{
+            analytics.add(plugin: p.make())
+            print("  Enabled destination: \(p.name)")
+        }}
+
         print("Segment Analytics initialized")
         print("  Write Key: \(Config.segmentWriteKey)")
         print("  Mode: \(Config.isUsingDemoKey ? "Demo (events queued locally)" : "Live (sending to Segment)")")
+        print("  Enabled plugins: \(Config.enabledPluginKeys.sorted().joined(separator: ", "))")
     }}
 
     var body: some View {{
@@ -384,7 +421,30 @@ struct ContentView: View {{
                 }}
             }}
             .padding(.horizontal, 32)
-{toggle_section}
+
+            // Plugin status list
+            VStack(spacing: 8) {{
+                Divider()
+                Text("Destination Plugins")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                ForEach(allPlugins) {{ plugin in
+                    let isEnabled = Config.enabledPluginKeys.contains(plugin.key)
+                    HStack {{
+                        Image(systemName: isEnabled ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(isEnabled ? .green : .gray)
+                        Text(plugin.name)
+                            .font(.subheadline)
+                        Spacer()
+                        Text(isEnabled ? "Enabled" : "Available")
+                            .font(.caption)
+                            .foregroundStyle(isEnabled ? .green : .secondary)
+                    }}
+                }}
+            }}
+            .padding(.horizontal, 32)
+
             Spacer()
         }}
         .padding()
@@ -436,17 +496,9 @@ struct ContentView: View {{
 "#,
         name = name,
         imports = imports,
-        toggle_states = toggle_states,
-        toggle_section = toggle_section,
+        all_plugins_data = all_plugins_data,
+        plugin_entries = plugin_entries,
     )
-}
-
-fn capitalize(s: &str) -> String {
-    let mut c = s.chars();
-    match c.next() {
-        None => String::new(),
-        Some(f) => f.to_uppercase().to_string() + c.as_str(),
-    }
 }
 
 /// Prompt the user for input with a default value. Returns the default in non-interactive mode.
@@ -592,8 +644,9 @@ pub fn run(
         err(&format!("Failed to create directory: {e}"));
     });
 
-    // project.yml (dynamically generated with plugins)
-    write_file(&out, "project.yml", &generate_project_yml(&name, &org, &plugins));
+    // project.yml — always includes all 7 plugins as SPM dependencies
+    let all_plugins: Vec<&Plugin> = PLUGIN_REGISTRY.iter().collect();
+    write_file(&out, "project.yml", &generate_project_yml(&name, &org, &all_plugins));
 
     // devbox.json
     write_file(&out, "devbox.json", &apply(DEVBOX_JSON, &name, &org, &write_key, &bundle_id));
@@ -604,9 +657,13 @@ pub fn run(
 
     // Swift source files
     let src = &name;
+    // SegmentConfig.xcconfig — runtime config read by Config.swift
+    let enabled_keys: Vec<String> = plugins.iter().map(|p| p.key.to_string()).collect();
+    write_file(&out, &format!("{src}/SegmentConfig.xcconfig"), &generate_xcconfig(&write_key, &enabled_keys));
+
     write_file(&out, &format!("{src}/Config.swift"), &apply(CONFIG_SWIFT, &name, &org, &write_key, &bundle_id));
     write_file(&out, &format!("{src}/{name}App.swift"), &apply(APP_SWIFT, &name, &org, &write_key, &bundle_id));
-    write_file(&out, &format!("{src}/ContentView.swift"), &generate_content_view(&name, &plugins));
+    write_file(&out, &format!("{src}/ContentView.swift"), &generate_content_view(&name));
     write_file(&out, &format!("{src}/ConsoleLoggerPlugin.swift"), CONSOLE_LOGGER_SWIFT);
     write_file(&out, &format!("{src}/IDFAPlugin.swift"), IDFA_PLUGIN_SWIFT);
 
@@ -658,8 +715,6 @@ pub fn run(
     info("Done!");
     eprintln!();
     eprintln!("  cd {name}");
-    eprintln!("  devbox shell");
-    eprintln!("  devbox run build");
     eprintln!("  devbox run start:app");
     eprintln!();
 
@@ -722,9 +777,31 @@ const CONFIG_SWIFT: &str = r#"//
 import Foundation
 
 enum Config {
-    /// Segment write key
-    /// Get yours at: https://app.segment.com -> Sources -> Your iOS Source -> Settings -> API Keys
-    static let segmentWriteKey = "__WRITE_KEY__"
+    private static let configValues: [String: String] = {
+        guard let url = Bundle.main.url(forResource: "SegmentConfig", withExtension: "xcconfig"),
+              let contents = try? String(contentsOf: url, encoding: .utf8) else { return [:] }
+        var dict: [String: String] = [:]
+        for line in contents.components(separatedBy: .newlines) {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty || trimmed.hasPrefix("//") { continue }
+            let parts = trimmed.split(separator: "=", maxSplits: 1)
+            if parts.count == 2 {
+                let key = parts[0].trimmingCharacters(in: .whitespaces)
+                let value = parts[1].trimmingCharacters(in: .whitespaces)
+                dict[key] = value
+            }
+        }
+        return dict
+    }()
+
+    /// Segment write key — read from SegmentConfig.xcconfig
+    static let segmentWriteKey: String = configValues["SEGMENT_WRITE_KEY"] ?? "demo_write_key_not_real"
+
+    /// Set of enabled plugin keys — read from SegmentConfig.xcconfig
+    static let enabledPluginKeys: Set<String> = {
+        guard let raw = configValues["ENABLED_PLUGINS"], !raw.isEmpty else { return [] }
+        return Set(raw.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) })
+    }()
 
     /// Check if using demo/placeholder key
     static var isUsingDemoKey: Bool {
