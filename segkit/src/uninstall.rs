@@ -3,18 +3,8 @@ use std::path::PathBuf;
 use std::process::{Command, ExitCode};
 
 use crate::state;
-
-fn info(msg: &str) {
-    eprintln!("\x1b[1;34m==> {}\x1b[0m", msg);
-}
-
-fn warn(msg: &str) {
-    eprintln!("\x1b[1;33m==> {}\x1b[0m", msg);
-}
-
-fn err(msg: &str) {
-    eprintln!("\x1b[1;31m==> {}\x1b[0m", msg);
-}
+use crate::util::brew::find_brew;
+use crate::util::log::{err, info, warn};
 
 // ============================================================================
 // Core uninstall steps (always run)
@@ -212,16 +202,6 @@ fn remove_homebrew() -> bool {
             err(&format!("failed to run Homebrew uninstaller: {e}"));
             false
         }
-    }
-}
-
-fn find_brew() -> String {
-    if std::path::Path::new("/opt/homebrew/bin/brew").exists() {
-        "/opt/homebrew/bin/brew".into()
-    } else if std::path::Path::new("/usr/local/bin/brew").exists() {
-        "/usr/local/bin/brew".into()
-    } else {
-        "brew".into()
     }
 }
 

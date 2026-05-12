@@ -1,6 +1,8 @@
 use std::process::{Command, ExitCode};
 
 use crate::state;
+use crate::util::brew::{ensure_homebrew_in_path, find_brew, homebrew_bin_dir};
+use crate::util::platform::is_macos;
 
 const DEVBOX_INSTALL_URL: &str = "https://get.jetify.com/devbox";
 const HOMEBREW_INSTALL_URL: &str =
@@ -8,35 +10,6 @@ const HOMEBREW_INSTALL_URL: &str =
 
 fn is_installed(cmd: &str) -> bool {
     which::which(cmd).is_ok()
-}
-
-fn is_macos() -> bool {
-    cfg!(target_os = "macos")
-}
-
-fn homebrew_bin_dir() -> Option<&'static str> {
-    if !is_macos() {
-        return None;
-    }
-    if std::path::Path::new("/opt/homebrew/bin/brew").exists() {
-        Some("/opt/homebrew/bin")
-    } else if std::path::Path::new("/usr/local/bin/brew").exists() {
-        Some("/usr/local/bin")
-    } else {
-        None
-    }
-}
-
-fn ensure_homebrew_in_path() {
-    if let Some(brew_dir) = homebrew_bin_dir() {
-        let path = std::env::var("PATH").unwrap_or_default();
-        if !path.split(':').any(|p| p == brew_dir) {
-            // SAFETY: segkit is single-threaded at this point
-            unsafe {
-                std::env::set_var("PATH", format!("{}:{}", brew_dir, path));
-            }
-        }
-    }
 }
 
 // ============================================================================
@@ -90,9 +63,7 @@ fn install_homebrew() -> Result<(), String> {
 fn install_applesimutils() -> Result<(), String> {
     ensure_homebrew_in_path();
 
-    let brew = homebrew_bin_dir()
-        .map(|d| format!("{}/brew", d))
-        .unwrap_or_else(|| "brew".into());
+    let brew = find_brew();
 
     let status = Command::new(&brew).args(["tap", "wix/brew"]).status();
     match status {
@@ -318,6 +289,7 @@ pub fn run(fix: bool) -> ExitCode {
             "\nInstalled missing dependencies: {}.",
             fixed_names.join(", ")
         );
+        eprintln!("You may need to restart your shell for PATH changes to take effect.");
         return ExitCode::SUCCESS;
     }
 
