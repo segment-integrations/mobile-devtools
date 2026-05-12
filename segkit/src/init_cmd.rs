@@ -658,8 +658,6 @@ pub fn run(
     info("Done!");
     eprintln!();
     eprintln!("  cd {name}");
-    eprintln!("  devbox shell");
-    eprintln!("  devbox run build");
     eprintln!("  devbox run start:app");
     eprintln!();
 
