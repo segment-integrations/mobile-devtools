@@ -245,7 +245,7 @@ packages:
     )
 }
 
-/// Generate the SegmentConfig.xcconfig file content.
+/// Generate the SegmentConfig.conf file content.
 pub fn generate_xcconfig(write_key: &str, enabled_plugins: &[String]) -> String {
     let plugins_csv = enabled_plugins.join(",");
     format!(
@@ -305,150 +305,246 @@ struct PluginInfo: Identifiable {{
 
 struct ContentView: View {{
     @State private var eventCount = 0
+    @State private var eventsSent = 0
     @State private var lastEventTime: Date?
+    @State private var connectionStatus: ConnectionStatus = .unknown
+    @State private var autoFlush = true
 
     let analytics: Analytics
+    private let loadedPluginKeys: Set<String>
 
     private let allPlugins: [PluginInfo] = [
 {all_plugins_data}    ]
 
     init() {{
-        var configuration = Configuration(writeKey: Config.segmentWriteKey)
-
-        if Config.isUsingDemoKey {{
-            configuration = configuration
-                .flushAt(1000)
-                .flushInterval(0)
-        }} else {{
-            configuration = configuration
-                .flushInterval(10)
-        }}
+        let configuration = Configuration(writeKey: Config.segmentWriteKey)
+            .flushAt(999999)
+            .flushInterval(0)
 
         self.analytics = Analytics(configuration: configuration)
         analytics.add(plugin: ConsoleLoggerPlugin())
         analytics.add(plugin: IDFAPlugin())
 
         // Dynamically register enabled destination plugins
+        var loaded = Set<String>()
         let availablePlugins: [(key: String, name: String, make: () -> any Plugin)] = [
 {plugin_entries}        ]
         for p in availablePlugins where Config.enabledPluginKeys.contains(p.key) {{
             analytics.add(plugin: p.make())
+            loaded.insert(p.key)
             print("  Enabled destination: \(p.name)")
         }}
+        self.loadedPluginKeys = loaded
 
         print("Segment Analytics initialized")
-        print("  Write Key: \(Config.segmentWriteKey)")
+        print("  Write Key: \(Config.segmentWriteKey.prefix(8))...")
         print("  Mode: \(Config.isUsingDemoKey ? "Demo (events queued locally)" : "Live (sending to Segment)")")
         print("  Enabled plugins: \(Config.enabledPluginKeys.sorted().joined(separator: ", "))")
     }}
 
+    private var eventsInQueue: Int {{
+        max(eventCount - eventsSent, 0)
+    }}
+
     var body: some View {{
-        VStack(spacing: 24) {{
-            VStack(spacing: 8) {{
-                Image(systemName: "chart.line.uptrend.xyaxis")
-                    .font(.system(size: 60))
-                    .foregroundStyle(.blue)
+        ScrollView {{
+            VStack(spacing: 20) {{
+                // Header
+                VStack(spacing: 6) {{
+                    Image(systemName: "chart.line.uptrend.xyaxis")
+                        .font(.system(size: 48))
+                        .foregroundStyle(.blue)
 
-                Text("Segment iOS Demo")
-                    .font(.title)
-                    .fontWeight(.bold)
+                    Text("Segment iOS Demo")
+                        .font(.title2)
+                        .fontWeight(.bold)
 
-                Text("Analytics Swift SDK")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }}
-            .padding(.top, 40)
+                    Text("Analytics Swift SDK")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }}
+                .padding(.top, 24)
 
-            Spacer()
+                // Connection status
+                HStack(spacing: 8) {{
+                    Image(systemName: connectionStatus.icon)
+                        .foregroundStyle(connectionStatus.color)
+                    Text(connectionStatus.label)
+                        .font(.subheadline)
+                        .foregroundStyle(connectionStatus.color)
+                    Spacer()
+                    if connectionStatus != .checking {{
+                        Button("Recheck") {{ checkConnection() }}
+                            .font(.caption)
+                    }}
+                }}
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(connectionStatus.color.opacity(0.1))
+                )
+                .padding(.horizontal, 32)
 
-            VStack(spacing: 4) {{
-                Text("\(eventCount)")
-                    .font(.system(size: 48, weight: .bold))
-                    .foregroundStyle(.blue)
-
-                Text("Events Tracked")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                // Stats
+                HStack(spacing: 16) {{
+                    statBox(title: "Tracked", value: "\(eventCount)", color: .blue)
+                    statBox(title: "In Queue", value: "\(eventsInQueue)", color: .orange)
+                    statBox(title: "Sent", value: "\(eventsSent)", color: .green)
+                }}
+                .padding(.horizontal, 32)
 
                 if let lastTime = lastEventTime {{
-                    Text("Last: \(lastTime, formatter: dateFormatter)")
+                    Text("Last event: \(lastTime, formatter: dateFormatter)")
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }}
-            }}
-            .padding()
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(.blue.opacity(0.1))
-            )
 
-            Spacer()
-
-            VStack(spacing: 16) {{
-                Button(action: trackEvent) {{
-                    HStack {{
-                        Image(systemName: "chart.bar.fill")
-                        Text("Track Event")
+                // Track buttons
+                VStack(spacing: 12) {{
+                    Button(action: trackEvent) {{
+                        HStack {{
+                            Image(systemName: "chart.bar.fill")
+                            Text("Track Event")
+                        }}
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(.blue)
+                        .foregroundStyle(.white)
+                        .cornerRadius(12)
                     }}
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(.blue)
-                    .foregroundStyle(.white)
-                    .cornerRadius(12)
-                }}
 
-                Button(action: identifyUser) {{
-                    HStack {{
-                        Image(systemName: "person.fill")
-                        Text("Identify User")
+                    Button(action: identifyUser) {{
+                        HStack {{
+                            Image(systemName: "person.fill")
+                            Text("Identify User")
+                        }}
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(.green)
+                        .foregroundStyle(.white)
+                        .cornerRadius(12)
                     }}
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(.green)
-                    .foregroundStyle(.white)
-                    .cornerRadius(12)
-                }}
 
-                Button(action: trackScreen) {{
-                    HStack {{
-                        Image(systemName: "iphone")
-                        Text("Track Screen")
+                    Button(action: trackScreen) {{
+                        HStack {{
+                            Image(systemName: "iphone")
+                            Text("Track Screen")
+                        }}
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(.purple)
+                        .foregroundStyle(.white)
+                        .cornerRadius(12)
                     }}
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(.purple)
-                    .foregroundStyle(.white)
-                    .cornerRadius(12)
                 }}
-            }}
-            .padding(.horizontal, 32)
+                .padding(.horizontal, 32)
 
-            // Plugin status list
-            VStack(spacing: 8) {{
-                Divider()
-                Text("Destination Plugins")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                ForEach(allPlugins) {{ plugin in
-                    let isEnabled = Config.enabledPluginKeys.contains(plugin.key)
+                // Flush controls
+                VStack(spacing: 10) {{
+                    Divider()
                     HStack {{
-                        Image(systemName: isEnabled ? "checkmark.circle.fill" : "circle")
-                            .foregroundStyle(isEnabled ? .green : .gray)
-                        Text(plugin.name)
-                            .font(.subheadline)
+                        Text("Flush Mode")
+                            .font(.headline)
                         Spacer()
-                        Text(isEnabled ? "Enabled" : "Available")
-                            .font(.caption)
-                            .foregroundStyle(isEnabled ? .green : .secondary)
+                        Picker("", selection: $autoFlush) {{
+                            Text("Auto").tag(true)
+                            Text("Manual").tag(false)
+                        }}
+                        .pickerStyle(.segmented)
+                        .frame(width: 160)
+                    }}
+
+                    if !autoFlush {{
+                        Button(action: flushEvents) {{
+                            HStack {{
+                                Image(systemName: "arrow.up.circle.fill")
+                                Text("Flush Now")
+                                if eventsInQueue > 0 {{
+                                    Text("(\(eventsInQueue))")
+                                }}
+                            }}
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(eventsInQueue > 0 ? .orange : .gray)
+                            .foregroundStyle(.white)
+                            .cornerRadius(12)
+                        }}
+                        .disabled(eventsInQueue == 0)
                     }}
                 }}
-            }}
-            .padding(.horizontal, 32)
+                .padding(.horizontal, 32)
 
-            Spacer()
+                // Plugin status list
+                VStack(spacing: 8) {{
+                    Divider()
+                    Text("Destination Plugins")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    ForEach(allPlugins) {{ plugin in
+                        let isEnabled = Config.enabledPluginKeys.contains(plugin.key)
+                        let isLoaded = loadedPluginKeys.contains(plugin.key)
+                        let statusIcon = isLoaded ? "checkmark.circle.fill" : isEnabled ? "exclamationmark.circle.fill" : "circle"
+                        let statusColor: Color = isLoaded ? .green : isEnabled ? .red : .gray
+                        let statusLabel = isLoaded ? "Running" : isEnabled ? "Error" : "Available"
+                        HStack {{
+                            Image(systemName: statusIcon)
+                                .foregroundStyle(statusColor)
+                            Text(plugin.name)
+                                .font(.subheadline)
+                            Spacer()
+                            Text(statusLabel)
+                                .font(.caption)
+                                .foregroundStyle(statusColor)
+                        }}
+                    }}
+                }}
+                .padding(.horizontal, 32)
+                .padding(.bottom, 24)
+            }}
         }}
-        .padding()
+        .onAppear {{ checkConnection() }}
+    }}
+
+    private func statBox(title: String, value: String, color: Color) -> some View {{
+        VStack(spacing: 4) {{
+            Text(value)
+                .font(.system(size: 28, weight: .bold))
+                .foregroundStyle(color)
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }}
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(color.opacity(0.1))
+        )
+    }}
+
+    private func checkConnection() {{
+        connectionStatus = .checking
+        Config.validateConnection {{ status in
+            connectionStatus = status
+        }}
+    }}
+
+    private func afterEvent() {{
+        if autoFlush && !Config.isUsingDemoKey {{
+            analytics.flush()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {{
+                eventsSent = eventCount
+            }}
+        }}
+    }}
+
+    private func flushEvents() {{
+        analytics.flush()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {{
+            eventsSent = eventCount
+        }}
     }}
 
     private func trackEvent() {{
@@ -460,6 +556,7 @@ struct ContentView: View {{
             "count": eventCount,
             "timestamp": ISO8601DateFormatter().string(from: Date())
         ])
+        afterEvent()
     }}
 
     private func identifyUser() {{
@@ -472,6 +569,7 @@ struct ContentView: View {{
             "plan": "free",
             "event_count": eventCount
         ])
+        afterEvent()
     }}
 
     private func trackScreen() {{
@@ -482,6 +580,7 @@ struct ContentView: View {{
             "screen_name": "ContentView",
             "view_count": eventCount
         ])
+        afterEvent()
     }}
 
     private var dateFormatter: DateFormatter {{
@@ -668,9 +767,10 @@ pub fn run(
 
     // Swift source files
     let src = &name;
-    // SegmentConfig.xcconfig — runtime config read by Config.swift
+    // SegmentConfig.conf — runtime config read by Config.swift
+    // Uses .conf extension so Xcode bundles it as a resource (not a build config)
     let enabled_keys: Vec<String> = plugins.iter().map(|p| p.key.to_string()).collect();
-    write_file(&out, &format!("{src}/SegmentConfig.xcconfig"), &generate_xcconfig(&write_key, &enabled_keys));
+    write_file(&out, &format!("{src}/SegmentConfig.conf"), &generate_xcconfig(&write_key, &enabled_keys));
 
     write_file(&out, &format!("{src}/Config.swift"), &apply(CONFIG_SWIFT, &name, &org, &write_key, &bundle_id));
     write_file(&out, &format!("{src}/{name}App.swift"), &apply(APP_SWIFT, &name, &org, &write_key, &bundle_id));
@@ -786,10 +886,11 @@ const CONFIG_SWIFT: &str = r#"//
 //
 
 import Foundation
+import SwiftUI
 
 enum Config {
     private static let configValues: [String: String] = {
-        guard let url = Bundle.main.url(forResource: "SegmentConfig", withExtension: "xcconfig"),
+        guard let url = Bundle.main.url(forResource: "SegmentConfig", withExtension: "conf"),
               let contents = try? String(contentsOf: url, encoding: .utf8) else { return [:] }
         var dict: [String: String] = [:]
         for line in contents.components(separatedBy: .newlines) {
@@ -805,10 +906,10 @@ enum Config {
         return dict
     }()
 
-    /// Segment write key — read from SegmentConfig.xcconfig
+    /// Segment write key — read from SegmentConfig.conf
     static let segmentWriteKey: String = configValues["SEGMENT_WRITE_KEY"] ?? "demo_write_key_not_real"
 
-    /// Set of enabled plugin keys — read from SegmentConfig.xcconfig
+    /// Set of enabled plugin keys — read from SegmentConfig.conf
     static let enabledPluginKeys: Set<String> = {
         guard let raw = configValues["ENABLED_PLUGINS"], !raw.isEmpty else { return [] }
         return Set(raw.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) })
@@ -819,6 +920,77 @@ enum Config {
         segmentWriteKey.isEmpty ||
         segmentWriteKey == "demo_write_key_not_real" ||
         segmentWriteKey == "YOUR_WRITE_KEY_HERE"
+    }
+
+    /// Validate the write key against Segment's API. Calls back on main thread.
+    static func validateConnection(completion: @escaping (ConnectionStatus) -> Void) {
+        guard !isUsingDemoKey else {
+            DispatchQueue.main.async { completion(.demoMode) }
+            return
+        }
+        var request = URLRequest(url: URL(string: "https://api.segment.io/v1/batch")!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let credentials = "\(segmentWriteKey):".data(using: .utf8)!.base64EncodedString()
+        request.setValue("Basic \(credentials)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "batch": [["type": "track", "event": "__segkit_ping", "userId": "segkit"]],
+            "sentAt": ISO8601DateFormatter().string(from: Date()),
+        ])
+        URLSession.shared.dataTask(with: request) { _, response, error in
+            let status: ConnectionStatus
+            if let error = error {
+                status = .error(error.localizedDescription)
+            } else if let http = response as? HTTPURLResponse {
+                switch http.statusCode {
+                case 200: status = .connected
+                case 401: status = .invalidKey
+                default: status = .error("HTTP \(http.statusCode)")
+                }
+            } else {
+                status = .error("No response")
+            }
+            DispatchQueue.main.async { completion(status) }
+        }.resume()
+    }
+}
+
+enum ConnectionStatus: Equatable {
+    case unknown
+    case checking
+    case connected
+    case invalidKey
+    case demoMode
+    case error(String)
+
+    var label: String {
+        switch self {
+        case .unknown: return "Not checked"
+        case .checking: return "Checking..."
+        case .connected: return "Connected"
+        case .invalidKey: return "Invalid write key"
+        case .demoMode: return "Demo mode"
+        case .error(let msg): return msg
+        }
+    }
+
+    var color: SwiftUI.Color {
+        switch self {
+        case .connected: return .green
+        case .invalidKey, .error: return .red
+        case .demoMode: return .orange
+        case .unknown, .checking: return .secondary
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .connected: return "checkmark.circle.fill"
+        case .invalidKey, .error: return "xmark.circle.fill"
+        case .demoMode: return "info.circle.fill"
+        case .checking: return "arrow.triangle.2.circlepath"
+        case .unknown: return "questionmark.circle"
+        }
     }
 }
 "#;
