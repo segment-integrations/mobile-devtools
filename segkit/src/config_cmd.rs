@@ -18,10 +18,10 @@ fn parse_plugin_csv(raw: &str) -> BTreeSet<String> {
         .collect()
 }
 
-/// Locate and parse SegmentConfig.xcconfig from the project directory.
+/// Locate and parse SegmentConfig.conf from the project directory.
 fn load_config() -> Result<(PathBuf, XCConfig), ExitCode> {
-    let path = find_file("SegmentConfig.xcconfig").ok_or_else(|| {
-        err("No SegmentConfig.xcconfig found. Are you in a segkit project directory?");
+    let path = find_file("SegmentConfig.conf").ok_or_else(|| {
+        err("No SegmentConfig.conf found. Are you in a segkit project directory?");
         ExitCode::FAILURE
     })?;
 
