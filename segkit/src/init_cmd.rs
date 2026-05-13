@@ -535,7 +535,7 @@ fn prompt_plugins(already_selected: &[String]) -> Vec<String> {
 
     loop {
         eprintln!();
-        eprintln!("Select destination plugins (enter numbers to toggle, Enter to confirm):");
+        eprintln!("Select destination plugins (numbers to toggle, all/none, Enter to confirm):");
         for (i, plugin) in PLUGIN_REGISTRY.iter().enumerate() {
             let marker = if selected[i] { "[x]" } else { "[ ]" };
             eprintln!("  {}) {} {}", i + 1, marker, plugin.key);
@@ -551,10 +551,20 @@ fn prompt_plugins(already_selected: &[String]) -> Vec<String> {
         if trimmed.is_empty() {
             break;
         }
-        for token in trimmed.split_whitespace() {
-            if let Ok(n) = token.parse::<usize>() {
-                if n >= 1 && n <= PLUGIN_REGISTRY.len() {
-                    selected[n - 1] = !selected[n - 1];
+        for token in trimmed.split(|c: char| c == ',' || c.is_whitespace()) {
+            let token = token.trim();
+            if token.is_empty() {
+                continue;
+            }
+            match token.to_lowercase().as_str() {
+                "all" => selected.iter_mut().for_each(|s| *s = true),
+                "none" => selected.iter_mut().for_each(|s| *s = false),
+                _ => {
+                    if let Ok(n) = token.parse::<usize>() {
+                        if n >= 1 && n <= PLUGIN_REGISTRY.len() {
+                            selected[n - 1] = !selected[n - 1];
+                        }
+                    }
                 }
             }
         }
