@@ -634,10 +634,11 @@ fn prompt_plugins(already_selected: &[String]) -> Vec<String> {
 
     loop {
         eprintln!();
-        eprintln!("Select destination plugins (numbers to toggle, all/none, Enter to confirm):");
+        eprintln!("Destination plugins — these forward events from Segment to your analytics tools.");
+        eprintln!("Type a number to toggle, 'all' to enable all, 'none' to clear, then press Enter to confirm:");
         for (i, plugin) in PLUGIN_REGISTRY.iter().enumerate() {
             let marker = if selected[i] { "[x]" } else { "[ ]" };
-            eprintln!("  {}) {} {}", i + 1, marker, plugin.key);
+            eprintln!("  {}) {} {}", i + 1, marker, plugin.display_name);
         }
         eprint!("> ");
         io::stderr().flush().ok();
@@ -689,9 +690,16 @@ pub fn run(
     // If any required field is missing and we're interactive, run the wizard
     let needs_wizard = interactive && sdk.is_none();
 
+    if needs_wizard {
+        eprintln!();
+        eprintln!("  \x1b[1mWelcome to segkit!\x1b[0m  Let's set up your Segment iOS project.");
+        eprintln!("  Press \x1b[1mEnter\x1b[0m to accept the default shown in [brackets], or type a new value.");
+        eprintln!();
+    }
+
     let sdk = sdk.unwrap_or_else(|| {
         if interactive {
-            prompt("SDK template (swift)", "swift")
+            "swift".to_string()
         } else {
             err("--sdk is required in non-interactive mode");
             std::process::exit(1);
@@ -703,7 +711,14 @@ pub fn run(
         return ExitCode::FAILURE;
     }
 
-    let name = name.unwrap_or_else(|| prompt("Project name", "SegmentDemo"));
+    let name = name.unwrap_or_else(|| {
+        if needs_wizard {
+            eprintln!("  Your project name becomes the Xcode project folder.");
+            eprintln!("  Use letters, digits, and underscores only — no spaces (e.g. MyApp, my_app).");
+            eprintln!();
+        }
+        prompt("Project name", "SegmentDemo")
+    });
 
     // Project name must be a valid Swift identifier (letters, digits, underscores)
     if !is_valid_swift_identifier(&name) {
@@ -714,8 +729,27 @@ pub fn run(
         return ExitCode::FAILURE;
     }
 
-    let org = org.unwrap_or_else(|| prompt("Organization identifier", "com.example"));
-    let write_key = write_key.unwrap_or_else(|| prompt("Segment write key", "demo_write_key_not_real"));
+    let org = org.unwrap_or_else(|| {
+        if needs_wizard {
+            eprintln!();
+            eprintln!("  Reverse-domain prefix used as your app's bundle ID prefix (e.g. com.acme).");
+        }
+        prompt("Organization identifier", "com.example")
+    });
+
+    let write_key_input = write_key.unwrap_or_else(|| {
+        if needs_wizard {
+            eprintln!();
+            eprintln!("  Find your write key in Segment: Sources → your source → Settings → API Keys.");
+            eprintln!("  Press Enter to use demo mode — events stored locally, not sent to Segment.");
+        }
+        prompt("Segment write key", "")
+    });
+    let write_key = if write_key_input.is_empty() {
+        "demo_write_key_not_real".to_string()
+    } else {
+        write_key_input
+    };
 
     let plugin_names = if needs_wizard && plugin_names.is_empty() {
         prompt_plugins(&plugin_names)
@@ -823,11 +857,18 @@ pub fn run(
         err("doctor --fix reported issues; the project was still created.");
     }
 
-    info("Done!");
+    info(&format!("Project '{name}' created successfully!"));
     eprintln!();
+    eprintln!("  \x1b[1mNext steps:\x1b[0m");
     eprintln!("  cd {name}");
-    eprintln!("  devbox run start:app");
+    eprintln!("  devbox run start:app     \x1b[2m# builds and launches in the iOS Simulator\x1b[0m");
     eprintln!();
+    if write_key == "demo_write_key_not_real" {
+        eprintln!("  \x1b[33mNote:\x1b[0m Running in demo mode — events are stored locally, not sent to Segment.");
+        eprintln!("  To connect to your workspace:");
+        eprintln!("  segkit config set --write-key=YOUR_WRITE_KEY");
+        eprintln!();
+    }
 
     ExitCode::SUCCESS
 }
