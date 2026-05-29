@@ -9,7 +9,7 @@
   "packages": {
     "curl": "latest",
     "lsof": "latest",
-    "nodejs": "20",
+    "nodejs": "22",
     "watchman": "latest",
     "process-compose": "latest"
   },

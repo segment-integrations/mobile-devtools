@@ -1,7 +1,7 @@
 {
   "include": ["path:../../../plugins/react-native/plugin.json"],
   "packages": [
-    "nodejs@20",
+    "nodejs@22",
     "watchman@latest",
     "jdk17@latest",
     "gradle@latest",
