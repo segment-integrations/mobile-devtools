@@ -8,7 +8,7 @@ export class ConsoleLoggerPlugin extends DestinationPlugin {
   type = PluginType.destination;
   key = 'ConsoleLogger';
 
-  execute(event: SegmentEvent): SegmentEvent {
+  async execute(event: SegmentEvent): Promise<SegmentEvent | undefined> {
     const type = event.type?.toUpperCase() ?? 'UNKNOWN';
     const timestamp = new Date().toISOString();
 
