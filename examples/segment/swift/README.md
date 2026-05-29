@@ -144,7 +144,7 @@ devbox version
 
 Copy and paste this into Terminal and press Enter:
 ```bash
-cd ~/Downloads/mobile-devtools-main/examples/repro/swift
+cd ~/Downloads/mobile-devtools-main/examples/segment/swift
 ```
 
 **If you saved it somewhere else:** Replace `~/Downloads` with the actual folder location.
@@ -319,7 +319,7 @@ You can also see events in the Segment Debugger:
 
 ## Available Commands
 
-Here are all the commands you can run. Type these in Terminal from the `examples/repro/swift` directory:
+Here are all the commands you can run. Type these in Terminal from the `examples/segment/swift` directory:
 
 **Build the app (without running it):**
 ```bash
@@ -410,7 +410,7 @@ When you encounter a bug with the Segment SDK, here's how to create a reproducti
 
 Clean any previous builds:
 ```bash
-cd examples/repro/swift
+cd examples/segment/swift
 devbox run --pure build:clean
 ```
 
@@ -861,7 +861,7 @@ This tells Devbox to fetch the iOS plugin directly from GitHub instead of lookin
 Here's what each file and folder does:
 
 ```
-examples/repro/swift/
+examples/segment/swift/
 ├── ios/                              # Swift source code
 │   ├── iosApp.swift                  # App entry point (where the app starts)
 │   ├── ContentView.swift             # Main UI with buttons and demo logic

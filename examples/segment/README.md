@@ -5,6 +5,7 @@ Pre-configured, minimal apps for reproducing Segment SDK issues. These examples 
 ## Available Examples
 
 - [Swift/iOS](./swift/README.md) - Fully-configured iOS app for reproducing Segment Analytics Swift SDK issues
+- [React Native](./react-native/README.md) - Cross-platform app for reproducing Segment Analytics React Native SDK issues
 
 ## Purpose
 
@@ -182,7 +183,7 @@ Everything needed is included. No manual setup required.
 When adding a new platform or SDK:
 
 **Required Structure:**
-1. Create directory: `examples/repro/{platform}/`
+1. Create directory: `examples/segment/{platform}/`
 2. Include mobile-devtools plugin in `devbox.json`
 3. Add interactive UI with basic SDK operations (track, identify, screen, etc.)
 4. Include custom logging plugin for console debugging

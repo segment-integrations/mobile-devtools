@@ -1,0 +1,66 @@
+{
+  "include": ["path:../../../plugins/react-native/plugin.json"],
+  "packages": [
+    "nodejs@20",
+    "watchman@latest",
+    "jdk17@latest",
+    "gradle@latest",
+    "process-compose@latest",
+    "zip@latest",
+    "rsync@latest"
+  ],
+  "env": {
+    "IOS_APP_SCHEME": "SegmentRNExample",
+    "IOS_APP_ARTIFACT": "ios/build/Build/Products/Debug-iphonesimulator/SegmentRNExample.app",
+    "IOS_APP_BUNDLE_ID": "com.segment.rnexample",
+    "ANDROID_APP_ID": "com.segment.rnexample",
+    "ANDROID_APP_APK": "android/app/build/outputs/apk/debug/app-debug.apk"
+  },
+  "shell": {
+    "scripts": {
+      "install": [
+        "npm install"
+      ],
+      "build:android": [
+        "devbox run install",
+        "cd android && ./gradlew assembleDebug"
+      ],
+      "build:ios": [
+        "devbox run install",
+        "cd ios && pod install --repo-update",
+        "ios.sh xcodebuild -workspace SegmentRNExample.xcworkspace -scheme SegmentRNExample -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath build build"
+      ],
+      "start:app:android": [
+        "devbox run build:android",
+        "android.sh run ${1:-}"
+      ],
+      "start:app:ios": [
+        "ios.sh run ${1:-}"
+      ],
+      "start:metro": [
+        "metro.sh start ${1:-default}"
+      ],
+      "stop:metro": [
+        "metro.sh stop ${1:-default}"
+      ],
+      "start:emu": [
+        "android.sh emulator start ${1:-${ANDROID_DEFAULT_DEVICE:-max}}"
+      ],
+      "stop:emu": [
+        "android.sh emulator stop"
+      ],
+      "start:sim": [
+        "ios.sh simulator start ${1:-${IOS_DEFAULT_DEVICE:-max}}"
+      ],
+      "stop:sim": [
+        "ios.sh simulator stop"
+      ],
+      "test": [
+        "npm test"
+      ],
+      "share": [
+        "segkit share"
+      ]
+    }
+  }
+}
