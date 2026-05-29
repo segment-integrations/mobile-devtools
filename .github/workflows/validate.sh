@@ -64,9 +64,12 @@ for workflow in $WORKFLOW_FILES; do
     fi
 
     # Check for common issues
-    if grep -q "uses:.*@v[0-9]" "$workflow"; then
+    if grep -q "uses:.*@[0-9a-f]\{40\}" "$workflow"; then
+        SHA_PINNED=$(grep -c "uses:.*@[0-9a-f]\{40\}" "$workflow" | xargs)
+        echo "  ✓ Actions pinned to commit SHAs ($SHA_PINNED)"
+    elif grep -q "uses:.*@v[0-9]" "$workflow"; then
         PINNED_ACTIONS=$(grep -o "uses:.*@v[0-9][0-9.]*" "$workflow" | wc -l | xargs)
-        echo "  ✓ Actions pinned to versions ($PINNED_ACTIONS)"
+        echo "  ⚠ Warning: Actions pinned to mutable tags ($PINNED_ACTIONS) - prefer commit SHA pinning"
     fi
 
     # Check for timeout configuration
