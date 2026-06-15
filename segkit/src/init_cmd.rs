@@ -529,18 +529,35 @@ pub fn run(
 
     let sdk = sdk.unwrap_or_else(|| {
         if interactive {
-            prompt("SDK template (swift)", "swift")
+            prompt("SDK template (swift, flutter)", "swift")
         } else {
             err("--sdk is required in non-interactive mode");
             std::process::exit(1);
         }
     });
 
-    if sdk != "swift" {
-        err(&format!("Unknown SDK: {sdk}. Only 'swift' is supported."));
-        return ExitCode::FAILURE;
+    match sdk.as_str() {
+        "swift" => init_swift(name, org, write_key, plugin_names, needs_wizard),
+        "flutter" => {
+            let name = name.unwrap_or_else(|| prompt("Project name", "segment_demo"));
+            let org = org.unwrap_or_else(|| prompt("Organization identifier", "com.example"));
+            let write_key = write_key.unwrap_or_else(|| prompt("Segment write key", "demo_write_key_not_real"));
+            init_flutter(name, org, write_key, plugin_names, needs_wizard)
+        }
+        _ => {
+            err(&format!("Unknown SDK: {sdk}. Supported: swift, flutter."));
+            ExitCode::FAILURE
+        }
     }
+}
 
+fn init_swift(
+    name: Option<String>,
+    org: Option<String>,
+    write_key: Option<String>,
+    plugin_names: Vec<String>,
+    needs_wizard: bool,
+) -> ExitCode {
     let name = name.unwrap_or_else(|| prompt("Project name", "SegmentDemo"));
 
     // Project name must be a valid Swift identifier (letters, digits, underscores)
@@ -1027,4 +1044,539 @@ zip -r "$ARCHIVE_NAME" . \
   -x '.devbox/*'
 
 echo "Created: $ARCHIVE_NAME"
+"#;
+
+// ============================================================================
+// Flutter support
+// ============================================================================
+
+struct FlutterPlugin {
+    key: &'static str,
+    package_name: &'static str,
+    min_version: &'static str,
+    import_name: &'static str,
+    class_name: &'static str,
+}
+
+const FLUTTER_PLUGIN_REGISTRY: &[FlutterPlugin] = &[
+    FlutterPlugin {
+        key: "amplitude",
+        package_name: "segment_analytics_amplitude",
+        min_version: "1.0.0",
+        import_name: "segment_analytics_amplitude",
+        class_name: "AmplitudeDestination",
+    },
+    FlutterPlugin {
+        key: "appsflyer",
+        package_name: "segment_analytics_appsflyer",
+        min_version: "1.0.0",
+        import_name: "segment_analytics_appsflyer",
+        class_name: "AppsflyerDestination",
+    },
+    FlutterPlugin {
+        key: "braze",
+        package_name: "segment_analytics_braze",
+        min_version: "1.0.0",
+        import_name: "segment_analytics_braze",
+        class_name: "BrazeDestination",
+    },
+    FlutterPlugin {
+        key: "firebase",
+        package_name: "segment_analytics_firebase",
+        min_version: "1.0.0",
+        import_name: "segment_analytics_firebase",
+        class_name: "FirebaseDestination",
+    },
+    FlutterPlugin {
+        key: "mixpanel",
+        package_name: "segment_analytics_mixpanel",
+        min_version: "1.0.0",
+        import_name: "segment_analytics_mixpanel",
+        class_name: "MixpanelDestination",
+    },
+];
+
+fn resolve_flutter_plugins(
+    requested: &[String],
+) -> Result<Vec<&'static FlutterPlugin>, String> {
+    let mut resolved = Vec::new();
+    for name in requested {
+        let lower = name.to_lowercase();
+        match FLUTTER_PLUGIN_REGISTRY.iter().find(|p| p.key == lower) {
+            Some(p) => resolved.push(p),
+            None => {
+                let available: Vec<_> = FLUTTER_PLUGIN_REGISTRY.iter().map(|p| p.key).collect();
+                return Err(format!(
+                    "Unknown Flutter plugin '{name}'. Available: {}",
+                    available.join(", ")
+                ));
+            }
+        }
+    }
+    resolved.dedup_by_key(|p| p.key);
+    Ok(resolved)
+}
+
+/// Check if a name is a valid Dart package identifier (lowercase, digits, underscores).
+fn is_valid_dart_package_name(name: &str) -> bool {
+    if name.is_empty() {
+        return false;
+    }
+    let mut chars = name.chars();
+    match chars.next() {
+        Some(c) if c.is_ascii_lowercase() || c == '_' => {}
+        _ => return false,
+    }
+    chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+}
+
+fn prompt_flutter_plugins(already_selected: &[String]) -> Vec<String> {
+    if !io::stdin().is_terminal() {
+        return already_selected.to_vec();
+    }
+
+    let mut selected: Vec<bool> = FLUTTER_PLUGIN_REGISTRY
+        .iter()
+        .map(|p| already_selected.iter().any(|s| s.to_lowercase() == p.key))
+        .collect();
+
+    loop {
+        eprintln!();
+        eprintln!("Select destination plugins (enter numbers to toggle, Enter to confirm):");
+        for (i, plugin) in FLUTTER_PLUGIN_REGISTRY.iter().enumerate() {
+            let marker = if selected[i] { "[x]" } else { "[ ]" };
+            eprintln!("  {}) {} {}", i + 1, marker, plugin.key);
+        }
+        eprint!("> ");
+        io::stderr().flush().ok();
+
+        let mut line = String::new();
+        if io::stdin().lock().read_line(&mut line).is_err() {
+            break;
+        }
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            break;
+        }
+        for token in trimmed.split_whitespace() {
+            if let Ok(n) = token.parse::<usize>() {
+                if n >= 1 && n <= FLUTTER_PLUGIN_REGISTRY.len() {
+                    selected[n - 1] = !selected[n - 1];
+                }
+            }
+        }
+    }
+
+    FLUTTER_PLUGIN_REGISTRY
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| selected[*i])
+        .map(|(_, p)| p.key.to_string())
+        .collect()
+}
+
+fn ensure_flutter() -> bool {
+    if which::which("flutter").is_ok() {
+        return true;
+    }
+    err("flutter not found in PATH. Install Flutter from https://docs.flutter.dev/get-started/install and ensure it is on your PATH.");
+    false
+}
+
+fn generate_flutter_pubspec(name: &str, _org: &str, plugins: &[&FlutterPlugin]) -> String {
+    let mut deps = String::from("  segment_analytics: ^1.4.0\n");
+    for p in plugins {
+        deps.push_str(&format!("  {}: ^{}\n", p.package_name, p.min_version));
+    }
+
+    format!(
+        r#"name: {name}
+description: A Flutter demo app with Segment Analytics.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+{deps}
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+"#,
+        name = name,
+        deps = deps,
+    )
+}
+
+fn generate_flutter_main_dart(_name: &str, write_key: &str, plugins: &[&FlutterPlugin]) -> String {
+    let mut imports = String::from("import 'package:segment_analytics/analytics.dart';\nimport 'package:segment_analytics/state.dart';\n");
+    for p in plugins {
+        imports.push_str(&format!(
+            "import 'package:{}/{}.dart';\n",
+            p.package_name, p.import_name
+        ));
+    }
+
+    let mut plugin_adds = String::new();
+    for p in plugins {
+        plugin_adds.push_str(&format!(
+            "    analytics.addPlugin({}());\n",
+            p.class_name
+        ));
+    }
+
+    let is_demo = write_key == "demo_write_key_not_real";
+    let flush_policy = if is_demo {
+        "    // Demo mode: queue events locally\n    configuration.flushAt = 1000;\n    configuration.flushInterval = 0;"
+    } else {
+        "    configuration.flushInterval = 10;"
+    };
+
+    format!(
+        r#"import 'package:flutter/material.dart';
+{imports}
+late Analytics analytics;
+
+void main() {{
+  WidgetsFlutterBinding.ensureInitialized();
+  final configuration = Configuration('{write_key}');
+{flush_policy}
+  analytics = Analytics(configuration, []);
+{plugin_adds}  runApp(const MyApp());
+}}
+
+class MyApp extends StatelessWidget {{
+  const MyApp({{super.key}});
+
+  @override
+  Widget build(BuildContext context) {{
+    return MaterialApp(
+      title: 'Segment Flutter Demo',
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        useMaterial3: true,
+      ),
+      home: const HomePage(),
+    );
+  }}
+}}
+
+class HomePage extends StatefulWidget {{
+  const HomePage({{super.key}});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}}
+
+class _HomePageState extends State<HomePage> {{
+  int _eventCount = 0;
+  String? _lastEventTime;
+
+  void _trackEvent() {{
+    setState(() {{
+      _eventCount++;
+      _lastEventTime = DateTime.now().toIso8601String();
+    }});
+    analytics.track(TrackEvent('Button Pressed', properties: {{
+      'button': 'Track Event',
+      'count': _eventCount,
+    }}));
+  }}
+
+  void _identifyUser() {{
+    setState(() {{
+      _eventCount++;
+      _lastEventTime = DateTime.now().toIso8601String();
+    }});
+    analytics.identify(IdentifyEvent(
+      userId: 'demo-user',
+      traits: {{
+        'name': 'Demo User',
+        'email': 'demo@example.com',
+        'plan': 'free',
+      }},
+    ));
+  }}
+
+  void _trackScreen() {{
+    setState(() {{
+      _eventCount++;
+      _lastEventTime = DateTime.now().toIso8601String();
+    }});
+    analytics.screen(ScreenEvent('Demo Screen', properties: {{
+      'screen_name': 'HomePage',
+      'view_count': _eventCount,
+    }}));
+  }}
+
+  @override
+  Widget build(BuildContext context) {{
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Segment Flutter Demo'),
+        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.analytics, size: 60, color: Colors.blue),
+              const SizedBox(height: 16),
+              Text(
+                '$_eventCount',
+                style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                  color: Colors.blue,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Text('Events Tracked'),
+              if (_lastEventTime != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Last: $_lastEventTime',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+              const SizedBox(height: 40),
+              FilledButton.icon(
+                onPressed: _trackEvent,
+                icon: const Icon(Icons.bar_chart),
+                label: const Text('Track Event'),
+              ),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: _identifyUser,
+                icon: const Icon(Icons.person),
+                label: const Text('Identify User'),
+                style: FilledButton.styleFrom(backgroundColor: Colors.green),
+              ),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: _trackScreen,
+                icon: const Icon(Icons.phone_iphone),
+                label: const Text('Track Screen'),
+                style: FilledButton.styleFrom(backgroundColor: Colors.purple),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }}
+}}
+"#,
+        imports = imports,
+        write_key = write_key,
+        flush_policy = flush_policy,
+        plugin_adds = plugin_adds,
+    )
+}
+
+fn generate_flutter_analysis_options() -> &'static str {
+    r#"include: package:flutter_lints/flutter.yaml
+"#
+}
+
+fn generate_flutter_gitignore() -> &'static str {
+    r#"# Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+*.iml
+
+# Devbox
+.devbox/
+"#
+}
+
+fn generate_flutter_devbox_json(name: &str) -> String {
+    format!(
+        r#"{{
+  "include": [
+    "github:segment-integrations/mobile-devtools?dir=plugins/android&ref=main",
+    "github:segment-integrations/mobile-devtools?dir=plugins/ios&ref=main"
+  ],
+  "packages": {{
+    "process-compose": "latest"
+  }},
+  "env": {{
+    "ANDROID_APP_APK": "build/app/outputs/flutter-apk/app-debug.apk",
+    "IOS_APP_ARTIFACT": "build/ios/iphonesimulator/{name}.app"
+  }},
+  "shell": {{
+    "scripts": {{
+      "build:android": [
+        "flutter build apk --debug"
+      ],
+      "build:ios": [
+        "flutter build ios --debug --simulator"
+      ],
+      "start:emu": [
+        "android.sh emulator start ${{1:-}}"
+      ],
+      "start:sim": [
+        "ios.sh simulator start ${{1:-}}"
+      ],
+      "start:app:android": [
+        "android.sh deploy && flutter run --no-pub"
+      ],
+      "start:app:ios": [
+        "ios.sh run ${{1:-}}"
+      ],
+      "stop:emu": [
+        "android.sh emulator stop"
+      ],
+      "stop:sim": [
+        "ios.sh simulator stop"
+      ],
+      "test": [
+        "flutter test"
+      ]
+    }}
+  }}
+}}
+"#,
+        name = name
+    )
+}
+
+fn init_flutter(
+    name: String,
+    org: String,
+    write_key: String,
+    plugin_names: Vec<String>,
+    needs_wizard: bool,
+) -> ExitCode {
+    if !is_valid_dart_package_name(&name) {
+        err(&format!(
+            "Project name '{name}' is not a valid Dart package name. \
+             Use only lowercase letters, digits, and underscores (e.g. segment_demo, my_app)."
+        ));
+        return ExitCode::FAILURE;
+    }
+
+    let plugin_names = if needs_wizard && plugin_names.is_empty() {
+        prompt_flutter_plugins(&plugin_names)
+    } else {
+        plugin_names
+    };
+
+    let plugins = match resolve_flutter_plugins(&plugin_names) {
+        Ok(p) => p,
+        Err(e) => {
+            err(&e);
+            return ExitCode::FAILURE;
+        }
+    };
+
+    if !plugins.is_empty() {
+        let names: Vec<_> = plugins.iter().map(|p| p.key).collect();
+        info(&format!("Plugins: {}", names.join(", ")));
+    }
+
+    let out = PathBuf::from(&name);
+    if out.exists() {
+        err(&format!("Directory '{}' already exists.", out.display()));
+        return ExitCode::FAILURE;
+    }
+
+    if !ensure_flutter() {
+        return ExitCode::FAILURE;
+    }
+
+    info(&format!("Creating {name} from flutter template..."));
+
+    // Run `flutter create` to scaffold the project
+    let status = Command::new("flutter")
+        .args([
+            "create",
+            "--org",
+            &org,
+            "--project-name",
+            &name,
+            "--platforms",
+            "android,ios",
+            &name,
+        ])
+        .status();
+
+    match status {
+        Ok(s) if s.success() => {}
+        Ok(s) => {
+            err(&format!("flutter create exited with code {}", s.code().unwrap_or(-1)));
+            return ExitCode::FAILURE;
+        }
+        Err(e) => {
+            err(&format!("Failed to run flutter create: {e}"));
+            return ExitCode::FAILURE;
+        }
+    }
+
+    // Overwrite pubspec.yaml with our version (adds segment_analytics + plugins)
+    write_file(&out, "pubspec.yaml", &generate_flutter_pubspec(&name, &org, &plugins));
+
+    // Overwrite lib/main.dart with our demo app
+    write_file(&out, "lib/main.dart", &generate_flutter_main_dart(&name, &write_key, &plugins));
+
+    // analysis_options.yaml
+    write_file(&out, "analysis_options.yaml", generate_flutter_analysis_options());
+
+    // .gitignore
+    write_file(&out, ".gitignore", generate_flutter_gitignore());
+
+    // devbox.json
+    write_file(&out, "devbox.json", &generate_flutter_devbox_json(&name));
+
+    // Device definitions (android + ios)
+    write_file(&out, "devbox.d/android/devices/max.json", FLUTTER_ANDROID_DEVICE_MAX_JSON);
+    write_file(&out, "devbox.d/android/devices/min.json", FLUTTER_ANDROID_DEVICE_MIN_JSON);
+    write_file(&out, "devbox.d/ios/devices/max.json", DEVICE_MAX_JSON);
+    write_file(&out, "devbox.d/ios/devices/min.json", DEVICE_MIN_JSON);
+
+    // Run doctor --fix
+    info("Running doctor --fix to ensure dependencies are installed...");
+    let doctor_result = doctor::run(true);
+    if doctor_result != ExitCode::SUCCESS {
+        err("doctor --fix reported issues; the project was still created.");
+    }
+
+    info("Done!");
+    eprintln!();
+    eprintln!("  cd {name}");
+    eprintln!("  devbox shell");
+    eprintln!("  devbox run build:android   # or build:ios");
+    eprintln!("  devbox run start:emu       # start Android emulator");
+    eprintln!("  devbox run start:app:android");
+    eprintln!();
+
+    ExitCode::SUCCESS
+}
+
+const FLUTTER_ANDROID_DEVICE_MAX_JSON: &str = r#"{
+  "name": "pixel_9",
+  "api": 36,
+  "device": "pixel_9",
+  "tag": "google_apis",
+  "preferred_abi": "x86_64"
+}
+"#;
+
+const FLUTTER_ANDROID_DEVICE_MIN_JSON: &str = r#"{
+  "name": "pixel_6",
+  "api": 28,
+  "device": "pixel_6",
+  "tag": "google_apis",
+  "preferred_abi": "x86_64"
+}
 "#;

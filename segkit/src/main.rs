@@ -56,7 +56,7 @@ enum Commands {
     },
     /// Scaffold a new project from a template
     Init {
-        /// SDK template to use (swift)
+        /// SDK template to use (swift, flutter)
         #[arg(long)]
         sdk: Option<String>,
         /// Project name
@@ -68,7 +68,7 @@ enum Commands {
         /// Segment write key
         #[arg(long)]
         write_key: Option<String>,
-        /// Segment SDK destination plugins to include (e.g. amplitude, firebase, mixpanel, braze, appsflyer, facebook, survicate)
+        /// Segment SDK destination plugins to include (swift: amplitude, firebase, mixpanel, braze, appsflyer, facebook, survicate; flutter: amplitude, appsflyer, braze, firebase, mixpanel)
         #[arg(long, value_delimiter = ',')]
         plugins: Vec<String>,
     },
