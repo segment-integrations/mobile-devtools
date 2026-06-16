@@ -113,15 +113,22 @@ fn main() -> ExitCode {
         Some(Commands::Metro { args }) => delegate::run("metro.sh", &args),
         Some(Commands::Doctor { fix }) => doctor::run(fix),
         Some(Commands::Uninstall { all, keep }) => uninstall::run(all, &keep),
-        Some(Commands::Init { sdk, name, org, write_key, plugins }) => {
-            init_cmd::run(sdk, name, org, write_key, plugins)
-        }
+        Some(Commands::Init {
+            sdk,
+            name,
+            org,
+            write_key,
+            plugins,
+        }) => init_cmd::run(sdk, name, org, write_key, plugins),
         Some(Commands::Update) => update::run(),
         Some(Commands::Config { action }) => match action {
             ConfigAction::Show => config_cmd::run_show(),
-            ConfigAction::Set { write_key, plugins, add_plugins, remove_plugins } => {
-                config_cmd::run_set(write_key, plugins, add_plugins, remove_plugins)
-            }
+            ConfigAction::Set {
+                write_key,
+                plugins,
+                add_plugins,
+                remove_plugins,
+            } => config_cmd::run_set(write_key, plugins, add_plugins, remove_plugins),
         },
         None => {
             println!("segkit {}", env!("CARGO_PKG_VERSION"));

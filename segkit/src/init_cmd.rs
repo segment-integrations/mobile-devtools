@@ -192,7 +192,9 @@ fn generate_deps_yaml(plugins: &[&Plugin]) -> String {
 /// Generate the project.yml with dynamic plugin support.
 fn generate_project_yml(name: &str, org: &str, plugins: &[&Plugin]) -> String {
     let mut packages_section = String::new();
-    packages_section.push_str("  Segment:\n    url: https://github.com/segmentio/analytics-swift\n    from: 1.9.3\n");
+    packages_section.push_str(
+        "  Segment:\n    url: https://github.com/segmentio/analytics-swift\n    from: 1.9.3\n",
+    );
     packages_section.push_str(&generate_packages_yaml(plugins));
 
     let mut deps_section = String::from("      - package: Segment\n");
@@ -618,7 +620,11 @@ fn prompt(label: &str, default: &str) -> String {
         return default.to_string();
     }
     let trimmed = line.trim();
-    if trimmed.is_empty() { default.to_string() } else { trimmed.to_string() }
+    if trimmed.is_empty() {
+        default.to_string()
+    } else {
+        trimmed.to_string()
+    }
 }
 
 /// Prompt user to select plugins interactively (toggle with numbers, Enter to confirm).
@@ -715,7 +721,8 @@ pub fn run(
     }
 
     let org = org.unwrap_or_else(|| prompt("Organization identifier", "com.example"));
-    let write_key = write_key.unwrap_or_else(|| prompt("Segment write key", "demo_write_key_not_real"));
+    let write_key =
+        write_key.unwrap_or_else(|| prompt("Segment write key", "demo_write_key_not_real"));
 
     let plugin_names = if needs_wizard && plugin_names.is_empty() {
         prompt_plugins(&plugin_names)
@@ -756,10 +763,18 @@ pub fn run(
 
     // project.yml — always includes all 7 plugins as SPM dependencies
     let all_plugins: Vec<&Plugin> = PLUGIN_REGISTRY.iter().collect();
-    write_file(&out, "project.yml", &generate_project_yml(&name, &org, &all_plugins));
+    write_file(
+        &out,
+        "project.yml",
+        &generate_project_yml(&name, &org, &all_plugins),
+    );
 
     // devbox.json
-    write_file(&out, "devbox.json", &apply(DEVBOX_JSON, &name, &org, &write_key, &bundle_id));
+    write_file(
+        &out,
+        "devbox.json",
+        &apply(DEVBOX_JSON, &name, &org, &write_key, &bundle_id),
+    );
 
     // Device definitions
     write_file(&out, "devbox.d/ios/devices/max.json", DEVICE_MAX_JSON);
@@ -770,23 +785,67 @@ pub fn run(
     // SegmentConfig.conf — runtime config read by Config.swift
     // Uses .conf extension so Xcode bundles it as a resource (not a build config)
     let enabled_keys: Vec<String> = plugins.iter().map(|p| p.key.to_string()).collect();
-    write_file(&out, &format!("{src}/SegmentConfig.conf"), &generate_xcconfig(&write_key, &enabled_keys));
+    write_file(
+        &out,
+        &format!("{src}/SegmentConfig.conf"),
+        &generate_xcconfig(&write_key, &enabled_keys),
+    );
 
-    write_file(&out, &format!("{src}/Config.swift"), &apply(CONFIG_SWIFT, &name, &org, &write_key, &bundle_id));
-    write_file(&out, &format!("{src}/{name}App.swift"), &apply(APP_SWIFT, &name, &org, &write_key, &bundle_id));
-    write_file(&out, &format!("{src}/ContentView.swift"), &generate_content_view(&name));
-    write_file(&out, &format!("{src}/ConsoleLoggerPlugin.swift"), CONSOLE_LOGGER_SWIFT);
+    write_file(
+        &out,
+        &format!("{src}/Config.swift"),
+        &apply(CONFIG_SWIFT, &name, &org, &write_key, &bundle_id),
+    );
+    write_file(
+        &out,
+        &format!("{src}/{name}App.swift"),
+        &apply(APP_SWIFT, &name, &org, &write_key, &bundle_id),
+    );
+    write_file(
+        &out,
+        &format!("{src}/ContentView.swift"),
+        &generate_content_view(&name),
+    );
+    write_file(
+        &out,
+        &format!("{src}/ConsoleLoggerPlugin.swift"),
+        CONSOLE_LOGGER_SWIFT,
+    );
     write_file(&out, &format!("{src}/IDFAPlugin.swift"), IDFA_PLUGIN_SWIFT);
 
     // Asset catalogs
-    write_file(&out, &format!("{src}/Assets.xcassets/Contents.json"), ASSETS_CONTENTS);
-    write_file(&out, &format!("{src}/Assets.xcassets/AccentColor.colorset/Contents.json"), ACCENT_COLOR_CONTENTS);
-    write_file(&out, &format!("{src}/Assets.xcassets/AppIcon.appiconset/Contents.json"), APP_ICON_CONTENTS);
+    write_file(
+        &out,
+        &format!("{src}/Assets.xcassets/Contents.json"),
+        ASSETS_CONTENTS,
+    );
+    write_file(
+        &out,
+        &format!("{src}/Assets.xcassets/AccentColor.colorset/Contents.json"),
+        ACCENT_COLOR_CONTENTS,
+    );
+    write_file(
+        &out,
+        &format!("{src}/Assets.xcassets/AppIcon.appiconset/Contents.json"),
+        APP_ICON_CONTENTS,
+    );
 
     // Test files
-    write_file(&out, &format!("{name}Tests/{name}Tests.swift"), &apply(TESTS_SWIFT, &name, &org, &write_key, &bundle_id));
-    write_file(&out, &format!("{name}UITests/{name}UITests.swift"), &apply(UI_TESTS_SWIFT, &name, &org, &write_key, &bundle_id));
-    write_file(&out, &format!("{name}UITests/{name}UITestsLaunchTests.swift"), &apply(UI_TESTS_LAUNCH_SWIFT, &name, &org, &write_key, &bundle_id));
+    write_file(
+        &out,
+        &format!("{name}Tests/{name}Tests.swift"),
+        &apply(TESTS_SWIFT, &name, &org, &write_key, &bundle_id),
+    );
+    write_file(
+        &out,
+        &format!("{name}UITests/{name}UITests.swift"),
+        &apply(UI_TESTS_SWIFT, &name, &org, &write_key, &bundle_id),
+    );
+    write_file(
+        &out,
+        &format!("{name}UITests/{name}UITestsLaunchTests.swift"),
+        &apply(UI_TESTS_LAUNCH_SWIFT, &name, &org, &write_key, &bundle_id),
+    );
 
     // .gitignore
     write_file(&out, ".gitignore", GITIGNORE);
