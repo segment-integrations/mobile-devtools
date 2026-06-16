@@ -5,6 +5,8 @@ use std::time::Instant;
 use anyhow::{Context, Result};
 use chrono::Utc;
 
+use crate::util::log;
+
 fn reports_dir() -> String {
     std::env::var("REPORTS_DIR").unwrap_or_else(|_| "reports".into())
 }
@@ -88,6 +90,8 @@ pub fn run(script: &str, args: &[String]) -> ExitCode {
             return ExitCode::from(127);
         }
     };
+
+    log::debug(&format!("delegating to {script_path} {}", args.join(" ")));
 
     let start = Instant::now();
 
