@@ -57,7 +57,7 @@ enum Commands {
     },
     /// Scaffold a new project from a template
     Init {
-        /// SDK template to use (swift)
+        /// SDK template to use (swift, flutter)
         #[arg(long)]
         sdk: Option<String>,
         /// Project name
