@@ -1061,38 +1061,17 @@ struct FlutterPlugin {
 const FLUTTER_PLUGIN_REGISTRY: &[FlutterPlugin] = &[
     FlutterPlugin {
         key: "amplitude",
-        package_name: "segment_analytics_amplitude",
+        package_name: "segment_analytics_plugin_amplitude",
         min_version: "1.0.0",
-        import_name: "segment_analytics_amplitude",
-        class_name: "AmplitudeDestination",
+        import_name: "plugin_amplitude",
+        class_name: "amplitudeDestination",
     },
     FlutterPlugin {
         key: "appsflyer",
-        package_name: "segment_analytics_appsflyer",
-        min_version: "1.0.0",
-        import_name: "segment_analytics_appsflyer",
-        class_name: "AppsflyerDestination",
-    },
-    FlutterPlugin {
-        key: "braze",
-        package_name: "segment_analytics_braze",
-        min_version: "1.0.0",
-        import_name: "segment_analytics_braze",
-        class_name: "BrazeDestination",
-    },
-    FlutterPlugin {
-        key: "firebase",
-        package_name: "segment_analytics_firebase",
-        min_version: "1.0.0",
-        import_name: "segment_analytics_firebase",
-        class_name: "FirebaseDestination",
-    },
-    FlutterPlugin {
-        key: "mixpanel",
-        package_name: "segment_analytics_mixpanel",
-        min_version: "1.0.0",
-        import_name: "segment_analytics_mixpanel",
-        class_name: "MixpanelDestination",
+        package_name: "segment_analytics_plugin_appsflyer",
+        min_version: "1.0.2",
+        import_name: "plugin_appsflyer",
+        class_name: "AppsFlyerDestination",
     },
 ];
 
@@ -1184,7 +1163,7 @@ fn ensure_flutter() -> bool {
 }
 
 fn generate_flutter_pubspec(name: &str, _org: &str, plugins: &[&FlutterPlugin]) -> String {
-    let mut deps = String::from("  segment_analytics: ^1.4.0\n");
+    let mut deps = String::from("  segment_analytics: ^1.1.11\n");
     for p in plugins {
         deps.push_str(&format!("  {}: ^{}\n", p.package_name, p.min_version));
     }
@@ -1216,40 +1195,101 @@ flutter:
 }
 
 fn generate_flutter_main_dart(_name: &str, write_key: &str, plugins: &[&FlutterPlugin]) -> String {
-    let mut imports = String::from("import 'package:segment_analytics/analytics.dart';\nimport 'package:segment_analytics/state.dart';\n");
+    // Plugin package imports
+    let mut plugin_imports = String::new();
     for p in plugins {
-        imports.push_str(&format!(
+        plugin_imports.push_str(&format!(
             "import 'package:{}/{}.dart';\n",
             p.package_name, p.import_name
         ));
     }
 
+    // analytics.addPlugin() calls
     let mut plugin_adds = String::new();
     for p in plugins {
-        plugin_adds.push_str(&format!(
-            "    analytics.addPlugin({}());\n",
-            p.class_name
+        plugin_adds.push_str(&format!("  analytics.addPlugin({}());\n", p.class_name));
+    }
+
+    // Toggle state fields + plugin instance holders
+    let mut toggle_states = String::new();
+    for p in plugins {
+        toggle_states.push_str(&format!(
+            "  bool _{key}Enabled = false;\n  Plugin? _{key}Plugin;\n",
+            key = p.key
         ));
     }
 
-    let is_demo = write_key == "demo_write_key_not_real";
-    let flush_policy = if is_demo {
-        "    // Demo mode: queue events locally\n    configuration.flushAt = 1000;\n    configuration.flushInterval = 0;"
+    // Destination plugin rows
+    let mut plugin_rows = String::new();
+    for p in plugins {
+        let display = capitalize(p.key);
+        plugin_rows.push_str(&format!(
+            r#"              _PluginRow(
+                name: '{display}',
+                enabled: _{key}Enabled,
+                onChanged: (v) {{
+                  setState(() => _{key}Enabled = v);
+                  if (v) {{
+                    _{key}Plugin = {constructor}();
+                    analytics.addPlugin(_{key}Plugin!);
+                    debugPrint('{display} destination enabled');
+                  }} else {{
+                    if (_{key}Plugin != null) {{
+                      analytics.removePlugin(_{key}Plugin!);
+                      _{key}Plugin = null;
+                    }}
+                    debugPrint('{display} destination disabled');
+                  }}
+                }},
+              ),
+"#,
+            key = p.key,
+            display = display,
+            constructor = p.class_name,
+        ));
+    }
+
+    let toggle_section = if plugins.is_empty() {
+        String::new()
     } else {
-        "    configuration.flushInterval = 10;"
+        format!(
+            r#"
+              const Divider(),
+              const SizedBox(height: 8),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Destination Plugins',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              ),
+{plugin_rows}"#,
+            plugin_rows = plugin_rows,
+        )
     };
+
+    let is_demo = write_key == "demo_write_key_not_real";
+    let debug_flag = if is_demo { "debug: true" } else { "debug: false" };
 
     format!(
         r#"import 'package:flutter/material.dart';
-{imports}
+import 'package:segment_analytics/analytics.dart';
+import 'package:segment_analytics/client.dart';
+import 'package:segment_analytics/state.dart';
+import 'config.dart';
+import 'console_logger_plugin.dart';
+{plugin_imports}
 late Analytics analytics;
 
 void main() {{
   WidgetsFlutterBinding.ensureInitialized();
-  final configuration = Configuration('{write_key}');
-{flush_policy}
-  analytics = Analytics(configuration, []);
-{plugin_adds}  runApp(const MyApp());
+
+  analytics = createClient(Configuration(Config.segmentWriteKey, {debug_flag}));
+  analytics.addPlugin(ConsoleLoggerPlugin());
+{plugin_adds}
+  debugPrint('Segment Analytics initialized');
+  debugPrint('  Write Key: ${{Config.segmentWriteKey}}');
+  debugPrint('  Mode: ${{Config.isUsingDemoKey ? "Demo (events queued locally)" : "Live (sending to Segment)"}}');
+
+  runApp(const MyApp());
 }}
 
 class MyApp extends StatelessWidget {{
@@ -1276,77 +1316,110 @@ class HomePage extends StatefulWidget {{
 }}
 
 class _HomePageState extends State<HomePage> {{
-  int _eventCount = 0;
-  String? _lastEventTime;
+  int _tracked = 0;
+  int _inQueue = 0;
+  int _sent = 0;
+  bool _isManualFlush = false;
+{toggle_states}
+  void _record() {{
+    setState(() {{
+      _tracked++;
+      if (_isManualFlush) {{
+        _inQueue++;
+      }} else {{
+        _sent++;
+      }}
+    }});
+  }}
+
+  void _flush() {{
+    analytics.flush();
+    setState(() {{
+      _sent += _inQueue;
+      _inQueue = 0;
+    }});
+  }}
 
   void _trackEvent() {{
-    setState(() {{
-      _eventCount++;
-      _lastEventTime = DateTime.now().toIso8601String();
-    }});
-    analytics.track(TrackEvent('Button Pressed', properties: {{
+    _record();
+    analytics.track('Button Pressed', properties: {{
       'button': 'Track Event',
-      'count': _eventCount,
-    }}));
+      'count': _tracked,
+      'timestamp': DateTime.now().toIso8601String(),
+    }});
   }}
 
   void _identifyUser() {{
-    setState(() {{
-      _eventCount++;
-      _lastEventTime = DateTime.now().toIso8601String();
-    }});
-    analytics.identify(IdentifyEvent(
-      userId: 'demo-user',
-      traits: {{
-        'name': 'Demo User',
-        'email': 'demo@example.com',
-        'plan': 'free',
-      }},
-    ));
+    _record();
+    analytics.identify(userId: 'demo-user');
   }}
 
   void _trackScreen() {{
-    setState(() {{
-      _eventCount++;
-      _lastEventTime = DateTime.now().toIso8601String();
-    }});
-    analytics.screen(ScreenEvent('Demo Screen', properties: {{
+    _record();
+    analytics.screen('Demo Screen', properties: {{
       'screen_name': 'HomePage',
-      'view_count': _eventCount,
-    }}));
+      'view_count': _tracked,
+    }});
   }}
 
   @override
   Widget build(BuildContext context) {{
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Segment Flutter Demo'),
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-      ),
-      body: Center(
-        child: Padding(
+      body: SafeArea(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(32.0),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Icon(Icons.analytics, size: 60, color: Colors.blue),
-              const SizedBox(height: 16),
-              Text(
-                '$_eventCount',
-                style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                  color: Colors.blue,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const Text('Events Tracked'),
-              if (_lastEventTime != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  'Last: $_lastEventTime',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
               const SizedBox(height: 40),
+              const Icon(Icons.show_chart, size: 60, color: Colors.blue),
+              const SizedBox(height: 8),
+              const Text(
+                'Segment Flutter Demo',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              ),
+              const Text(
+                'Analytics Flutter SDK',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 16),
+              if (Config.isUsingDemoKey)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Row(children: [
+                    Icon(Icons.info_outline, color: Colors.orange.shade700, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Demo mode',
+                        style: TextStyle(color: Colors.orange.shade700, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                    GestureDetector(
+                      onTap: () => setState(() {{}}),
+                      child: Text(
+                        'Recheck',
+                        style: TextStyle(color: Colors.blue.shade600, fontWeight: FontWeight.w500),
+                      ),
+                    ),
+                  ]),
+                ),
+              const SizedBox(height: 16),
+              Row(children: [
+                _StatCard(value: _tracked, label: 'Tracked', color: Colors.blue),
+                const SizedBox(width: 12),
+                _StatCard(value: _inQueue, label: 'In Queue', color: Colors.orange),
+                const SizedBox(width: 12),
+                _StatCard(value: _sent, label: 'Sent', color: Colors.green),
+              ]),
+              const SizedBox(height: 32),
               FilledButton.icon(
                 onPressed: _trackEvent,
                 icon: const Icon(Icons.bar_chart),
@@ -1366,6 +1439,33 @@ class _HomePageState extends State<HomePage> {{
                 label: const Text('Track Screen'),
                 style: FilledButton.styleFrom(backgroundColor: Colors.purple),
               ),
+              const SizedBox(height: 24),
+              const Divider(),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Flush Mode',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  SegmentedButton<bool>(
+                    segments: const [
+                      ButtonSegment(value: false, label: Text('Auto')),
+                      ButtonSegment(value: true, label: Text('Manual')),
+                    ],
+                    selected: {{_isManualFlush}},
+                    onSelectionChanged: (s) => setState(() => _isManualFlush = s.first),
+                  ),
+                ],
+              ),
+              if (_isManualFlush) ...[
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: _inQueue > 0 ? _flush : null,
+                  icon: const Icon(Icons.upload),
+                  label: Text('Flush Now ($_inQueue queued)'),
+                ),
+              ],
+{toggle_section}
+              const SizedBox(height: 40),
             ],
           ),
         ),
@@ -1373,13 +1473,105 @@ class _HomePageState extends State<HomePage> {{
     );
   }}
 }}
+
+class _PluginRow extends StatelessWidget {{
+  final String name;
+  final bool enabled;
+  final ValueChanged<bool> onChanged;
+
+  const _PluginRow({{required this.name, required this.enabled, required this.onChanged}});
+
+  @override
+  Widget build(BuildContext context) {{
+    return InkWell(
+      onTap: () => onChanged(!enabled),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(children: [
+          Icon(
+            enabled ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+            color: enabled ? Colors.blue : Colors.grey,
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: Text(name, style: const TextStyle(fontSize: 15))),
+          Text(
+            'Available',
+            style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
+          ),
+        ]),
+      ),
+    );
+  }}
+}}
+
+class _StatCard extends StatelessWidget {{
+  final int value;
+  final String label;
+  final Color color;
+
+  const _StatCard({{required this.value, required this.label, required this.color}});
+
+  @override
+  Widget build(BuildContext context) {{
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(children: [
+          Text(
+            '$value',
+            style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: color),
+          ),
+          Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        ]),
+      ),
+    );
+  }}
+}}
 "#,
-        imports = imports,
-        write_key = write_key,
-        flush_policy = flush_policy,
+        plugin_imports = plugin_imports,
         plugin_adds = plugin_adds,
+        toggle_states = toggle_states,
+        debug_flag = debug_flag,
+        toggle_section = toggle_section,
     )
 }
+
+fn flutter_config_dart(write_key: &str) -> String {
+    format!(
+        r#"class Config {{
+  static const segmentWriteKey = '{write_key}';
+
+  static bool get isUsingDemoKey =>
+      segmentWriteKey.isEmpty ||
+      segmentWriteKey == 'demo_write_key_not_real' ||
+      segmentWriteKey == 'YOUR_WRITE_KEY_HERE';
+}}
+"#,
+        write_key = write_key,
+    )
+}
+
+const FLUTTER_CONSOLE_LOGGER_DART: &str = r#"import 'package:flutter/foundation.dart';
+import 'package:segment_analytics/event.dart';
+import 'package:segment_analytics/plugin.dart';
+
+class ConsoleLoggerPlugin extends Plugin {
+  ConsoleLoggerPlugin() : super(PluginType.enrichment);
+
+  @override
+  Future<RawEvent?> execute(RawEvent event) async {
+    final typeName = event.type.toString().split('.').last.toUpperCase();
+    final name = event is TrackEvent ? ' (${event.event})' : '';
+    debugPrint('[Segment] $typeName$name');
+    return event;
+  }
+}
+"#;
 
 fn generate_flutter_analysis_options() -> &'static str {
     r#"include: package:flutter_lints/flutter.yaml
@@ -1449,6 +1641,21 @@ fn generate_flutter_devbox_json(name: &str) -> String {
 "#,
         name = name
     )
+}
+
+fn patch_android_ndk(out: &PathBuf) {
+    let gradle_path = out.join("android/app/build.gradle.kts");
+    let Ok(content) = std::fs::read_to_string(&gradle_path) else {
+        return;
+    };
+    // Replace flutter.ndkVersion (resolves to 26.3) with the version plugins require
+    let patched = content.replace(
+        "ndkVersion = flutter.ndkVersion",
+        "ndkVersion = \"27.0.12077973\"",
+    );
+    if patched != content {
+        std::fs::write(&gradle_path, patched).ok();
+    }
 }
 
 fn init_flutter(
@@ -1526,8 +1733,13 @@ fn init_flutter(
     // Overwrite pubspec.yaml with our version (adds segment_analytics + plugins)
     write_file(&out, "pubspec.yaml", &generate_flutter_pubspec(&name, &org, &plugins));
 
+    // Patch android/app/build.gradle.kts to use NDK 27 (required by segment_analytics and friends)
+    patch_android_ndk(&out);
+
     // Overwrite lib/main.dart with our demo app
     write_file(&out, "lib/main.dart", &generate_flutter_main_dart(&name, &write_key, &plugins));
+    write_file(&out, "lib/config.dart", &flutter_config_dart(&write_key));
+    write_file(&out, "lib/console_logger_plugin.dart", FLUTTER_CONSOLE_LOGGER_DART);
 
     // analysis_options.yaml
     write_file(&out, "analysis_options.yaml", generate_flutter_analysis_options());
