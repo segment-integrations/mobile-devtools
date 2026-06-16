@@ -18,10 +18,10 @@ impl XCConfig {
             if trimmed.starts_with("//") || trimmed.is_empty() {
                 continue;
             }
-            if let Some((k, v)) = trimmed.split_once('=') {
-                if k.trim() == key {
-                    return Some(v.trim().to_string());
-                }
+            if let Some((k, v)) = trimmed.split_once('=')
+                && k.trim() == key
+            {
+                return Some(v.trim().to_string());
             }
         }
         None
@@ -33,22 +33,24 @@ impl XCConfig {
             if trimmed.starts_with("//") || trimmed.is_empty() {
                 continue;
             }
-            if let Some((k, _)) = trimmed.split_once('=') {
-                if k.trim() == key {
-                    *line = format!("{} = {}", key, value);
-                    return;
-                }
+            if let Some((k, _)) = trimmed.split_once('=')
+                && k.trim() == key
+            {
+                *line = format!("{} = {}", key, value);
+                return;
             }
         }
         // Key not found — append it
         self.lines.push(format!("{} = {}", key, value));
     }
+}
 
-    pub fn to_string(&self) -> String {
+impl std::fmt::Display for XCConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut out = self.lines.join("\n");
         if !out.ends_with('\n') {
             out.push('\n');
         }
-        out
+        f.write_str(&out)
     }
 }

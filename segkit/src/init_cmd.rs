@@ -665,10 +665,11 @@ fn prompt_plugins(already_selected: &[String]) -> Vec<String> {
                 "all" => selected.iter_mut().for_each(|s| *s = true),
                 "none" => selected.iter_mut().for_each(|s| *s = false),
                 _ => {
-                    if let Ok(n) = token.parse::<usize>() {
-                        if n >= 1 && n <= PLUGIN_REGISTRY.len() {
-                            selected[n - 1] = !selected[n - 1];
-                        }
+                    if let Ok(n) = token.parse::<usize>()
+                        && n >= 1
+                        && n <= PLUGIN_REGISTRY.len()
+                    {
+                        selected[n - 1] = !selected[n - 1];
                     }
                 }
             }
