@@ -691,15 +691,22 @@ pub fn run(
 
     let sdk = sdk.unwrap_or_else(|| {
         if interactive {
-            prompt("SDK template (swift)", "swift")
+            prompt("SDK template (swift, flutter)", "swift")
         } else {
             err("--sdk is required in non-interactive mode");
             std::process::exit(1);
         }
     });
 
+    if sdk == "flutter" {
+        let name = name.unwrap_or_else(|| prompt("Project name", "segment_demo"));
+        let org = org.unwrap_or_else(|| prompt("Organization identifier", "com.example"));
+        let write_key = write_key.unwrap_or_else(|| prompt("Segment write key", "demo_write_key_not_real"));
+        return init_flutter(name, org, write_key, plugin_names, needs_wizard);
+    }
+
     if sdk != "swift" {
-        err(&format!("Unknown SDK: {sdk}. Only 'swift' is supported."));
+        err(&format!("Unknown SDK: {sdk}. Supported: swift, flutter."));
         return ExitCode::FAILURE;
     }
 
@@ -1288,3 +1295,336 @@ zip -r "$ARCHIVE_NAME" . \
 
 echo "Created: $ARCHIVE_NAME"
 "#;
+
+// ============================================================================
+// Flutter support
+// ============================================================================
+
+const FLUTTER_MAIN_DART: &str = include_str!("templates/flutter/lib/main.dart");
+const FLUTTER_CONFIG_DART: &str = include_str!("templates/flutter/lib/config.dart");
+const FLUTTER_CONSOLE_LOGGER_DART: &str = include_str!("templates/flutter/lib/console_logger_plugin.dart");
+const FLUTTER_PUBSPEC_YAML: &str = include_str!("templates/flutter/pubspec.yaml");
+const FLUTTER_ANALYSIS_OPTIONS: &str = include_str!("templates/flutter/analysis_options.yaml");
+const FLUTTER_GITIGNORE: &str = include_str!("templates/flutter/.gitignore");
+const FLUTTER_DEVBOX_JSON: &str = include_str!("templates/flutter/devbox.json");
+const FLUTTER_ANDROID_DEVICE_MAX_JSON: &str = include_str!("templates/flutter/devbox.d/android/devices/max.json");
+const FLUTTER_ANDROID_DEVICE_MIN_JSON: &str = include_str!("templates/flutter/devbox.d/android/devices/min.json");
+const FLUTTER_IOS_DEVICE_MAX_JSON: &str = include_str!("templates/flutter/devbox.d/ios/devices/max.json");
+const FLUTTER_IOS_DEVICE_MIN_JSON: &str = include_str!("templates/flutter/devbox.d/ios/devices/min.json");
+
+struct FlutterPlugin {
+    key: &'static str,
+    package_name: &'static str,
+    min_version: &'static str,
+    import_name: &'static str,
+    class_name: &'static str,
+}
+
+const FLUTTER_PLUGIN_REGISTRY: &[FlutterPlugin] = &[
+    FlutterPlugin {
+        key: "amplitude",
+        package_name: "segment_analytics_plugin_amplitude",
+        min_version: "1.0.0",
+        import_name: "plugin_amplitude",
+        class_name: "amplitudeDestination",
+    },
+    FlutterPlugin {
+        key: "appsflyer",
+        package_name: "segment_analytics_plugin_appsflyer",
+        min_version: "1.0.2",
+        import_name: "plugin_appsflyer",
+        class_name: "AppsFlyerDestination",
+    },
+];
+
+fn capitalize(s: &str) -> String {
+    let mut c = s.chars();
+    match c.next() {
+        None => String::new(),
+        Some(f) => f.to_uppercase().to_string() + c.as_str(),
+    }
+}
+
+fn resolve_flutter_plugins(requested: &[String]) -> Result<Vec<&'static FlutterPlugin>, String> {
+    let mut resolved = Vec::new();
+    for name in requested {
+        let lower = name.to_lowercase();
+        match FLUTTER_PLUGIN_REGISTRY.iter().find(|p| p.key == lower) {
+            Some(p) => resolved.push(p),
+            None => {
+                let available: Vec<_> = FLUTTER_PLUGIN_REGISTRY.iter().map(|p| p.key).collect();
+                return Err(format!(
+                    "Unknown Flutter plugin '{name}'. Available: {}",
+                    available.join(", ")
+                ));
+            }
+        }
+    }
+    resolved.dedup_by_key(|p| p.key);
+    Ok(resolved)
+}
+
+fn is_valid_dart_package_name(name: &str) -> bool {
+    if name.is_empty() {
+        return false;
+    }
+    let mut chars = name.chars();
+    match chars.next() {
+        Some(c) if c.is_ascii_lowercase() || c == '_' => {}
+        _ => return false,
+    }
+    chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+}
+
+fn prompt_flutter_plugins(already_selected: &[String]) -> Vec<String> {
+    if !io::stdin().is_terminal() {
+        return already_selected.to_vec();
+    }
+
+    let mut selected: Vec<bool> = FLUTTER_PLUGIN_REGISTRY
+        .iter()
+        .map(|p| already_selected.iter().any(|s| s.to_lowercase() == p.key))
+        .collect();
+
+    loop {
+        eprintln!();
+        eprintln!("Select destination plugins (enter numbers to toggle, Enter to confirm):");
+        for (i, plugin) in FLUTTER_PLUGIN_REGISTRY.iter().enumerate() {
+            let marker = if selected[i] { "[x]" } else { "[ ]" };
+            eprintln!("  {}) {} {}", i + 1, marker, plugin.key);
+        }
+        eprint!("> ");
+        io::stderr().flush().ok();
+
+        let mut line = String::new();
+        if io::stdin().lock().read_line(&mut line).is_err() {
+            break;
+        }
+        let trimmed = line.trim();
+        if trimmed.is_empty() {
+            break;
+        }
+        for token in trimmed.split_whitespace() {
+            if let Ok(n) = token.parse::<usize>() {
+                if n >= 1 && n <= FLUTTER_PLUGIN_REGISTRY.len() {
+                    selected[n - 1] = !selected[n - 1];
+                }
+            }
+        }
+    }
+
+    FLUTTER_PLUGIN_REGISTRY
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| selected[*i])
+        .map(|(_, p)| p.key.to_string())
+        .collect()
+}
+
+fn ensure_flutter() -> bool {
+    if which::which("flutter").is_ok() {
+        return true;
+    }
+    err("flutter not found in PATH. Install Flutter from https://docs.flutter.dev/get-started/install and ensure it is on your PATH.");
+    false
+}
+
+fn apply_flutter(template: &str, name: &str, write_key: &str) -> String {
+    template
+        .replace("__NAME__", name)
+        .replace("__WRITE_KEY__", write_key)
+}
+
+fn generate_flutter_pubspec(name: &str, plugins: &[&FlutterPlugin]) -> String {
+    let mut plugin_deps = String::new();
+    for p in plugins {
+        plugin_deps.push_str(&format!("  {}: ^{}\n", p.package_name, p.min_version));
+    }
+    FLUTTER_PUBSPEC_YAML
+        .replace("__NAME__", name)
+        .replace("__PLUGIN_DEPS__", &plugin_deps)
+}
+
+fn generate_flutter_main_dart(write_key: &str, plugins: &[&FlutterPlugin]) -> String {
+    let mut plugin_imports = String::new();
+    for p in plugins {
+        plugin_imports.push_str(&format!(
+            "import 'package:{}/{}.dart';\n",
+            p.package_name, p.import_name
+        ));
+    }
+
+    let mut plugin_adds = String::new();
+    for p in plugins {
+        plugin_adds.push_str(&format!("  analytics.addPlugin({}());\n", p.class_name));
+    }
+
+    let mut toggle_states = String::new();
+    for p in plugins {
+        toggle_states.push_str(&format!(
+            "  bool _{key}Enabled = false;\n  Plugin? _{key}Plugin;\n",
+            key = p.key
+        ));
+    }
+
+    let mut plugin_rows = String::new();
+    for p in plugins {
+        let display = capitalize(p.key);
+        plugin_rows.push_str(&format!(
+            "              _PluginRow(\n\
+             \x20               name: '{display}',\n\
+             \x20               enabled: _{key}Enabled,\n\
+             \x20               onChanged: (v) {{\n\
+             \x20                 setState(() => _{key}Enabled = v);\n\
+             \x20                 if (v) {{\n\
+             \x20                   _{key}Plugin = {constructor}();\n\
+             \x20                   analytics.addPlugin(_{key}Plugin!);\n\
+             \x20                   debugPrint('{display} destination enabled');\n\
+             \x20                 }} else {{\n\
+             \x20                   if (_{key}Plugin != null) {{\n\
+             \x20                     analytics.removePlugin(_{key}Plugin!);\n\
+             \x20                     _{key}Plugin = null;\n\
+             \x20                   }}\n\
+             \x20                   debugPrint('{display} destination disabled');\n\
+             \x20                 }}\n\
+             \x20               }},\n\
+             \x20             ),\n",
+            key = p.key,
+            display = display,
+            constructor = p.class_name,
+        ));
+    }
+
+    let toggle_section = if plugins.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "\n              const Divider(),\n\
+             \x20             const SizedBox(height: 8),\n\
+             \x20             const Align(\n\
+             \x20               alignment: Alignment.centerLeft,\n\
+             \x20               child: Text('Destination Plugins',\n\
+             \x20                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),\n\
+             \x20             ),\n\
+             {plugin_rows}",
+            plugin_rows = plugin_rows,
+        )
+    };
+
+    let debug_flag = if write_key == "demo_write_key_not_real" { "debug: true" } else { "debug: false" };
+
+    FLUTTER_MAIN_DART
+        .replace("__PLUGIN_IMPORTS__", &plugin_imports)
+        .replace("__PLUGIN_ADDS__", &plugin_adds)
+        .replace("__TOGGLE_STATES__", &toggle_states)
+        .replace("__TOGGLE_SECTION__", &toggle_section)
+        .replace("__DEBUG_FLAG__", debug_flag)
+}
+
+fn patch_android_ndk(out: &PathBuf) {
+    let gradle_path = out.join("android/app/build.gradle.kts");
+    let Ok(content) = std::fs::read_to_string(&gradle_path) else {
+        return;
+    };
+    let patched = content.replace(
+        "ndkVersion = flutter.ndkVersion",
+        "ndkVersion = \"27.0.12077973\"",
+    );
+    if patched != content {
+        std::fs::write(&gradle_path, patched).ok();
+    }
+}
+
+fn init_flutter(
+    name: String,
+    org: String,
+    write_key: String,
+    plugin_names: Vec<String>,
+    needs_wizard: bool,
+) -> ExitCode {
+    if !is_valid_dart_package_name(&name) {
+        err(&format!(
+            "Project name '{name}' is not a valid Dart package name. \
+             Use only lowercase letters, digits, and underscores (e.g. segment_demo, my_app)."
+        ));
+        return ExitCode::FAILURE;
+    }
+
+    let plugin_names = if needs_wizard && plugin_names.is_empty() {
+        prompt_flutter_plugins(&plugin_names)
+    } else {
+        plugin_names
+    };
+
+    let plugins = match resolve_flutter_plugins(&plugin_names) {
+        Ok(p) => p,
+        Err(e) => {
+            err(&e);
+            return ExitCode::FAILURE;
+        }
+    };
+
+    if !plugins.is_empty() {
+        let names: Vec<_> = plugins.iter().map(|p| p.key).collect();
+        info(&format!("Plugins: {}", names.join(", ")));
+    }
+
+    let out = PathBuf::from(&name);
+    if out.exists() {
+        err(&format!("Directory '{}' already exists.", out.display()));
+        return ExitCode::FAILURE;
+    }
+
+    if !ensure_flutter() {
+        return ExitCode::FAILURE;
+    }
+
+    info(&format!("Creating {name} from flutter template..."));
+
+    let status = Command::new("flutter")
+        .args(["create", "--org", &org, "--project-name", &name, "--platforms", "android,ios", &name])
+        .status();
+
+    match status {
+        Ok(s) if s.success() => {}
+        Ok(s) => {
+            err(&format!("flutter create exited with code {}", s.code().unwrap_or(-1)));
+            return ExitCode::FAILURE;
+        }
+        Err(e) => {
+            err(&format!("Failed to run flutter create: {e}"));
+            return ExitCode::FAILURE;
+        }
+    }
+
+    write_file(&out, "pubspec.yaml", &generate_flutter_pubspec(&name, &plugins));
+    patch_android_ndk(&out);
+    write_file(&out, "lib/main.dart", &generate_flutter_main_dart(&write_key, &plugins));
+    write_file(&out, "lib/config.dart", &apply_flutter(FLUTTER_CONFIG_DART, &name, &write_key));
+    write_file(&out, "lib/console_logger_plugin.dart", FLUTTER_CONSOLE_LOGGER_DART);
+    write_file(&out, "analysis_options.yaml", FLUTTER_ANALYSIS_OPTIONS);
+    write_file(&out, ".gitignore", FLUTTER_GITIGNORE);
+    write_file(&out, "devbox.json", &apply_flutter(FLUTTER_DEVBOX_JSON, &name, &write_key));
+    write_file(&out, "devbox.d/android/devices/max.json", FLUTTER_ANDROID_DEVICE_MAX_JSON);
+    write_file(&out, "devbox.d/android/devices/min.json", FLUTTER_ANDROID_DEVICE_MIN_JSON);
+    write_file(&out, "devbox.d/ios/devices/max.json", FLUTTER_IOS_DEVICE_MAX_JSON);
+    write_file(&out, "devbox.d/ios/devices/min.json", FLUTTER_IOS_DEVICE_MIN_JSON);
+
+    info("Running doctor --fix to ensure dependencies are installed...");
+    let doctor_result = doctor::run(true);
+    if doctor_result != ExitCode::SUCCESS {
+        err("doctor --fix reported issues; the project was still created.");
+    }
+
+    info("Done!");
+    eprintln!();
+    eprintln!("  cd {name}");
+    eprintln!("  devbox shell");
+    eprintln!("  devbox run build:android   # or build:ios");
+    eprintln!("  devbox run start:emu       # start Android emulator");
+    eprintln!("  devbox run start:app:android");
+    eprintln!();
+
+    ExitCode::SUCCESS
+}
+
