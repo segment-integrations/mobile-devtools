@@ -1,0 +1,44 @@
+{
+  "include": [
+    "github:segment-integrations/mobile-devtools?dir=plugins/android&ref=main",
+    "github:segment-integrations/mobile-devtools?dir=plugins/ios&ref=main"
+  ],
+  "packages": {
+    "process-compose": "latest"
+  },
+  "env": {
+    "ANDROID_APP_APK": "build/app/outputs/flutter-apk/app-debug.apk",
+    "IOS_APP_ARTIFACT": "build/ios/iphonesimulator/__NAME__.app"
+  },
+  "shell": {
+    "scripts": {
+      "build:android": [
+        "flutter build apk --debug"
+      ],
+      "build:ios": [
+        "flutter build ios --debug --simulator"
+      ],
+      "start:emu": [
+        "android.sh emulator start ${1:-}"
+      ],
+      "start:sim": [
+        "ios.sh simulator start ${1:-}"
+      ],
+      "start:app:android": [
+        "android.sh deploy && flutter run --no-pub"
+      ],
+      "start:app:ios": [
+        "ios.sh run ${1:-}"
+      ],
+      "stop:emu": [
+        "android.sh emulator stop"
+      ],
+      "stop:sim": [
+        "ios.sh simulator stop"
+      ],
+      "test": [
+        "flutter test"
+      ]
+    }
+  }
+}

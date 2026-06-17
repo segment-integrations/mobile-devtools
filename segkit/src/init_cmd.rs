@@ -1300,6 +1300,18 @@ echo "Created: $ARCHIVE_NAME"
 // Flutter support
 // ============================================================================
 
+const FLUTTER_MAIN_DART: &str = include_str!("templates/flutter/lib/main.dart");
+const FLUTTER_CONFIG_DART: &str = include_str!("templates/flutter/lib/config.dart");
+const FLUTTER_CONSOLE_LOGGER_DART: &str = include_str!("templates/flutter/lib/console_logger_plugin.dart");
+const FLUTTER_PUBSPEC_YAML: &str = include_str!("templates/flutter/pubspec.yaml");
+const FLUTTER_ANALYSIS_OPTIONS: &str = include_str!("templates/flutter/analysis_options.yaml");
+const FLUTTER_GITIGNORE: &str = include_str!("templates/flutter/.gitignore");
+const FLUTTER_DEVBOX_JSON: &str = include_str!("templates/flutter/devbox.json");
+const FLUTTER_ANDROID_DEVICE_MAX_JSON: &str = include_str!("templates/flutter/devbox.d/android/devices/max.json");
+const FLUTTER_ANDROID_DEVICE_MIN_JSON: &str = include_str!("templates/flutter/devbox.d/android/devices/min.json");
+const FLUTTER_IOS_DEVICE_MAX_JSON: &str = include_str!("templates/flutter/devbox.d/ios/devices/max.json");
+const FLUTTER_IOS_DEVICE_MIN_JSON: &str = include_str!("templates/flutter/devbox.d/ios/devices/min.json");
+
 struct FlutterPlugin {
     key: &'static str,
     package_name: &'static str,
@@ -1417,38 +1429,23 @@ fn ensure_flutter() -> bool {
     false
 }
 
-fn generate_flutter_pubspec(name: &str, _org: &str, plugins: &[&FlutterPlugin]) -> String {
-    let mut deps = String::from("  segment_analytics: ^1.1.11\n");
-    for p in plugins {
-        deps.push_str(&format!("  {}: ^{}\n", p.package_name, p.min_version));
-    }
-    format!(
-        r#"name: {name}
-description: A Flutter demo app with Segment Analytics.
-publish_to: 'none'
-version: 1.0.0+1
-
-environment:
-  sdk: '>=3.0.0 <4.0.0'
-
-dependencies:
-  flutter:
-    sdk: flutter
-{deps}
-dev_dependencies:
-  flutter_test:
-    sdk: flutter
-  flutter_lints: ^3.0.0
-
-flutter:
-  uses-material-design: true
-"#,
-        name = name,
-        deps = deps,
-    )
+fn apply_flutter(template: &str, name: &str, write_key: &str) -> String {
+    template
+        .replace("__NAME__", name)
+        .replace("__WRITE_KEY__", write_key)
 }
 
-fn generate_flutter_main_dart(_name: &str, write_key: &str, plugins: &[&FlutterPlugin]) -> String {
+fn generate_flutter_pubspec(name: &str, plugins: &[&FlutterPlugin]) -> String {
+    let mut plugin_deps = String::new();
+    for p in plugins {
+        plugin_deps.push_str(&format!("  {}: ^{}\n", p.package_name, p.min_version));
+    }
+    FLUTTER_PUBSPEC_YAML
+        .replace("__NAME__", name)
+        .replace("__PLUGIN_DEPS__", &plugin_deps)
+}
+
+fn generate_flutter_main_dart(write_key: &str, plugins: &[&FlutterPlugin]) -> String {
     let mut plugin_imports = String::new();
     for p in plugins {
         plugin_imports.push_str(&format!(
@@ -1474,25 +1471,24 @@ fn generate_flutter_main_dart(_name: &str, write_key: &str, plugins: &[&FlutterP
     for p in plugins {
         let display = capitalize(p.key);
         plugin_rows.push_str(&format!(
-            r#"              _PluginRow(
-                name: '{display}',
-                enabled: _{key}Enabled,
-                onChanged: (v) {{
-                  setState(() => _{key}Enabled = v);
-                  if (v) {{
-                    _{key}Plugin = {constructor}();
-                    analytics.addPlugin(_{key}Plugin!);
-                    debugPrint('{display} destination enabled');
-                  }} else {{
-                    if (_{key}Plugin != null) {{
-                      analytics.removePlugin(_{key}Plugin!);
-                      _{key}Plugin = null;
-                    }}
-                    debugPrint('{display} destination disabled');
-                  }}
-                }},
-              ),
-"#,
+            "              _PluginRow(\n\
+             \x20               name: '{display}',\n\
+             \x20               enabled: _{key}Enabled,\n\
+             \x20               onChanged: (v) {{\n\
+             \x20                 setState(() => _{key}Enabled = v);\n\
+             \x20                 if (v) {{\n\
+             \x20                   _{key}Plugin = {constructor}();\n\
+             \x20                   analytics.addPlugin(_{key}Plugin!);\n\
+             \x20                   debugPrint('{display} destination enabled');\n\
+             \x20                 }} else {{\n\
+             \x20                   if (_{key}Plugin != null) {{\n\
+             \x20                     analytics.removePlugin(_{key}Plugin!);\n\
+             \x20                     _{key}Plugin = null;\n\
+             \x20                   }}\n\
+             \x20                   debugPrint('{display} destination disabled');\n\
+             \x20                 }}\n\
+             \x20               }},\n\
+             \x20             ),\n",
             key = p.key,
             display = display,
             constructor = p.class_name,
@@ -1503,393 +1499,26 @@ fn generate_flutter_main_dart(_name: &str, write_key: &str, plugins: &[&FlutterP
         String::new()
     } else {
         format!(
-            r#"
-              const Divider(),
-              const SizedBox(height: 8),
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Destination Plugins',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              ),
-{plugin_rows}"#,
+            "\n              const Divider(),\n\
+             \x20             const SizedBox(height: 8),\n\
+             \x20             const Align(\n\
+             \x20               alignment: Alignment.centerLeft,\n\
+             \x20               child: Text('Destination Plugins',\n\
+             \x20                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),\n\
+             \x20             ),\n\
+             {plugin_rows}",
             plugin_rows = plugin_rows,
         )
     };
 
     let debug_flag = if write_key == "demo_write_key_not_real" { "debug: true" } else { "debug: false" };
 
-    format!(
-        r#"import 'package:flutter/material.dart';
-import 'package:segment_analytics/analytics.dart';
-import 'package:segment_analytics/client.dart';
-import 'package:segment_analytics/state.dart';
-import 'config.dart';
-import 'console_logger_plugin.dart';
-{plugin_imports}
-late Analytics analytics;
-
-void main() {{
-  WidgetsFlutterBinding.ensureInitialized();
-
-  analytics = createClient(Configuration(Config.segmentWriteKey, {debug_flag}));
-  analytics.addPlugin(ConsoleLoggerPlugin());
-{plugin_adds}
-  debugPrint('Segment Analytics initialized');
-  debugPrint('  Write Key: ${{Config.segmentWriteKey}}');
-  debugPrint('  Mode: ${{Config.isUsingDemoKey ? "Demo (events queued locally)" : "Live (sending to Segment)"}}');
-
-  runApp(const MyApp());
-}}
-
-class MyApp extends StatelessWidget {{
-  const MyApp({{super.key}});
-
-  @override
-  Widget build(BuildContext context) {{
-    return MaterialApp(
-      title: 'Segment Flutter Demo',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
-      ),
-      home: const HomePage(),
-    );
-  }}
-}}
-
-class HomePage extends StatefulWidget {{
-  const HomePage({{super.key}});
-
-  @override
-  State<HomePage> createState() => _HomePageState();
-}}
-
-class _HomePageState extends State<HomePage> {{
-  int _tracked = 0;
-  int _inQueue = 0;
-  int _sent = 0;
-  bool _isManualFlush = false;
-{toggle_states}
-  void _record() {{
-    setState(() {{
-      _tracked++;
-      if (_isManualFlush) {{
-        _inQueue++;
-      }} else {{
-        _sent++;
-      }}
-    }});
-  }}
-
-  void _flush() {{
-    analytics.flush();
-    setState(() {{
-      _sent += _inQueue;
-      _inQueue = 0;
-    }});
-  }}
-
-  void _trackEvent() {{
-    _record();
-    analytics.track('Button Pressed', properties: {{
-      'button': 'Track Event',
-      'count': _tracked,
-      'timestamp': DateTime.now().toIso8601String(),
-    }});
-  }}
-
-  void _identifyUser() {{
-    _record();
-    analytics.identify(userId: 'demo-user');
-  }}
-
-  void _trackScreen() {{
-    _record();
-    analytics.screen('Demo Screen', properties: {{
-      'screen_name': 'HomePage',
-      'view_count': _tracked,
-    }});
-  }}
-
-  @override
-  Widget build(BuildContext context) {{
-    return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 40),
-              const Icon(Icons.show_chart, size: 60, color: Colors.blue),
-              const SizedBox(height: 8),
-              const Text(
-                'Segment Flutter Demo',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              const Text(
-                'Analytics Flutter SDK',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-              const SizedBox(height: 16),
-              if (Config.isUsingDemoKey)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.shade50,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.orange.shade200),
-                  ),
-                  child: Row(children: [
-                    Icon(Icons.info_outline, color: Colors.orange.shade700, size: 18),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Demo mode',
-                        style: TextStyle(color: Colors.orange.shade700, fontWeight: FontWeight.w500),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () => setState(() {{}}),
-                      child: Text(
-                        'Recheck',
-                        style: TextStyle(color: Colors.blue.shade600, fontWeight: FontWeight.w500),
-                      ),
-                    ),
-                  ]),
-                ),
-              const SizedBox(height: 16),
-              Row(children: [
-                _StatCard(value: _tracked, label: 'Tracked', color: Colors.blue),
-                const SizedBox(width: 12),
-                _StatCard(value: _inQueue, label: 'In Queue', color: Colors.orange),
-                const SizedBox(width: 12),
-                _StatCard(value: _sent, label: 'Sent', color: Colors.green),
-              ]),
-              const SizedBox(height: 32),
-              FilledButton.icon(
-                onPressed: _trackEvent,
-                icon: const Icon(Icons.bar_chart),
-                label: const Text('Track Event'),
-              ),
-              const SizedBox(height: 12),
-              FilledButton.icon(
-                onPressed: _identifyUser,
-                icon: const Icon(Icons.person),
-                label: const Text('Identify User'),
-                style: FilledButton.styleFrom(backgroundColor: Colors.green),
-              ),
-              const SizedBox(height: 12),
-              FilledButton.icon(
-                onPressed: _trackScreen,
-                icon: const Icon(Icons.phone_iphone),
-                label: const Text('Track Screen'),
-                style: FilledButton.styleFrom(backgroundColor: Colors.purple),
-              ),
-              const SizedBox(height: 24),
-              const Divider(),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Flush Mode',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                  SegmentedButton<bool>(
-                    segments: const [
-                      ButtonSegment(value: false, label: Text('Auto')),
-                      ButtonSegment(value: true, label: Text('Manual')),
-                    ],
-                    selected: {{_isManualFlush}},
-                    onSelectionChanged: (s) => setState(() => _isManualFlush = s.first),
-                  ),
-                ],
-              ),
-              if (_isManualFlush) ...[
-                const SizedBox(height: 8),
-                OutlinedButton.icon(
-                  onPressed: _inQueue > 0 ? _flush : null,
-                  icon: const Icon(Icons.upload),
-                  label: Text('Flush Now ($_inQueue queued)'),
-                ),
-              ],
-{toggle_section}
-              const SizedBox(height: 40),
-            ],
-          ),
-        ),
-      ),
-    );
-  }}
-}}
-
-class _PluginRow extends StatelessWidget {{
-  final String name;
-  final bool enabled;
-  final ValueChanged<bool> onChanged;
-
-  const _PluginRow({{required this.name, required this.enabled, required this.onChanged}});
-
-  @override
-  Widget build(BuildContext context) {{
-    return InkWell(
-      onTap: () => onChanged(!enabled),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Row(children: [
-          Icon(
-            enabled ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-            color: enabled ? Colors.blue : Colors.grey,
-            size: 20,
-          ),
-          const SizedBox(width: 12),
-          Expanded(child: Text(name, style: const TextStyle(fontSize: 15))),
-          Text(
-            'Available',
-            style: TextStyle(fontSize: 13, color: Colors.grey.shade500),
-          ),
-        ]),
-      ),
-    );
-  }}
-}}
-
-class _StatCard extends StatelessWidget {{
-  final int value;
-  final String label;
-  final Color color;
-
-  const _StatCard({{required this.value, required this.label, required this.color}});
-
-  @override
-  Widget build(BuildContext context) {{
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(children: [
-          Text(
-            '$value',
-            style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: color),
-          ),
-          Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-        ]),
-      ),
-    );
-  }}
-}}
-"#,
-        plugin_imports = plugin_imports,
-        plugin_adds = plugin_adds,
-        toggle_states = toggle_states,
-        debug_flag = debug_flag,
-        toggle_section = toggle_section,
-    )
-}
-
-fn flutter_config_dart(write_key: &str) -> String {
-    format!(
-        r#"class Config {{
-  static const segmentWriteKey = '{write_key}';
-
-  static bool get isUsingDemoKey =>
-      segmentWriteKey.isEmpty ||
-      segmentWriteKey == 'demo_write_key_not_real' ||
-      segmentWriteKey == 'YOUR_WRITE_KEY_HERE';
-}}
-"#,
-        write_key = write_key,
-    )
-}
-
-const FLUTTER_CONSOLE_LOGGER_DART: &str = r#"import 'package:flutter/foundation.dart';
-import 'package:segment_analytics/event.dart';
-import 'package:segment_analytics/plugin.dart';
-
-class ConsoleLoggerPlugin extends Plugin {
-  ConsoleLoggerPlugin() : super(PluginType.enrichment);
-
-  @override
-  Future<RawEvent?> execute(RawEvent event) async {
-    final typeName = event.type.toString().split('.').last.toUpperCase();
-    final name = event is TrackEvent ? ' (${event.event})' : '';
-    debugPrint('[Segment] $typeName$name');
-    return event;
-  }
-}
-"#;
-
-fn generate_flutter_analysis_options() -> &'static str {
-    r#"include: package:flutter_lints/flutter.yaml
-"#
-}
-
-fn generate_flutter_gitignore() -> &'static str {
-    r#"# Flutter
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-.packages
-build/
-*.iml
-
-# Devbox
-.devbox/
-"#
-}
-
-fn generate_flutter_devbox_json(name: &str) -> String {
-    format!(
-        r#"{{
-  "include": [
-    "github:segment-integrations/mobile-devtools?dir=plugins/android&ref=main",
-    "github:segment-integrations/mobile-devtools?dir=plugins/ios&ref=main"
-  ],
-  "packages": {{
-    "process-compose": "latest"
-  }},
-  "env": {{
-    "ANDROID_APP_APK": "build/app/outputs/flutter-apk/app-debug.apk",
-    "IOS_APP_ARTIFACT": "build/ios/iphonesimulator/{name}.app"
-  }},
-  "shell": {{
-    "scripts": {{
-      "build:android": [
-        "flutter build apk --debug"
-      ],
-      "build:ios": [
-        "flutter build ios --debug --simulator"
-      ],
-      "start:emu": [
-        "android.sh emulator start ${{1:-}}"
-      ],
-      "start:sim": [
-        "ios.sh simulator start ${{1:-}}"
-      ],
-      "start:app:android": [
-        "android.sh deploy && flutter run --no-pub"
-      ],
-      "start:app:ios": [
-        "ios.sh run ${{1:-}}"
-      ],
-      "stop:emu": [
-        "android.sh emulator stop"
-      ],
-      "stop:sim": [
-        "ios.sh simulator stop"
-      ],
-      "test": [
-        "flutter test"
-      ]
-    }}
-  }}
-}}
-"#,
-        name = name
-    )
+    FLUTTER_MAIN_DART
+        .replace("__PLUGIN_IMPORTS__", &plugin_imports)
+        .replace("__PLUGIN_ADDS__", &plugin_adds)
+        .replace("__TOGGLE_STATES__", &toggle_states)
+        .replace("__TOGGLE_SECTION__", &toggle_section)
+        .replace("__DEBUG_FLAG__", debug_flag)
 }
 
 fn patch_android_ndk(out: &PathBuf) {
@@ -1968,18 +1597,18 @@ fn init_flutter(
         }
     }
 
-    write_file(&out, "pubspec.yaml", &generate_flutter_pubspec(&name, &org, &plugins));
+    write_file(&out, "pubspec.yaml", &generate_flutter_pubspec(&name, &plugins));
     patch_android_ndk(&out);
-    write_file(&out, "lib/main.dart", &generate_flutter_main_dart(&name, &write_key, &plugins));
-    write_file(&out, "lib/config.dart", &flutter_config_dart(&write_key));
+    write_file(&out, "lib/main.dart", &generate_flutter_main_dart(&write_key, &plugins));
+    write_file(&out, "lib/config.dart", &apply_flutter(FLUTTER_CONFIG_DART, &name, &write_key));
     write_file(&out, "lib/console_logger_plugin.dart", FLUTTER_CONSOLE_LOGGER_DART);
-    write_file(&out, "analysis_options.yaml", generate_flutter_analysis_options());
-    write_file(&out, ".gitignore", generate_flutter_gitignore());
-    write_file(&out, "devbox.json", &generate_flutter_devbox_json(&name));
+    write_file(&out, "analysis_options.yaml", FLUTTER_ANALYSIS_OPTIONS);
+    write_file(&out, ".gitignore", FLUTTER_GITIGNORE);
+    write_file(&out, "devbox.json", &apply_flutter(FLUTTER_DEVBOX_JSON, &name, &write_key));
     write_file(&out, "devbox.d/android/devices/max.json", FLUTTER_ANDROID_DEVICE_MAX_JSON);
     write_file(&out, "devbox.d/android/devices/min.json", FLUTTER_ANDROID_DEVICE_MIN_JSON);
-    write_file(&out, "devbox.d/ios/devices/max.json", DEVICE_MAX_JSON);
-    write_file(&out, "devbox.d/ios/devices/min.json", DEVICE_MIN_JSON);
+    write_file(&out, "devbox.d/ios/devices/max.json", FLUTTER_IOS_DEVICE_MAX_JSON);
+    write_file(&out, "devbox.d/ios/devices/min.json", FLUTTER_IOS_DEVICE_MIN_JSON);
 
     info("Running doctor --fix to ensure dependencies are installed...");
     let doctor_result = doctor::run(true);
@@ -1999,20 +1628,3 @@ fn init_flutter(
     ExitCode::SUCCESS
 }
 
-const FLUTTER_ANDROID_DEVICE_MAX_JSON: &str = r#"{
-  "name": "pixel_9",
-  "api": 36,
-  "device": "pixel_9",
-  "tag": "google_apis",
-  "preferred_abi": "x86_64"
-}
-"#;
-
-const FLUTTER_ANDROID_DEVICE_MIN_JSON: &str = r#"{
-  "name": "pixel_6",
-  "api": 28,
-  "device": "pixel_6",
-  "tag": "google_apis",
-  "preferred_abi": "x86_64"
-}
-"#;
