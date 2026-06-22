@@ -244,10 +244,11 @@ fn prompt_selection(installed: &[&DoctorDep]) -> Vec<String> {
     let mut selected = Vec::new();
     for part in input.split([',', ' ']) {
         let part = part.trim();
-        if let Ok(n) = part.parse::<usize>() {
-            if n >= 1 && n <= installed.len() {
-                selected.push(installed[n - 1].name.to_string());
-            }
+        if let Ok(n) = part.parse::<usize>()
+            && n >= 1
+            && n <= installed.len()
+        {
+            selected.push(installed[n - 1].name.to_string());
         }
     }
     selected

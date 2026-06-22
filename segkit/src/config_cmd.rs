@@ -3,7 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use crate::init_cmd::{validate_plugin_names, PLUGIN_REGISTRY};
+use crate::init_cmd::{PLUGIN_REGISTRY, validate_plugin_names};
 use crate::util::log::{err, info};
 use crate::util::project::find_file;
 use crate::util::xcconfig::XCConfig;
@@ -50,7 +50,9 @@ fn apply_plugin_changes(
 
     // Start from --plugins (replace) or current value
     let mut current = if let Some(list) = plugins {
-        list.iter().map(|s| s.to_lowercase()).collect::<BTreeSet<String>>()
+        list.iter()
+            .map(|s| s.to_lowercase())
+            .collect::<BTreeSet<String>>()
     } else {
         let raw = config.get("ENABLED_PLUGINS").unwrap_or_default();
         parse_plugin_csv(&raw)
@@ -77,7 +79,14 @@ pub fn run_show() -> ExitCode {
 
     eprintln!("Config: {}", config_path.display());
     eprintln!();
-    eprintln!("  Write Key: {}", if write_key.is_empty() { "(not set)" } else { &write_key });
+    eprintln!(
+        "  Write Key: {}",
+        if write_key.is_empty() {
+            "(not set)"
+        } else {
+            &write_key
+        }
+    );
     eprintln!();
     eprintln!("  Plugins:");
     for p in PLUGIN_REGISTRY {
@@ -113,7 +122,10 @@ pub fn run_set(
             }
         };
         config.set("ENABLED_PLUGINS", &csv);
-        info(&format!("Enabled plugins: {}", if csv.is_empty() { "(none)" } else { &csv }));
+        info(&format!(
+            "Enabled plugins: {}",
+            if csv.is_empty() { "(none)" } else { &csv }
+        ));
     }
 
     if let Err(e) = fs::write(&config_path, config.to_string()) {

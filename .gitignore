@@ -33,6 +33,7 @@ examples/*/reports/
 examples/*/test-results/
 plugins/*/tests/reports/
 plugins/*/tests/test-results/
+segkit/reports/
 notes/
 
 # AI-generated artifacts (don't commit these)
